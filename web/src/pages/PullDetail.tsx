@@ -76,6 +76,13 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
   const [mergeStyle, setMergeStyle] = useState<'merge' | 'squash' | 'rebase'>('merge');
   const [merging, setMerging] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showMergeConfirmModal, setShowMergeConfirmModal] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 4000);
+  };
 
   // Review changes panel state
   const [showReviewPanel, setShowReviewPanel] = useState(false);
@@ -117,14 +124,16 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
   }, [owner, repoName, index]);
 
   const handleMerge = async () => {
-    if (!confirm(`Are you sure you want to perform a ${mergeStyle} merge?`)) return;
+    setShowMergeConfirmModal(false);
     setMerging(true);
     try {
       const res = await api.mergePull(owner, repoName, index, mergeStyle);
-      alert(`Pull request merged successfully (commit ${res.merge_commit_sha.substring(0, 7)})`);
-      window.location.reload();
+      showToast(`Pull request merged successfully (commit ${res.merge_commit_sha.substring(0, 7)})`, 'success');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (err: any) {
-      alert(`Merge failed: ${err.message}`);
+      showToast(`Merge failed: ${err.message}`, 'error');
     } finally {
       setMerging(false);
     }
@@ -137,15 +146,16 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
       const cmt = await api.addComment(owner, repoName, index, newComment.trim());
       setComments(prev => [...prev, cmt]);
       setNewComment('');
+      showToast('Comment posted', 'success');
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      alert('Please log in to submit a review');
+      showToast('Please log in to submit a review', 'error');
       return;
     }
     setSubmittingReview(true);
@@ -157,9 +167,9 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
       setReviews(prev => [...prev, rev]);
       setReviewContent('');
       setShowReviewPanel(false);
-      alert(`Review submitted as ${reviewState}`);
+      showToast(`Review submitted as ${reviewState}`, 'success');
     } catch (err: any) {
-      alert(`Failed to submit review: ${err.message}`);
+      showToast(`Failed to submit review: ${err.message}`, 'error');
     } finally {
       setSubmittingReview(false);
     }
@@ -178,8 +188,9 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
       setReviewComments(prev => [...prev, cmt]);
       setInlineContent('');
       setActiveInlineComment(null);
+      showToast('Line comment added', 'success');
     } catch (err: any) {
-      alert(`Failed to add comment: ${err.message}`);
+      showToast(`Failed to add comment: ${err.message}`, 'error');
     } finally {
       setSubmittingInline(false);
     }
@@ -420,7 +431,7 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
                   </select>
 
                   <button
-                    onClick={handleMerge}
+                    onClick={() => setShowMergeConfirmModal(true)}
                     disabled={merging}
                     className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs shadow-sm transition-colors cursor-pointer"
                   >
@@ -548,7 +559,7 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
                         <button
                           type="button"
                           onClick={() => setShowReviewPanel(false)}
-                          className="px-3 py-1.5 text-xs text-gray-600 dark:text-dark-muted hover:text-gray-800"
+                          className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors"
                         >
                           Cancel
                         </button>
@@ -694,7 +705,7 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
                                         <button
                                           type="button"
                                           onClick={() => setActiveInlineComment(null)}
-                                          className="px-2.5 py-1 text-xs text-gray-600 dark:text-dark-muted hover:text-gray-800"
+                                          className="px-3 py-1 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors"
                                         >
                                           Cancel
                                         </button>
@@ -724,6 +735,67 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
           </div>
         )}
       </div>
+
+      {/* Merge Confirmation Modal */}
+      {showMergeConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm">
+          <div className="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl max-w-md w-full shadow-2xl overflow-hidden p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-dark-border pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
+                  <GitMerge className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-gray-900 dark:text-white">Confirm Merge</h3>
+                  <p className="text-xs text-gray-500 dark:text-dark-muted">Merge #{pull.issue?.index_number} into {pull.base_branch}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMergeConfirmModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-600 dark:text-dark-text leading-relaxed">
+              Are you sure you want to merge commits from <strong className="font-mono text-emerald-600 dark:text-emerald-400">{pull.head_branch}</strong> into <strong className="font-mono text-emerald-600 dark:text-emerald-400">{pull.base_branch}</strong> using a <strong>{mergeStyle}</strong> merge?
+            </p>
+
+            <div className="flex items-center justify-end space-x-3 pt-3 border-t border-gray-100 dark:border-dark-border">
+              <button
+                type="button"
+                onClick={() => setShowMergeConfirmModal(false)}
+                className="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={merging}
+                onClick={handleMerge}
+                className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors flex items-center space-x-1.5"
+              >
+                {merging && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>Confirm & Merge</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Themed Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center space-x-2.5 px-4 py-3 rounded-xl shadow-2xl border text-xs font-semibold backdrop-blur-md transition-all animate-bounce-once bg-white dark:bg-dark-surface border-gray-200 dark:border-dark-border text-gray-900 dark:text-white">
+          {toast.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+          )}
+          <span>{toast.message}</span>
+        </div>
+      )}
     </div>
   );
 };

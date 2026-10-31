@@ -461,15 +461,15 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
 
       {/* Create Team Modal */}
       {showTeamModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-dark-surface rounded-2xl max-w-md w-full border border-gray-200 dark:border-dark-border p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-dark-border pb-3">
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-dark-surface rounded-xl max-w-md w-full border border-gray-200 dark:border-dark-border p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-dark-border pb-3">
               <h3 className="font-bold text-base text-gray-900 dark:text-white">
                 Create new team
               </h3>
               <button
                 onClick={() => setShowTeamModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-white"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text p-1"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -477,7 +477,7 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
 
             <form onSubmit={handleCreateTeam} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1">
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
                   Team Name *
                 </label>
                 <input
@@ -486,12 +486,12 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
                   placeholder="e.g. Developers, QA, DevOps"
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1">
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
                   Description
                 </label>
                 <input
@@ -499,18 +499,18 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
                   value={teamDesc}
                   onChange={(e) => setTeamDesc(e.target.value)}
                   placeholder="Responsibilities or purpose of this team"
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1">
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
                   Repository Permission Level *
                 </label>
                 <select
                   value={teamPerm}
                   onChange={(e) => setTeamPerm(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   <option value="write">Write (Can push, edit files, and upload)</option>
                   <option value="admin">Admin (Can push and manage repository settings)</option>
@@ -518,18 +518,18 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
                 </select>
               </div>
 
-              <div className="flex justify-end space-x-2 pt-2">
+              <div className="flex justify-end space-x-2 pt-3 border-t border-gray-200 dark:border-dark-border">
                 <button
                   type="button"
                   onClick={() => setShowTeamModal(false)}
-                  className="px-3.5 py-1.5 text-xs font-semibold text-gray-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-dark-hover rounded-lg"
+                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creatingTeam}
-                  className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50"
+                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {creatingTeam ? 'Creating...' : 'Create Team'}
                 </button>

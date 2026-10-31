@@ -223,18 +223,18 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({ owner, repo: repoNam
 
       {/* Create Project Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-dark-surface rounded-2xl max-w-md w-full border border-gray-200 dark:border-dark-border p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-dark-border pb-3">
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-dark-surface rounded-xl max-w-md w-full border border-gray-200 dark:border-dark-border p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-dark-border pb-3">
               <div className="flex items-center space-x-2">
-                <FolderPlus className="w-5 h-5 text-emerald-600" />
+                <FolderPlus className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 <h3 className="font-bold text-base text-gray-900 dark:text-white">
                   Create new project
                 </h3>
               </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-white"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text p-1"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -248,7 +248,7 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({ owner, repo: repoNam
 
             <form onSubmit={handleCreateProject} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1">
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
                   Project Title *
                 </label>
                 <input
@@ -257,12 +257,12 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({ owner, repo: repoNam
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Q4 Sprint Roadmap"
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1">
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
                   Description
                 </label>
                 <textarea
@@ -270,22 +270,22 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({ owner, repo: repoNam
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Goals, milestones, or notes for this board..."
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                 />
               </div>
 
-              <div className="flex justify-end space-x-2 pt-2">
+              <div className="flex justify-end space-x-2 pt-3 border-t border-gray-200 dark:border-dark-border">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-3.5 py-1.5 text-xs font-semibold text-gray-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-dark-hover rounded-lg"
+                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creating}
-                  className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50"
+                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {creating ? 'Creating...' : 'Create Project'}
                 </button>

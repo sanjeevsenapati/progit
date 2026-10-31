@@ -165,7 +165,7 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
                     <button
                       type="button"
                       onClick={() => setShowBranchDropdown(false)}
-                      className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text"
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-white text-base leading-none p-1 rounded-lg transition-colors"
                     >
                       ×
                     </button>
@@ -315,14 +315,14 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
               </button>
 
             {showCloneModal && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl shadow-xl bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border p-4 text-xs z-50 space-y-3">
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl shadow-2xl bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border p-4 text-xs z-50 space-y-3">
                 <div className="flex space-x-2 border-b border-gray-200 dark:border-dark-border pb-2">
                   <button
                     onClick={() => setCloneTab('http')}
                     className={`font-semibold pb-1 border-b-2 transition-colors ${
                       cloneTab === 'http'
                         ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-dark-muted dark:hover:text-dark-text'
                     }`}
                   >
                     HTTPS / HTTP
@@ -332,7 +332,7 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
                     className={`font-semibold pb-1 border-b-2 transition-colors ${
                       cloneTab === 'ssh'
                         ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-dark-muted dark:hover:text-dark-text'
                     }`}
                   >
                     SSH

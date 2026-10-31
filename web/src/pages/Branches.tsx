@@ -466,9 +466,9 @@ export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => 
 
       {/* Create Branch Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-2xl max-w-md w-full shadow-2xl overflow-hidden p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-dark-border pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm">
+          <div className="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl max-w-md w-full shadow-2xl overflow-hidden p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-dark-border pb-3">
               <div className="flex items-center space-x-2 text-sm font-bold text-gray-900 dark:text-white">
                 <GitBranch className="w-4 h-4 text-emerald-600" />
                 <span>Create a branch</span>
@@ -525,18 +525,18 @@ export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => 
                 </p>
               </div>
 
-              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-gray-100 dark:border-dark-border">
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-gray-200 dark:border-dark-border">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-gray-700 dark:text-dark-text bg-gray-100 dark:bg-dark-hover rounded-lg hover:bg-gray-200 transition-colors"
+                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creating || !newBranchName.trim()}
-                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors"
+                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {creating ? 'Creating...' : 'Create branch'}
                 </button>
@@ -548,9 +548,9 @@ export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => 
 
       {/* Delete Branch Modal */}
       {branchToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-2xl max-w-md w-full shadow-2xl overflow-hidden p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-dark-border pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm">
+          <div className="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl max-w-md w-full shadow-2xl overflow-hidden p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-dark-border pb-3">
               <div className="flex items-center space-x-2 text-sm font-bold text-red-600 dark:text-red-400">
                 <AlertTriangle className="w-5 h-5" />
                 <span>Delete branch</span>
@@ -576,11 +576,11 @@ export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => 
               <strong className="font-mono text-gray-900 dark:text-white">{branchToDelete}</strong>? This action cannot be undone.
             </p>
 
-            <div className="flex items-center justify-end space-x-3 pt-3 border-t border-gray-100 dark:border-dark-border">
+            <div className="flex items-center justify-end space-x-3 pt-3 border-t border-gray-200 dark:border-dark-border">
               <button
                 type="button"
                 onClick={() => setBranchToDelete(null)}
-                className="px-4 py-2 text-xs font-semibold text-gray-700 dark:text-dark-text bg-gray-100 dark:bg-dark-hover rounded-lg hover:bg-gray-200"
+                className="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors"
               >
                 Cancel
               </button>
@@ -588,7 +588,7 @@ export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => 
                 type="button"
                 onClick={handleDeleteBranch}
                 disabled={deleting}
-                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm disabled:opacity-50"
+                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
               >
                 {deleting ? 'Deleting...' : 'Delete branch'}
               </button>

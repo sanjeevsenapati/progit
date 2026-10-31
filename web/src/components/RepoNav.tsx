@@ -274,7 +274,7 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar,
 
       {/* Fork Modal */}
       {showForkModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="relative bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl max-w-lg w-full shadow-2xl overflow-hidden transition-all">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-dark-border">
               <div className="flex items-center space-x-2.5">
@@ -289,7 +289,7 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar,
               <button
                 type="button"
                 onClick={() => setShowForkModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text p-1 rounded-lg"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -346,7 +346,7 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar,
                 <button
                   type="button"
                   onClick={() => setShowForkModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover rounded-lg border border-gray-300 dark:border-dark-border"
+                  className="px-4 py-2 text-xs font-semibold border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors rounded-lg"
                 >
                   Cancel
                 </button>

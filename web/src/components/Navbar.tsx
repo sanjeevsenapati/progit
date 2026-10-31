@@ -94,15 +94,19 @@ export const Navbar: React.FC = () => {
 
                   {createMenuOpen && (
                     <div 
-                      className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border text-sm z-50"
+                      className="absolute right-0 mt-2 w-52 rounded-xl shadow-2xl py-1.5 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border text-xs z-50 divide-y divide-gray-100 dark:divide-dark-border/40 overflow-hidden"
                       onClick={() => setCreateMenuOpen(false)}
                     >
-                      <a href="/new" className="block px-4 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover">
-                        New Repository
-                      </a>
-                      <a href="/org/new" className="block px-4 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover">
-                        New Organization
-                      </a>
+                      <div className="py-1">
+                        <a href="/new" className="flex items-center space-x-2.5 px-3.5 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover hover:text-emerald-600 dark:hover:text-emerald-400 font-medium transition-colors">
+                          <Plus className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                          <span>New Repository</span>
+                        </a>
+                        <a href="/org/new" className="flex items-center space-x-2.5 px-3.5 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover hover:text-emerald-600 dark:hover:text-emerald-400 font-medium transition-colors">
+                          <Building2 className="w-4 h-4 text-blue-500" />
+                          <span>New Organization</span>
+                        </a>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -120,35 +124,38 @@ export const Navbar: React.FC = () => {
 
                   {userMenuOpen && (
                     <div 
-                      className="absolute right-0 mt-2 w-56 rounded-md shadow-lg py-1 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border text-sm z-50"
+                      className="absolute right-0 mt-2 w-56 rounded-xl shadow-2xl py-1.5 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border text-xs z-50 divide-y divide-gray-100 dark:divide-dark-border/40 overflow-hidden"
                       onClick={() => setUserMenuOpen(false)}
                     >
-                      <div className="px-4 py-2 border-b border-gray-100 dark:border-dark-border">
-                        <p className="text-xs text-gray-500 dark:text-dark-muted">Signed in as</p>
-                        <p className="font-semibold text-gray-900 dark:text-white truncate">@{user.username}</p>
+                      <div className="px-4 py-2.5 bg-gray-50/50 dark:bg-dark-hover/30">
+                        <p className="text-[11px] text-gray-500 dark:text-dark-muted">Signed in as</p>
+                        <p className="font-bold text-gray-900 dark:text-white truncate text-xs">@{user.username}</p>
                       </div>
 
-                      <a href={`/user/${user.username}`} className="flex items-center px-4 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover">
-                        <UserIcon className="w-4 h-4 mr-2 text-gray-500" />
-                        Your Profile
-                      </a>
-                      <a href="/settings" className="flex items-center px-4 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover">
-                        <Settings className="w-4 h-4 mr-2 text-gray-500" />
-                        Settings
-                      </a>
-                      {user.is_admin && (
-                        <a href="/admin" className="flex items-center px-4 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover">
-                          <Shield className="w-4 h-4 mr-2 text-emerald-500" />
-                          Administration
+                      <div className="py-1">
+                        <a href={`/user/${user.username}`} className="flex items-center px-4 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+                          <UserIcon className="w-4 h-4 mr-2.5 text-gray-400" />
+                          <span>Your Profile</span>
                         </a>
-                      )}
-                      <div className="border-t border-gray-100 dark:border-dark-border mt-1 pt-1">
+                        <a href="/settings" className="flex items-center px-4 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+                          <Settings className="w-4 h-4 mr-2.5 text-gray-400" />
+                          <span>Settings</span>
+                        </a>
+                        {user.is_admin && (
+                          <a href="/admin" className="flex items-center px-4 py-2 text-emerald-600 dark:text-emerald-400 font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors">
+                            <Shield className="w-4 h-4 mr-2.5" />
+                            <span>Administration</span>
+                          </a>
+                        )}
+                      </div>
+
+                      <div className="py-1">
                         <button
                           onClick={logout}
-                          className="w-full text-left flex items-center px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-dark-hover"
+                          className="w-full text-left flex items-center px-4 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
                         >
-                          <LogOut className="w-4 h-4 mr-2" />
-                          Sign out
+                          <LogOut className="w-4 h-4 mr-2.5" />
+                          <span>Sign out</span>
                         </button>
                       </div>
                     </div>

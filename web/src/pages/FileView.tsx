@@ -300,26 +300,26 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-2xl max-w-md w-full shadow-xl overflow-hidden p-6 space-y-4">
-            <div className="flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm">
+          <div className="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl max-w-md w-full shadow-2xl overflow-hidden p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-dark-border pb-3">
               <div className="flex items-center space-x-2 text-red-600 dark:text-red-400 font-bold text-sm">
                 <AlertTriangle className="w-5 h-5" />
                 <span>Delete file</span>
               </div>
               <button
                 onClick={() => setShowDeleteModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text p-1"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-gray-600 dark:text-dark-muted">
-              Are you sure you want to delete <span className="font-mono font-bold text-gray-900 dark:text-white">{filePath}</span> from branch <span className="font-mono font-semibold text-emerald-600">{branch}</span>?
+            <p className="text-xs text-gray-600 dark:text-dark-text leading-relaxed">
+              Are you sure you want to delete <span className="font-mono font-bold text-gray-900 dark:text-white">{filePath}</span> from branch <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">{branch}</span>?
             </p>
 
-            <form onSubmit={handleDelete} className="space-y-4 pt-2">
+            <form onSubmit={handleDelete} className="space-y-4 pt-1">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
                   Commit message
@@ -333,18 +333,18 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
                 />
               </div>
 
-              <div className="flex items-center justify-end space-x-3 pt-2">
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-gray-200 dark:border-dark-border">
                 <button
                   type="button"
                   onClick={() => setShowDeleteModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-gray-700 dark:text-dark-text bg-gray-100 dark:bg-dark-hover rounded-lg hover:bg-gray-200"
+                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={deleting}
-                  className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm disabled:opacity-50"
+                  className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {deleting ? 'Deleting...' : 'Commit deletion'}
                 </button>

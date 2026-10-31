@@ -17,7 +17,8 @@ import {
   Cpu,
   Layers,
   Settings,
-  HardDrive
+  HardDrive,
+  X
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
@@ -479,12 +480,21 @@ export const AdminDashboard: React.FC = () => {
 
       {/* Add User Modal */}
       {showAddUserModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white dark:bg-dark-surface rounded-2xl max-w-md w-full p-6 border border-gray-200 dark:border-dark-border shadow-xl space-y-4">
-            <h3 className="font-bold text-lg text-gray-900 dark:text-white flex items-center space-x-2">
-              <UserPlus className="w-5 h-5 text-emerald-600" />
-              <span>Create New User</span>
-            </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm">
+          <div className="bg-white dark:bg-dark-surface rounded-xl max-w-md w-full p-6 border border-gray-200 dark:border-dark-border shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-dark-border">
+              <h3 className="font-bold text-base text-gray-900 dark:text-white flex items-center space-x-2">
+                <UserPlus className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <span>Create New User</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAddUserModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
             <form onSubmit={handleCreateUser} className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
@@ -495,7 +505,7 @@ export const AdminDashboard: React.FC = () => {
                   required
                   value={newUsername}
                   onChange={e => setNewUsername(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
               <div>
@@ -507,7 +517,7 @@ export const AdminDashboard: React.FC = () => {
                   required
                   value={newEmail}
                   onChange={e => setNewEmail(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
               <div>
@@ -518,7 +528,7 @@ export const AdminDashboard: React.FC = () => {
                   type="text"
                   value={newFullName}
                   onChange={e => setNewFullName(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
               <div>
@@ -530,7 +540,7 @@ export const AdminDashboard: React.FC = () => {
                   required
                   value={newPassword}
                   onChange={e => setNewPassword(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
               <div className="flex items-center space-x-2 pt-2">
@@ -550,14 +560,14 @@ export const AdminDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddUserModal(false)}
-                  className="px-4 py-2 rounded-lg text-xs font-semibold text-gray-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-dark-hover"
+                  className="px-4 py-2 rounded-lg text-xs font-semibold border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={modalLoading}
-                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-colors disabled:opacity-50"
+                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-colors disabled:opacity-50"
                 >
                   {modalLoading ? 'Creating...' : 'Create Account'}
                 </button>

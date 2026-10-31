@@ -518,16 +518,16 @@ export const Wiki: React.FC<WikiProps> = ({ owner, repo: repoName, initialSlug =
 
       {/* History Modal */}
       {showHistory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-2xl max-w-2xl w-full max-h-[80vh] flex flex-col shadow-xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-dark-border flex items-center justify-between bg-gray-50 dark:bg-dark-hover/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm">
+          <div className="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl max-w-2xl w-full max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-dark-border flex items-center justify-between bg-gray-50/80 dark:bg-dark-hover/40">
               <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center space-x-2">
-                <History className="w-4 h-4 text-blue-600" />
+                <History className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Wiki Revision History: {currentPage?.title}</span>
               </h3>
               <button
                 onClick={() => setShowHistory(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -559,10 +559,10 @@ export const Wiki: React.FC<WikiProps> = ({ owner, repo: repoName, initialSlug =
               )}
             </div>
 
-            <div className="px-6 py-3 border-t border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-hover/40 flex justify-end">
+            <div className="px-6 py-3 border-t border-gray-200 dark:border-dark-border bg-gray-50/80 dark:bg-dark-hover/40 flex justify-end">
               <button
                 onClick={() => setShowHistory(false)}
-                className="px-4 py-1.5 text-xs font-semibold text-gray-700 dark:text-dark-text bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 text-xs font-semibold border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors rounded-lg"
               >
                 Close
               </button>
