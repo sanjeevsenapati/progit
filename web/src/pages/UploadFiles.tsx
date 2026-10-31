@@ -41,6 +41,7 @@ export const UploadFiles: React.FC<UploadFilesProps> = ({
   const [newBranchName, setNewBranchName] = useState(`${owner}-patch-1`);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [canWrite, setCanWrite] = useState(true);
   const [error, setError] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -52,6 +53,11 @@ export const UploadFiles: React.FC<UploadFilesProps> = ({
         setLoading(true);
         const r = await api.getRepo(owner, repoName);
         setRepoData(r.repository);
+        const hasAccess = Boolean(r.can_write || r.permissions?.write);
+        setCanWrite(hasAccess);
+        if (!hasAccess) {
+          setError('You do not have write permissions to this repository. You must be signed in as the owner or have edit permissions to commit changes.');
+        }
       } catch (err: any) {
         setError(err.message || 'Failed to load repository');
       } finally {
@@ -120,6 +126,10 @@ export const UploadFiles: React.FC<UploadFilesProps> = ({
 
   const handleCommit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canWrite) {
+      setError('You do not have write access to this repository.');
+      return;
+    }
     if (stagedFiles.length === 0) {
       alert('Please choose or drop files to upload');
       return;
@@ -405,7 +415,7 @@ export const UploadFiles: React.FC<UploadFilesProps> = ({
             </a>
             <button
               type="submit"
-              disabled={uploading || stagedFiles.length === 0}
+              disabled={uploading || stagedFiles.length === 0 || !canWrite}
               className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors flex items-center space-x-1.5"
             >
               <UploadCloud className="w-3.5 h-3.5" />

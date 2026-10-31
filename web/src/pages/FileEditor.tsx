@@ -48,6 +48,7 @@ export const FileEditor: React.FC<FileEditorProps> = ({
   const [newBranchName, setNewBranchName] = useState(`${owner}-patch-1`);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [canWrite, setCanWrite] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -56,6 +57,11 @@ export const FileEditor: React.FC<FileEditorProps> = ({
         setLoading(true);
         const r = await api.getRepo(owner, repoName);
         setRepoData(r.repository);
+        const hasAccess = Boolean(r.can_write || r.permissions?.write);
+        setCanWrite(hasAccess);
+        if (!hasAccess) {
+          setError('You do not have write permissions to this repository. You must be signed in as the owner or have edit permissions to commit changes.');
+        }
 
         if (mode === 'edit' && filePath) {
           const b = await api.getBlob(owner, repoName, branch, filePath);
@@ -73,6 +79,10 @@ export const FileEditor: React.FC<FileEditorProps> = ({
 
   const handleCommit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canWrite) {
+      setError('You do not have write access to this repository.');
+      return;
+    }
     const cleanPath = pathInput.trim().replace(/^\/+/, '');
     if (!cleanPath) {
       alert('Please provide a file name');
@@ -320,7 +330,7 @@ export const FileEditor: React.FC<FileEditorProps> = ({
             </a>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || !canWrite}
               className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors"
             >
               {saving ? 'Committing...' : mode === 'edit' ? 'Commit changes' : 'Commit new file'}

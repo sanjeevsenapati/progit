@@ -162,6 +162,90 @@ export interface Activity {
   created_at: string;
 }
 
+export interface CollaboratorUser {
+  user_id: number;
+  username: string;
+  email: string;
+  full_name: string;
+  avatar_url: string;
+  mode: string;
+  created_at: string;
+}
+
+export interface Organization {
+  id: number;
+  name: string;
+  full_name: string;
+  description: string;
+  avatar_url: string;
+  location: string;
+  website: string;
+  num_members?: number;
+  num_repos?: number;
+  num_teams?: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface OrgMember {
+  org_id: number;
+  user_id: number;
+  username: string;
+  full_name: string;
+  email: string;
+  avatar_url: string;
+  role: string;
+  created_at: string;
+}
+
+export interface Team {
+  id: number;
+  org_id: number;
+  name: string;
+  description: string;
+  permission: string;
+  num_members?: number;
+  created_at: string;
+}
+
+export interface Project {
+  id: number;
+  repo_id: number;
+  title: string;
+  description: string;
+  is_closed: boolean;
+  creator_id: number;
+  creator_name?: string;
+  columns?: ProjectColumn[];
+  total_cards?: number;
+  done_cards?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectColumn {
+  id: number;
+  project_id: number;
+  title: string;
+  order_num: number;
+  cards?: ProjectCard[];
+  created_at: string;
+}
+
+export interface ProjectCard {
+  id: number;
+  column_id: number;
+  project_id: number;
+  issue_id?: number;
+  issue?: Issue;
+  content: string;
+  order_num: number;
+  creator_id: number;
+  creator_name?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...options,
@@ -218,7 +302,7 @@ export const api = {
     return fetchJSON<Repository[]>(url);
   },
 
-  async createRepo(data: { name: string; description: string; private: boolean; auto_init: boolean }) {
+  async createRepo(data: { name: string; owner?: string; description: string; private: boolean; auto_init: boolean }) {
     return fetchJSON<Repository>('/api/v1/repos', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -229,10 +313,15 @@ export const api = {
     return fetchJSON<{
       repository: Repository;
       is_starred: boolean;
+      can_write?: boolean;
+      permissions?: { admin: boolean; write: boolean; read: boolean };
       branches: string[];
       tags: string[];
       clone_url_http: string;
       clone_url_ssh: string;
+      wiki_clone_url_http?: string;
+      wiki_clone_url_ssh?: string;
+      pages_url?: string;
     }>(`/api/v1/repos/${owner}/${repo}`);
   },
 
@@ -579,6 +668,141 @@ export const api = {
 
   async getHealth() {
     return fetchJSON<{ status: string; uptime: string; database: string }>('/api/health');
+  },
+
+  // Collaborators
+  async getCollaborators(owner: string, repo: string) {
+    return fetchJSON<CollaboratorUser[]>(`/api/v1/repos/${owner}/${repo}/collaborators`);
+  },
+
+  async addCollaborator(owner: string, repo: string, username: string, mode: string = 'write') {
+    return fetchJSON<{ message: string; username: string; mode: string }>(
+      `/api/v1/repos/${owner}/${repo}/collaborators/${username}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ mode }),
+      }
+    );
+  },
+
+  async removeCollaborator(owner: string, repo: string, username: string) {
+    return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}/collaborators/${username}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Organizations
+  async createOrg(data: { name: string; full_name?: string; description?: string; location?: string; website?: string }) {
+    return fetchJSON<Organization>('/api/v1/orgs', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async listOrgs() {
+    return fetchJSON<Organization[]>('/api/v1/orgs');
+  },
+
+  async listUserOrgs() {
+    return fetchJSON<Organization[]>('/api/v1/user/orgs');
+  },
+
+  async getOrg(name: string) {
+    return fetchJSON<{ organization: Organization; is_member: boolean; is_admin: boolean }>(`/api/v1/orgs/${name}`);
+  },
+
+  async listOrgMembers(orgName: string) {
+    return fetchJSON<OrgMember[]>(`/api/v1/orgs/${orgName}/members`);
+  },
+
+  async addOrgMember(orgName: string, username: string, role: string = 'member') {
+    return fetchJSON<{ message: string; username: string; role: string }>(`/api/v1/orgs/${orgName}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ username, role }),
+    });
+  },
+
+  async removeOrgMember(orgName: string, username: string) {
+    return fetchJSON<{ message: string }>(`/api/v1/orgs/${orgName}/members/${username}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async listOrgTeams(orgName: string) {
+    return fetchJSON<Team[]>(`/api/v1/orgs/${orgName}/teams`);
+  },
+
+  async createOrgTeam(orgName: string, data: { name: string; description?: string; permission: string }) {
+    return fetchJSON<Team>(`/api/v1/orgs/${orgName}/teams`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async listOrgRepos(orgName: string) {
+    return fetchJSON<Repository[]>(`/api/v1/orgs/${orgName}/repos`);
+  },
+
+  // Projects (Kanban Boards)
+  async listProjects(owner: string, repo: string) {
+    return fetchJSON<Project[]>(`/api/v1/repos/${owner}/${repo}/projects`);
+  },
+
+  async createProject(owner: string, repo: string, data: { title: string; description?: string }) {
+    return fetchJSON<Project>(`/api/v1/repos/${owner}/${repo}/projects`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getProject(owner: string, repo: string, id: number) {
+    return fetchJSON<Project>(`/api/v1/repos/${owner}/${repo}/projects/${id}`);
+  },
+
+  async updateProject(owner: string, repo: string, id: number, data: { title: string; description?: string; is_closed?: boolean }) {
+    return fetchJSON<Project>(`/api/v1/repos/${owner}/${repo}/projects/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteProject(owner: string, repo: string, id: number) {
+    return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}/projects/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async createProjectColumn(owner: string, repo: string, projectId: number, data: { title: string; order_num: number }) {
+    return fetchJSON<ProjectColumn>(`/api/v1/repos/${owner}/${repo}/projects/${projectId}/columns`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteProjectColumn(owner: string, repo: string, projectId: number, columnId: number) {
+    return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}/projects/${projectId}/columns/${columnId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async createProjectCard(owner: string, repo: string, projectId: number, data: { column_id: number; issue_id?: number; content: string; order_num: number }) {
+    return fetchJSON<ProjectCard>(`/api/v1/repos/${owner}/${repo}/projects/${projectId}/cards`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async moveProjectCard(owner: string, repo: string, projectId: number, cardId: number, data: { column_id: number; order_num: number }) {
+    return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}/projects/${projectId}/cards/${cardId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteProjectCard(owner: string, repo: string, projectId: number, cardId: number) {
+    return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}/projects/${projectId}/cards/${cardId}`, {
+      method: 'DELETE',
+    });
   },
 };
 

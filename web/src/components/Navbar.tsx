@@ -13,7 +13,8 @@ import {
   Compass, 
   LayoutDashboard,
   CircleDot,
-  GitPullRequest
+  GitPullRequest,
+  Building2
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -98,6 +99,9 @@ export const Navbar: React.FC = () => {
                     >
                       <a href="/new" className="block px-4 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover">
                         New Repository
+                      </a>
+                      <a href="/org/new" className="block px-4 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover">
+                        New Organization
                       </a>
                     </div>
                   )}

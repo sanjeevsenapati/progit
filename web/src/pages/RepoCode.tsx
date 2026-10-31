@@ -38,6 +38,7 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
   const [cloneTab, setCloneTab] = useState<'http' | 'ssh'>('http');
   const [showCloneModal, setShowCloneModal] = useState(false);
   const [showAddFileModal, setShowAddFileModal] = useState(false);
+  const [canWrite, setCanWrite] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -47,6 +48,7 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
         const data = await api.getRepo(owner, repoName);
         setRepoData(data.repository);
         setIsStarred(data.is_starred);
+        setCanWrite(Boolean(data.can_write || data.permissions?.write));
         setBranches(data.branches || ['main']);
         if (data.branches?.length > 0) {
           setCurrentBranch(data.branches[0]);
@@ -163,39 +165,41 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
           </div>
 
           <div className="flex items-center space-x-2">
-            {/* Add File Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setShowAddFileModal(!showAddFileModal)}
-                className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text font-semibold text-xs shadow-sm transition-colors"
-              >
-                <span>Add file</span>
-                <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-              </button>
+            {/* Add File Dropdown (restricted to repo owner / collaborators with write access) */}
+            {canWrite && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowAddFileModal(!showAddFileModal)}
+                  className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text font-semibold text-xs shadow-sm transition-colors"
+                >
+                  <span>Add file</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                </button>
 
-              {showAddFileModal && (
-                <div className="absolute right-0 mt-2 w-48 rounded-xl shadow-xl bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border p-1.5 text-xs z-50 divide-y divide-gray-100 dark:divide-dark-border/40">
-                  <div className="py-1">
-                    <a
-                      href={`/${owner}/${repoName}/new/${currentBranch}${initialPath ? '/' + initialPath : ''}`}
-                      className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 dark:text-dark-text hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-700 dark:hover:text-emerald-400 font-medium"
-                    >
-                      <FilePlus className="w-4 h-4 text-emerald-600" />
-                      <span>Create new file</span>
-                    </a>
+                {showAddFileModal && (
+                  <div className="absolute right-0 mt-2 w-48 rounded-xl shadow-xl bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border p-1.5 text-xs z-50 divide-y divide-gray-100 dark:divide-dark-border/40">
+                    <div className="py-1">
+                      <a
+                        href={`/${owner}/${repoName}/new/${currentBranch}${initialPath ? '/' + initialPath : ''}`}
+                        className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 dark:text-dark-text hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-700 dark:hover:text-emerald-400 font-medium"
+                      >
+                        <FilePlus className="w-4 h-4 text-emerald-600" />
+                        <span>Create new file</span>
+                      </a>
+                    </div>
+                    <div className="py-1">
+                      <a
+                        href={`/${owner}/${repoName}/upload/${currentBranch}${initialPath ? '/' + initialPath : ''}`}
+                        className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 dark:text-dark-text hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-700 dark:hover:text-emerald-400 font-medium"
+                      >
+                        <UploadCloud className="w-4 h-4 text-emerald-600" />
+                        <span>Upload files</span>
+                      </a>
+                    </div>
                   </div>
-                  <div className="py-1">
-                    <a
-                      href={`/${owner}/${repoName}/upload/${currentBranch}${initialPath ? '/' + initialPath : ''}`}
-                      className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 dark:text-dark-text hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-700 dark:hover:text-emerald-400 font-medium"
-                    >
-                      <UploadCloud className="w-4 h-4 text-emerald-600" />
-                      <span>Upload files</span>
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* Clone Popover Button */}
             <div className="relative">

@@ -29,6 +29,10 @@ import { PagesSettings } from './pages/PagesSettings';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { UserProfile } from './pages/UserProfile';
 import { Install } from './pages/Install';
+import { ProjectsList } from './pages/ProjectsList';
+import { ProjectBoard } from './pages/ProjectBoard';
+import { NewOrg } from './pages/NewOrg';
+import { OrgView } from './pages/OrgView';
 
 export const App: React.FC = () => {
   const { user, loading } = useAuth();
@@ -68,6 +72,13 @@ export const App: React.FC = () => {
     if (path === '/settings') return <UserSettings />;
     if (path === '/admin') return <AdminDashboard />;
     if (path === '/install') return <Install />;
+    if (path === '/org/new') return <NewOrg />;
+
+    // Organization View: /org/:orgname
+    if (path.startsWith('/org/')) {
+      const orgName = path.split('/')[2];
+      return <OrgView orgName={orgName} />;
+    }
 
     // User Profile: /user/:username
     if (path.startsWith('/user/')) {
@@ -153,6 +164,13 @@ export const App: React.FC = () => {
 
       if (subAction === 'compare') {
         return <CompareBranches owner={owner} repo={repo} />;
+      }
+
+      if (subAction === 'projects') {
+        if (segments[3]) {
+          return <ProjectBoard owner={owner} repo={repo} projectId={parseInt(segments[3], 10)} />;
+        }
+        return <ProjectsList owner={owner} repo={repo} />;
       }
 
       if (subAction === 'wiki') {

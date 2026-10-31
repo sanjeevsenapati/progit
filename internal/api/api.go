@@ -131,6 +131,37 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/pages", r.handleUpdatePagesConfig)
 	r.mux.HandleFunc("PATCH /api/v1/repos/{owner}/{repo}/settings", r.handleUpdateRepoSettings)
 
+	// Collaborators Endpoints
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/collaborators", r.handleListCollaborators)
+	r.mux.HandleFunc("PUT /api/v1/repos/{owner}/{repo}/collaborators/{collaborator}", r.handleAddCollaborator)
+	r.mux.HandleFunc("DELETE /api/v1/repos/{owner}/{repo}/collaborators/{collaborator}", r.handleRemoveCollaborator)
+
+	// Organizations Endpoints
+	r.mux.HandleFunc("POST /api/v1/orgs", r.handleCreateOrg)
+	r.mux.HandleFunc("GET /api/v1/orgs", r.handleListOrgs)
+	r.mux.HandleFunc("GET /api/v1/user/orgs", r.handleListUserOrgs)
+	r.mux.HandleFunc("GET /api/v1/orgs/{org}", r.handleGetOrg)
+	r.mux.HandleFunc("GET /api/v1/orgs/{org}/members", r.handleListOrgMembers)
+	r.mux.HandleFunc("POST /api/v1/orgs/{org}/members", r.handleAddOrgMember)
+	r.mux.HandleFunc("DELETE /api/v1/orgs/{org}/members/{username}", r.handleRemoveOrgMember)
+	r.mux.HandleFunc("GET /api/v1/orgs/{org}/teams", r.handleListOrgTeams)
+	r.mux.HandleFunc("POST /api/v1/orgs/{org}/teams", r.handleCreateOrgTeam)
+	r.mux.HandleFunc("POST /api/v1/orgs/{org}/teams/{team_id}/members", r.handleAddTeamMember)
+	r.mux.HandleFunc("DELETE /api/v1/orgs/{org}/teams/{team_id}/members/{user_id}", r.handleRemoveTeamMember)
+	r.mux.HandleFunc("GET /api/v1/orgs/{org}/repos", r.handleListOrgRepos)
+
+	// Projects Endpoints
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/projects", r.handleListProjects)
+	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/projects", r.handleCreateProject)
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/projects/{id}", r.handleGetProject)
+	r.mux.HandleFunc("PUT /api/v1/repos/{owner}/{repo}/projects/{id}", r.handleUpdateProject)
+	r.mux.HandleFunc("DELETE /api/v1/repos/{owner}/{repo}/projects/{id}", r.handleDeleteProject)
+	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/projects/{id}/columns", r.handleCreateProjectColumn)
+	r.mux.HandleFunc("DELETE /api/v1/repos/{owner}/{repo}/projects/{id}/columns/{column_id}", r.handleDeleteProjectColumn)
+	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/projects/{id}/cards", r.handleCreateProjectCard)
+	r.mux.HandleFunc("PUT /api/v1/repos/{owner}/{repo}/projects/{id}/cards/{card_id}", r.handleMoveProjectCard)
+	r.mux.HandleFunc("DELETE /api/v1/repos/{owner}/{repo}/projects/{id}/cards/{card_id}", r.handleDeleteProjectCard)
+
 	// Static Pages Web Hosting
 	r.mux.HandleFunc("GET /pages/{owner}/{repo}/{path...}", r.handleServePages)
 
@@ -550,6 +581,7 @@ func (r *Router) handleCreateRepo(w http.ResponseWriter, req *http.Request) {
 
 	var body struct {
 		Name        string `json:"name"`
+		Owner       string `json:"owner"`
 		Description string `json:"description"`
 		Private     bool   `json:"private"`
 		AutoInit    bool   `json:"auto_init"`
@@ -565,7 +597,29 @@ func (r *Router) handleCreateRepo(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	repo, err := database.CreateRepository(user.ID, body.Name, body.Description, body.Private)
+	targetOwnerID := user.ID
+	targetOwnerName := user.Username
+
+	if body.Owner != "" && !strings.EqualFold(body.Owner, user.Username) {
+		org, err := database.GetOrgByName(body.Owner)
+		if err != nil || org == nil {
+			jsonError(w, http.StatusBadRequest, "Selected organization does not exist")
+			return
+		}
+		if !user.IsAdmin && !database.IsOrgAdmin(org.ID, user.ID) {
+			jsonError(w, http.StatusForbidden, "You do not have permission to create repositories under this organization")
+			return
+		}
+		orgUser, err := database.GetUserByUsername(org.Name)
+		if err != nil || orgUser == nil {
+			jsonError(w, http.StatusInternalServerError, "Organization account stub missing")
+			return
+		}
+		targetOwnerID = orgUser.ID
+		targetOwnerName = org.Name
+	}
+
+	repo, err := database.CreateRepository(targetOwnerID, body.Name, body.Description, body.Private)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
 			jsonError(w, http.StatusConflict, "Repository already exists")
@@ -575,7 +629,7 @@ func (r *Router) handleCreateRepo(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	repoDir := filepath.Join(r.cfg.Repository.Root, user.Username, repo.Name+".git")
+	repoDir := filepath.Join(r.cfg.Repository.Root, targetOwnerName, repo.Name+".git")
 	if body.AutoInit {
 		err = git.InitRepositoryWithReadme(repoDir, repo.Name, repo.Description, "main", user.Username, user.Email)
 	} else {
@@ -589,7 +643,7 @@ func (r *Router) handleCreateRepo(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "create_repo", fmt.Sprintf("Created repository %s/%s", user.Username, repo.Name))
+	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "create_repo", fmt.Sprintf("Created repository %s/%s", targetOwnerName, repo.Name))
 
 	jsonResponse(w, http.StatusCreated, repo)
 }
@@ -615,6 +669,14 @@ func (r *Router) handleGetRepo(w http.ResponseWriter, req *http.Request) {
 		isStarred = database.HasStarred(user.ID, repo.ID)
 	}
 
+	canWrite := database.CanUserAccessRepo(user, repo, true)
+	canAdmin := user != nil && (user.IsAdmin || user.ID == repo.OwnerID)
+	if !canAdmin && user != nil {
+		if org, _ := database.GetOrgByName(repo.OwnerName); org != nil {
+			canAdmin = database.IsOrgAdmin(org.ID, user.ID)
+		}
+	}
+
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
 	branches, _ := git.GetBranches(repoDir)
 	tags, _ := git.GetTags(repoDir)
@@ -626,8 +688,14 @@ func (r *Router) handleGetRepo(w http.ResponseWriter, req *http.Request) {
 	pagesURL := fmt.Sprintf("%spages/%s/%s/", r.cfg.Server.RootURL, owner, repoName)
 
 	jsonResponse(w, http.StatusOK, map[string]any{
-		"repository":          repo,
-		"is_starred":          isStarred,
+		"repository": repo,
+		"is_starred": isStarred,
+		"can_write":  canWrite,
+		"permissions": map[string]bool{
+			"admin": canAdmin,
+			"write": canWrite,
+			"read":  true,
+		},
 		"branches":            branches,
 		"tags":                tags,
 		"clone_url_http":      httpCloneURL,
@@ -2341,5 +2409,862 @@ func (r *Router) handleAdminMaintenance(w http.ResponseWriter, req *http.Request
 	default:
 		jsonError(w, http.StatusBadRequest, "Unknown maintenance operation")
 	}
+}
+
+// ============================================================================
+// Collaborator Handlers
+// ============================================================================
+
+func (r *Router) handleListCollaborators(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	user := auth.AuthenticateRequest(req)
+	if !database.CanUserAccessRepo(user, repo, false) {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	collabs, err := database.ListCollaborators(repo.ID)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if collabs == nil {
+		collabs = []database.CollaboratorUser{}
+	}
+	jsonResponse(w, http.StatusOK, collabs)
+}
+
+func (r *Router) handleAddCollaborator(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	collaboratorName := req.PathValue("collaborator")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	canAdmin := user.IsAdmin || user.ID == repo.OwnerID
+	if !canAdmin {
+		if org, _ := database.GetOrgByName(repo.OwnerName); org != nil {
+			canAdmin = database.IsOrgAdmin(org.ID, user.ID)
+		}
+	}
+	if !canAdmin {
+		jsonError(w, http.StatusForbidden, "Admin privileges required to manage collaborators")
+		return
+	}
+
+	targetUser, err := database.GetUserByUsername(collaboratorName)
+	if err != nil || targetUser == nil {
+		jsonError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	var body struct {
+		Mode string `json:"mode"`
+	}
+	_ = json.NewDecoder(req.Body).Decode(&body)
+	if body.Mode == "" {
+		body.Mode = "write"
+	}
+
+	if err := database.AddCollaborator(repo.ID, targetUser.ID, body.Mode); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{
+		"message":  "Collaborator updated successfully",
+		"username": targetUser.Username,
+		"mode":     body.Mode,
+	})
+}
+
+func (r *Router) handleRemoveCollaborator(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	collaboratorName := req.PathValue("collaborator")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	canAdmin := user.IsAdmin || user.ID == repo.OwnerID
+	if !canAdmin {
+		if org, _ := database.GetOrgByName(repo.OwnerName); org != nil {
+			canAdmin = database.IsOrgAdmin(org.ID, user.ID)
+		}
+	}
+	if !canAdmin {
+		jsonError(w, http.StatusForbidden, "Admin privileges required to manage collaborators")
+		return
+	}
+
+	targetUser, err := database.GetUserByUsername(collaboratorName)
+	if err != nil || targetUser == nil {
+		jsonError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	if err := database.RemoveCollaborator(repo.ID, targetUser.ID); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "Collaborator removed successfully"})
+}
+
+// ============================================================================
+// Organization Handlers
+// ============================================================================
+
+func (r *Router) handleCreateOrg(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	var body struct {
+		Name        string `json:"name"`
+		FullName    string `json:"full_name"`
+		Description string `json:"description"`
+		Location    string `json:"location"`
+		Website     string `json:"website"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	body.Name = strings.TrimSpace(body.Name)
+	if body.Name == "" {
+		jsonError(w, http.StatusBadRequest, "Organization name is required")
+		return
+	}
+
+	org, err := database.CreateOrganization(body.Name, body.FullName, body.Description, body.Location, body.Website, user.ID)
+	if err != nil {
+		if strings.Contains(err.Error(), "already taken") || strings.Contains(err.Error(), "UNIQUE") {
+			jsonError(w, http.StatusConflict, fmt.Sprintf("Organization name '%s' is already in use", body.Name))
+			return
+		}
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	database.CreateActivity(user.ID, user.Username, nil, "", "create_org", fmt.Sprintf("Created organization @%s", org.Name))
+	jsonResponse(w, http.StatusCreated, org)
+}
+
+func (r *Router) handleListOrgs(w http.ResponseWriter, req *http.Request) {
+	orgs, err := database.ListAllOrganizations()
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if orgs == nil {
+		orgs = []database.Organization{}
+	}
+	jsonResponse(w, http.StatusOK, orgs)
+}
+
+func (r *Router) handleListUserOrgs(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	orgs, err := database.ListUserOrganizations(user.ID)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if orgs == nil {
+		orgs = []database.Organization{}
+	}
+	jsonResponse(w, http.StatusOK, orgs)
+}
+
+func (r *Router) handleGetOrg(w http.ResponseWriter, req *http.Request) {
+	orgName := req.PathValue("org")
+	org, err := database.GetOrgByName(orgName)
+	if err != nil || org == nil {
+		jsonError(w, http.StatusNotFound, "Organization not found")
+		return
+	}
+
+	user := auth.AuthenticateRequest(req)
+	isMember := false
+	isAdmin := false
+	if user != nil {
+		if user.IsAdmin {
+			isAdmin = true
+			isMember = true
+		} else {
+			isAdmin = database.IsOrgAdmin(org.ID, user.ID)
+			members, _ := database.ListOrgMembers(org.ID)
+			for _, m := range members {
+				if m.UserID == user.ID {
+					isMember = true
+					break
+				}
+			}
+		}
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"organization": org,
+		"is_member":    isMember,
+		"is_admin":     isAdmin,
+	})
+}
+
+func (r *Router) handleListOrgMembers(w http.ResponseWriter, req *http.Request) {
+	orgName := req.PathValue("org")
+	org, err := database.GetOrgByName(orgName)
+	if err != nil || org == nil {
+		jsonError(w, http.StatusNotFound, "Organization not found")
+		return
+	}
+
+	members, err := database.ListOrgMembers(org.ID)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if members == nil {
+		members = []database.OrgMember{}
+	}
+	jsonResponse(w, http.StatusOK, members)
+}
+
+func (r *Router) handleAddOrgMember(w http.ResponseWriter, req *http.Request) {
+	orgName := req.PathValue("org")
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	org, err := database.GetOrgByName(orgName)
+	if err != nil || org == nil {
+		jsonError(w, http.StatusNotFound, "Organization not found")
+		return
+	}
+
+	if !user.IsAdmin && !database.IsOrgAdmin(org.ID, user.ID) {
+		jsonError(w, http.StatusForbidden, "Organization admin privileges required")
+		return
+	}
+
+	var body struct {
+		Username string `json:"username"`
+		Role     string `json:"role"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	targetUser, err := database.GetUserByUsername(body.Username)
+	if err != nil || targetUser == nil {
+		jsonError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	if body.Role == "" {
+		body.Role = "member"
+	}
+
+	if err := database.AddOrgMember(org.ID, targetUser.ID, body.Role); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{
+		"message":  "Member added to organization successfully",
+		"username": targetUser.Username,
+		"role":     body.Role,
+	})
+}
+
+func (r *Router) handleRemoveOrgMember(w http.ResponseWriter, req *http.Request) {
+	orgName := req.PathValue("org")
+	username := req.PathValue("username")
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	org, err := database.GetOrgByName(orgName)
+	if err != nil || org == nil {
+		jsonError(w, http.StatusNotFound, "Organization not found")
+		return
+	}
+
+	if !user.IsAdmin && !database.IsOrgAdmin(org.ID, user.ID) {
+		jsonError(w, http.StatusForbidden, "Organization admin privileges required")
+		return
+	}
+
+	targetUser, err := database.GetUserByUsername(username)
+	if err != nil || targetUser == nil {
+		jsonError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	if err := database.RemoveOrgMember(org.ID, targetUser.ID); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "Member removed from organization"})
+}
+
+func (r *Router) handleListOrgTeams(w http.ResponseWriter, req *http.Request) {
+	orgName := req.PathValue("org")
+	org, err := database.GetOrgByName(orgName)
+	if err != nil || org == nil {
+		jsonError(w, http.StatusNotFound, "Organization not found")
+		return
+	}
+
+	teams, err := database.ListTeams(org.ID)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if teams == nil {
+		teams = []database.Team{}
+	}
+	jsonResponse(w, http.StatusOK, teams)
+}
+
+func (r *Router) handleCreateOrgTeam(w http.ResponseWriter, req *http.Request) {
+	orgName := req.PathValue("org")
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	org, err := database.GetOrgByName(orgName)
+	if err != nil || org == nil {
+		jsonError(w, http.StatusNotFound, "Organization not found")
+		return
+	}
+
+	if !user.IsAdmin && !database.IsOrgAdmin(org.ID, user.ID) {
+		jsonError(w, http.StatusForbidden, "Organization admin privileges required")
+		return
+	}
+
+	var body struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Permission  string `json:"permission"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	team, err := database.CreateTeam(org.ID, body.Name, body.Description, body.Permission)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusCreated, team)
+}
+
+func (r *Router) handleAddTeamMember(w http.ResponseWriter, req *http.Request) {
+	teamIDStr := req.PathValue("team_id")
+	teamID, err := strconv.ParseInt(teamIDStr, 10, 64)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid team ID")
+		return
+	}
+
+	var body struct {
+		Username string `json:"username"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	targetUser, err := database.GetUserByUsername(body.Username)
+	if err != nil || targetUser == nil {
+		jsonError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	if err := database.AddTeamMember(teamID, targetUser.ID); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "Team member added"})
+}
+
+func (r *Router) handleRemoveTeamMember(w http.ResponseWriter, req *http.Request) {
+	teamIDStr := req.PathValue("team_id")
+	userIDStr := req.PathValue("user_id")
+	teamID, _ := strconv.ParseInt(teamIDStr, 10, 64)
+	userID, _ := strconv.ParseInt(userIDStr, 10, 64)
+
+	if err := database.RemoveTeamMember(teamID, userID); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "Team member removed"})
+}
+
+func (r *Router) handleListOrgRepos(w http.ResponseWriter, req *http.Request) {
+	orgName := req.PathValue("org")
+	org, err := database.GetOrgByName(orgName)
+	if err != nil || org == nil {
+		jsonError(w, http.StatusNotFound, "Organization not found")
+		return
+	}
+
+	user := auth.AuthenticateRequest(req)
+	isMember := false
+	if user != nil {
+		if user.IsAdmin || database.IsOrgAdmin(org.ID, user.ID) {
+			isMember = true
+		} else {
+			members, _ := database.ListOrgMembers(org.ID)
+			for _, m := range members {
+				if m.UserID == user.ID {
+					isMember = true
+					break
+				}
+			}
+		}
+	}
+
+	allRepos, err := database.ListRepositories(100, 0, !isMember)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	var orgRepos []*database.Repository
+	for _, repo := range allRepos {
+		if strings.EqualFold(repo.OwnerName, orgName) {
+			orgRepos = append(orgRepos, repo)
+		}
+	}
+	if orgRepos == nil {
+		orgRepos = []*database.Repository{}
+	}
+
+	jsonResponse(w, http.StatusOK, orgRepos)
+}
+
+// ============================================================================
+// Project Handlers
+// ============================================================================
+
+func (r *Router) handleListProjects(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	user := auth.AuthenticateRequest(req)
+	if !database.CanUserAccessRepo(user, repo, false) {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	projects, err := database.ListRepoProjects(repo.ID)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if projects == nil {
+		projects = []database.Project{}
+	}
+
+	jsonResponse(w, http.StatusOK, projects)
+}
+
+func (r *Router) handleCreateProject(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required to create project")
+		return
+	}
+
+	var body struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	body.Title = strings.TrimSpace(body.Title)
+	if body.Title == "" {
+		jsonError(w, http.StatusBadRequest, "Project title is required")
+		return
+	}
+
+	project, err := database.CreateProject(repo.ID, user.ID, body.Title, body.Description)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "project", fmt.Sprintf("Created project '%s'", project.Title))
+	jsonResponse(w, http.StatusCreated, project)
+}
+
+func (r *Router) handleGetProject(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	idStr := req.PathValue("id")
+	projectID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid project ID")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	user := auth.AuthenticateRequest(req)
+	if !database.CanUserAccessRepo(user, repo, false) {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	project, err := database.GetProjectByID(projectID)
+	if err != nil || project == nil {
+		jsonError(w, http.StatusNotFound, "Project not found")
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, project)
+}
+
+func (r *Router) handleUpdateProject(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	idStr := req.PathValue("id")
+	projectID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid project ID")
+		return
+	}
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required")
+		return
+	}
+
+	var body struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		IsClosed    bool   `json:"is_closed"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if err := database.UpdateProject(projectID, body.Title, body.Description, body.IsClosed); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	proj, _ := database.GetProjectByID(projectID)
+	jsonResponse(w, http.StatusOK, proj)
+}
+
+func (r *Router) handleDeleteProject(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	idStr := req.PathValue("id")
+	projectID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid project ID")
+		return
+	}
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required")
+		return
+	}
+
+	if err := database.DeleteProject(projectID); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "Project deleted successfully"})
+}
+
+func (r *Router) handleCreateProjectColumn(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	idStr := req.PathValue("id")
+	projectID, _ := strconv.ParseInt(idStr, 10, 64)
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required")
+		return
+	}
+
+	var body struct {
+		Title    string `json:"title"`
+		OrderNum int    `json:"order_num"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	col, err := database.CreateProjectColumn(projectID, body.Title, body.OrderNum)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusCreated, col)
+}
+
+func (r *Router) handleDeleteProjectColumn(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	colIDStr := req.PathValue("column_id")
+	colID, _ := strconv.ParseInt(colIDStr, 10, 64)
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required")
+		return
+	}
+
+	if err := database.DeleteProjectColumn(colID); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "Column deleted successfully"})
+}
+
+func (r *Router) handleCreateProjectCard(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	idStr := req.PathValue("id")
+	projectID, _ := strconv.ParseInt(idStr, 10, 64)
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required")
+		return
+	}
+
+	var body struct {
+		ColumnID int64  `json:"column_id"`
+		IssueID  *int64 `json:"issue_id"`
+		Content  string `json:"content"`
+		OrderNum int    `json:"order_num"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	card, err := database.CreateProjectCard(projectID, body.ColumnID, user.ID, body.IssueID, body.Content, body.OrderNum)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusCreated, card)
+}
+
+func (r *Router) handleMoveProjectCard(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	cardIDStr := req.PathValue("card_id")
+	cardID, _ := strconv.ParseInt(cardIDStr, 10, 64)
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required")
+		return
+	}
+
+	var body struct {
+		ColumnID int64 `json:"column_id"`
+		OrderNum int   `json:"order_num"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if err := database.MoveProjectCard(cardID, body.ColumnID, body.OrderNum); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "Card moved successfully"})
+}
+
+func (r *Router) handleDeleteProjectCard(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	cardIDStr := req.PathValue("card_id")
+	cardID, _ := strconv.ParseInt(cardIDStr, 10, 64)
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required")
+		return
+	}
+
+	if err := database.DeleteProjectCard(cardID); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "Card deleted successfully"})
 }
 

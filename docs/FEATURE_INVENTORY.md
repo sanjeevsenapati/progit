@@ -40,6 +40,9 @@
 | **Webhooks** | Webhook Dispatcher | Basic HTTP | Implemented | Push/Issue/PR event triggers & logs |
 | **Wiki** | Git-backed Wiki | Yes | Implemented | Dedicated `<repo>.wiki.git` bare repo, CLI clone/push over HTTP & SSH, Page revision history, Markdown editor with live preview |
 | **Pages** | ProGit Pages (GitHub Pages) | No (ProGit exclusive) | Implemented | Static site & documentation hosting from `gh-pages` or `main` (`/` or `/docs`), automatic Markdown-to-HTML rendering, 404 fallback, permission enforcement |
+| **Security & Permissions** | Access Control & Collaborators | Yes | Implemented | Strict permission checks for online file edit, create, upload, and delete (HTTP 401 unauthenticated, HTTP 403 unauthorized, collaborator management with `read`, `write`, `admin` modes) |
+| **Organizations** | GitHub-Style Organizations & Teams | Yes | Implemented | Full organization lifecycle (`/org/new`, `/org/:orgname`), member roles (`owner`, `admin`, `member`), teams with granular permission levels, organization-owned repositories (`/<org>/<repo>.git`) |
+| **Projects** | Kanban Project Boards | Yes | Implemented | GitHub-style interactive project boards (`/projects`), default & custom columns ("To do", "In progress", "Done"), task cards, issue linking, drag/move workflows, completion progress calculation |
 | **Admin** | Admin Dashboard | Basic | Implemented | System telemetry, users, repo manager |
 | **Observability**| Health & Readiness Check | Basic | Implemented | `/api/health` and `/api/ready` |
 

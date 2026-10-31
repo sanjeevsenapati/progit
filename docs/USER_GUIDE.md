@@ -153,4 +153,73 @@ http://localhost:3000/pages/<owner>/<repo>/
 - **Custom 404 Pages**: If a page is not found, ProGit serves `404.html` if present in the source folder.
 - **Security**: For private repositories, pages are protected and require active session credentials.
 
+---
+
+## 8. Security & Collaborator Permissions
+
+ProGit strictly enforces access control boundaries across all online write operations (file editing, file creation, file deletion, and file/folder uploading):
+
+### 8.1 Write Access Rules
+- **Authentication**: All online write operations strictly require an active authenticated user session or valid Bearer PAT. Unauthenticated requests return `HTTP 401 Unauthorized`.
+- **Authorization**: Write operations are permitted only if:
+  1. The user is a **Site Administrator** (`is_admin = true`).
+  2. The user is the **Repository Owner**.
+  3. The user is an **Explicit Collaborator** with `write` or `admin` permission mode.
+  4. The user is an **Organization Owner/Admin** or a member of an authorized team for an organization-owned repository.
+- **Unauthorized Protection**: Unauthorized users receive `HTTP 403 Forbidden` from the API, and the Web UI automatically hides the "Add file", "Edit", and "Delete" buttons, while direct navigation displays a warning and disables the commit buttons.
+
+### 8.2 Managing Collaborators
+1. In your repository, click **Settings**.
+2. Scroll to the **Collaborators & Edit Permissions** section.
+3. Enter the collaborator's username and select their permission level:
+   - `write`: Can edit, create, delete, upload files, push code, and open/manage issues and PRs.
+   - `admin`: Full administrative control over the repository including settings and collaborator management.
+   - `read`: Read-only access to browse code and clone private repositories.
+4. Click **Add Collaborator**.
+5. To revoke access, click the **Remove** button next to any collaborator in the list.
+
+---
+
+## 9. Organizations & Teams
+
+Like GitHub, ProGit allows users to create Organizations to manage shared repositories, access permissions, and developer teams.
+
+### 9.1 Creating an Organization
+1. Click the **+** (Create) menu in the navigation bar and select **New Organization** (or visit `/org/new`).
+2. Enter a unique organization handle (e.g. `acme-corp`), full name, and description.
+3. Click **Create Organization**. The creator is automatically assigned the `owner` role.
+
+### 9.2 Managing Organization Members & Teams
+- Navigate to `/org/<orgname>` to view the organization profile.
+- **Repositories Tab**: View all repositories owned by the organization or create a new one directly.
+- **Members Tab**: Invite existing users by username and assign them roles (`owner`, `admin`, or `member`).
+- **Teams Tab**: Create developer teams (e.g. `Frontend Engineers`, `DevOps`) and assign team-wide default permissions (`read`, `write`, `admin`).
+- **Organization Repositories**: When creating a new repository (`/new`), choose the organization as the owner in the dropdown. Git clone/push URLs automatically reflect the organization namespace:
+  ```bash
+  git clone http://localhost:3000/acme-corp/service-backend.git
+  ```
+
+---
+
+## 10. Projects & Kanban Boards
+
+ProGit features interactive Kanban project boards for repositories to organize sprint tasks, roadmap epics, and repository issues.
+
+### 10.1 Creating a Project Board
+1. In your repository header, click the **Projects** tab.
+2. Click **New Project**.
+3. Enter a title (e.g. `Q1 Sprint Roadmap`) and optional description.
+4. Click **Create Project**. ProGit automatically provisions the board with default columns:
+   - **To do**
+   - **In progress**
+   - **Done**
+
+### 10.2 Kanban Board Workflows
+- **Add Custom Columns**: Click **Add column** to insert custom stages (e.g., `In Review`, `QA Testing`).
+- **Add Task Cards**: Click the **+** button on any column to create a card. You can create standalone Markdown notes or link directly to open repository issues.
+- **Drag & Drop**: Easily drag task cards between columns as work progresses, or use the card position controls.
+- **Automated Progress Tracking**: The project board automatically tracks completed tasks (`Done` column) against total cards, displaying real-time completion percentage bars.
+- **Close & Reopen**: Mark projects as closed when completed, or reopen them anytime.
+
+
 

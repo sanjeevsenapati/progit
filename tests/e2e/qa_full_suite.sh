@@ -56,7 +56,7 @@ echo ""
 # -----------------------------------------------------------------------------
 # SUITE 1: System Health, Readiness & Frontend Delivery
 # -----------------------------------------------------------------------------
-echo -e "${BLUE}=== [1/8] SYSTEM HEALTH, READINESS & FRONTEND SPA DELIVERY ===${NC}"
+echo -e "${BLUE}=== [1/10] SYSTEM HEALTH, READINESS & FRONTEND SPA DELIVERY ===${NC}"
 
 log_test "Check /api/health endpoint"
 HEALTH=$(curl -s -f "${PROGIT_URL}/api/health")
@@ -81,7 +81,7 @@ assert_pass "SPA fallback functional"
 # -----------------------------------------------------------------------------
 # SUITE 2: Installation Wizard & Super Admin Setup
 # -----------------------------------------------------------------------------
-echo -e "\n${BLUE}=== [2/8] INSTALLATION WIZARD & SUPER ADMIN SETUP ===${NC}"
+echo -e "\n${BLUE}=== [2/10] INSTALLATION WIZARD & SUPER ADMIN SETUP ===${NC}"
 
 log_test "Inspect installation status (/api/v1/install/status)"
 INSTALL_STATUS=$(curl -s -f "${PROGIT_URL}/api/v1/install/status")
@@ -108,7 +108,7 @@ fi
 # -----------------------------------------------------------------------------
 # SUITE 3: User Authentication, PAT & SSH Key Lifecycle
 # -----------------------------------------------------------------------------
-echo -e "\n${BLUE}=== [3/8] AUTHENTICATION, PERSONAL ACCESS TOKENS & SSH KEYS ===${NC}"
+echo -e "\n${BLUE}=== [3/10] AUTHENTICATION, PERSONAL ACCESS TOKENS & SSH KEYS ===${NC}"
 
 log_test "Authenticate Super Admin via /api/v1/auth/login"
 LOGIN_RES=$(curl -s -c "${TEST_DIR}/admin_cookies.txt" -X POST "${PROGIT_URL}/api/v1/auth/login" \
@@ -136,6 +136,19 @@ REG_RES=$(curl -s -c "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1
 echo "${REG_RES}" | grep -q '"token":' || assert_fail "Registration failed: ${REG_RES}"
 DEV_TOKEN=$(echo "${REG_RES}" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
 assert_pass "Registered successfully"
+
+# Register unprivileged stranger user for security access control testing
+STRANGER_USER="stranger_${TIMESTAMP}"
+STRANGER_PASS="StrangerPass12345!"
+STRANGER_EMAIL="${STRANGER_USER}@example.com"
+
+log_test "Register unprivileged stranger user for security checks"
+STRANGER_RES=$(curl -s -c "${TEST_DIR}/stranger_cookies.txt" -X POST "${PROGIT_URL}/api/v1/auth/register" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"${STRANGER_USER}\",\"email\":\"${STRANGER_EMAIL}\",\"password\":\"${STRANGER_PASS}\",\"full_name\":\"Test Stranger\"}")
+echo "${STRANGER_RES}" | grep -q '"token":' || assert_fail "Stranger registration failed: ${STRANGER_RES}"
+STRANGER_TOKEN=$(echo "${STRANGER_RES}" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+assert_pass "Stranger registered successfully"
 
 log_test "Prevent duplicate username registration"
 DUP_RES=$(curl -s -w "%{http_code}" -o /dev/null -X POST "${PROGIT_URL}/api/v1/auth/register" \
@@ -169,7 +182,7 @@ assert_pass "SSH key registered"
 # -----------------------------------------------------------------------------
 # SUITE 4: Repository Management & Visibility Controls
 # -----------------------------------------------------------------------------
-echo -e "\n${BLUE}=== [4/8] REPOSITORY LIFECYCLE & ACCESS CONTROLS ===${NC}"
+echo -e "\n${BLUE}=== [4/10] REPOSITORY LIFECYCLE & ACCESS CONTROLS ===${NC}"
 
 PUBLIC_REPO="qa-public-repo"
 PRIVATE_REPO="qa-private-repo"
@@ -208,7 +221,7 @@ assert_pass "Star toggle functional"
 # -----------------------------------------------------------------------------
 # SUITE 5: Git CLI Operations (Smart HTTP & Native SSH)
 # -----------------------------------------------------------------------------
-echo -e "\n${BLUE}=== [5/8] GIT CLI OPERATIONS (SMART HTTP & SSH) ===${NC}"
+echo -e "\n${BLUE}=== [5A/10] GIT CLI OPERATIONS (SMART HTTP & SSH) ===${NC}"
 
 log_test "Git Clone Public Repository over Smart HTTP"
 HTTP_CLONE_URL="http://${DEV_USER}:${DEV_PASS}@localhost:3000/${DEV_USER}/${PUBLIC_REPO}.git"
@@ -251,7 +264,7 @@ assert_pass "Commit diff rendered"
 # -----------------------------------------------------------------------------
 # SUITE 5B: Online File Operations (Create, Edit, Delete, Upload & Online Commit)
 # -----------------------------------------------------------------------------
-echo -e "\n${BLUE}=== [5B/9] ONLINE FILE OPERATIONS (CREATE, EDIT, UPLOAD, COMMIT) ===${NC}"
+echo -e "\n${BLUE}=== [5B/10] ONLINE FILE OPERATIONS (CREATE, EDIT, UPLOAD, COMMIT) ===${NC}"
 
 log_test "Online File Creation (Create src/config/database.json)"
 CREATE_FILE_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/contents/src/config/database.json" \
@@ -307,9 +320,75 @@ DELETED_BLOB=$(curl -s -w "%{http_code}" -o /dev/null "${PROGIT_URL}/api/v1/repo
 assert_pass "File removal confirmed"
 
 # -----------------------------------------------------------------------------
+# SUITE 5C: Security & Access Control Enforcement
+# -----------------------------------------------------------------------------
+echo -e "\n${BLUE}=== [5C/10] SECURITY & ACCESS CONTROL ENFORCEMENT ===${NC}"
+
+log_test "Enforce Authentication: Unauthenticated file edit blocked (HTTP 401)"
+UNAUTH_EDIT_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/contents/hack.txt" \
+  -H "Content-Type: application/json" \
+  -d '{"branch":"main","content":"evil","message":"unauth commit"}')
+[ "${UNAUTH_EDIT_CODE}" = "401" ] || assert_fail "Expected 401 unauthenticated, got ${UNAUTH_EDIT_CODE}"
+assert_pass "Unauthenticated write blocked"
+
+log_test "Enforce Authentication: Unauthenticated file upload blocked (HTTP 401)"
+UNAUTH_UPLOAD_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/upload" \
+  -F "branch=main" \
+  -F "message=evil upload" \
+  -F "files=@${TEST_DIR}/logo.svg;filename=evil.svg")
+[ "${UNAUTH_UPLOAD_CODE}" = "401" ] || assert_fail "Expected 401 unauthenticated, got ${UNAUTH_UPLOAD_CODE}"
+assert_pass "Unauthenticated upload blocked"
+
+log_test "Enforce Authorization: Stranger denied file write access (HTTP 403)"
+STRANGER_WRITE_CODE=$(curl -s -b "${TEST_DIR}/stranger_cookies.txt" -w "%{http_code}" -o /dev/null -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/contents/unauthorized.txt" \
+  -H "Content-Type: application/json" \
+  -d '{"branch":"main","content":"stranger hack","message":"unauthorized commit"}')
+[ "${STRANGER_WRITE_CODE}" = "403" ] || assert_fail "Expected 403 forbidden for stranger, got ${STRANGER_WRITE_CODE}"
+assert_pass "Stranger write blocked (403)"
+
+log_test "Enforce Authorization: Stranger denied upload access (HTTP 403)"
+STRANGER_UPLOAD_CODE=$(curl -s -b "${TEST_DIR}/stranger_cookies.txt" -w "%{http_code}" -o /dev/null -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/upload" \
+  -F "branch=main" \
+  -F "message=stranger upload" \
+  -F "files=@${TEST_DIR}/logo.svg;filename=stranger.svg")
+[ "${STRANGER_UPLOAD_CODE}" = "403" ] || assert_fail "Expected 403 forbidden for stranger upload, got ${STRANGER_UPLOAD_CODE}"
+assert_pass "Stranger upload blocked (403)"
+
+log_test "Grant Collaborator write permissions via Repo Owner"
+ADD_COLLAB_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X PUT "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/collaborators/${STRANGER_USER}" \
+  -H "Content-Type: application/json" \
+  -d '{"mode":"write"}')
+echo "${ADD_COLLAB_RES}" | grep -q '"message":"Collaborator updated successfully"' || assert_fail "Failed to add collaborator: ${ADD_COLLAB_RES}"
+assert_pass "Collaborator granted write access"
+
+log_test "Verify Collaborator permission reflected in Repo metadata"
+COLLAB_REPO_META=$(curl -s -b "${TEST_DIR}/stranger_cookies.txt" "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}")
+echo "${COLLAB_REPO_META}" | grep -q '"can_write":true' || assert_fail "Collaborator does not have can_write:true"
+assert_pass "can_write is true for collaborator"
+
+log_test "Verify Collaborator can now perform online file commit"
+COLLAB_COMMIT_RES=$(curl -s -b "${TEST_DIR}/stranger_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/contents/src/collab.txt" \
+  -H "Content-Type: application/json" \
+  -d '{"branch":"main","content":"Collaborator contribution","message":"Collaborator commit"}')
+echo "${COLLAB_COMMIT_RES}" | grep -q '"commit_sha":' || assert_fail "Collaborator failed to commit file: ${COLLAB_COMMIT_RES}"
+assert_pass "Collaborator committed successfully"
+
+log_test "Revoke Collaborator permissions via Repo Owner"
+REVOKE_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X DELETE "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/collaborators/${STRANGER_USER}")
+echo "${REVOKE_RES}" | grep -q '"message":"Collaborator removed successfully"' || assert_fail "Failed to remove collaborator: ${REVOKE_RES}"
+assert_pass "Collaborator access revoked"
+
+log_test "Verify Revoked Collaborator is blocked again (HTTP 403)"
+POST_REVOKE_CODE=$(curl -s -b "${TEST_DIR}/stranger_cookies.txt" -w "%{http_code}" -o /dev/null -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/contents/after_revoke.txt" \
+  -H "Content-Type: application/json" \
+  -d '{"branch":"main","content":"revoked","message":"revoked commit"}')
+[ "${POST_REVOKE_CODE}" = "403" ] || assert_fail "Expected 403 after revocation, got ${POST_REVOKE_CODE}"
+assert_pass "Access revoked and blocked (403)"
+
+# -----------------------------------------------------------------------------
 # SUITE 6: Issues, Pull Requests & Real Git Merge
 # -----------------------------------------------------------------------------
-echo -e "\n${BLUE}=== [6/8] ISSUES, PULL REQUESTS & NATIVE GIT MERGES ===${NC}"
+echo -e "\n${BLUE}=== [6/10] ISSUES, PULL REQUESTS & NATIVE GIT MERGES ===${NC}"
 
 log_test "Create Issue with Markdown description"
 ISSUE_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/issues" \
@@ -368,7 +447,7 @@ assert_pass "Merge verified on remote"
 # -----------------------------------------------------------------------------
 # SUITE 7: Git-Backed Wiki Engine
 # -----------------------------------------------------------------------------
-echo -e "\n${BLUE}=== [7/8] GIT-BACKED WIKI ENGINE ===${NC}"
+echo -e "\n${BLUE}=== [7/10] GIT-BACKED WIKI ENGINE ===${NC}"
 
 log_test "Auto-provision Wiki repository and list pages"
 WIKI_LIST=$(curl -s "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/wiki/pages")
@@ -412,7 +491,7 @@ assert_pass "CLI push reflected in Web/API"
 # -----------------------------------------------------------------------------
 # SUITE 8: ProGit Pages (GitHub Pages Hosting) & Administration
 # -----------------------------------------------------------------------------
-echo -e "\n${BLUE}=== [8/8] PROGIT PAGES HOSTING & ADMINISTRATION ===${NC}"
+echo -e "\n${BLUE}=== [8/10] PROGIT PAGES HOSTING & ADMINISTRATION ===${NC}"
 
 log_test "Configure and Enable ProGit Pages on main branch"
 PAGES_CONF=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/pages" \
@@ -460,6 +539,109 @@ MAINT_RES=$(curl -s -b "${TEST_DIR}/admin_cookies.txt" -X POST "${PROGIT_URL}/ap
   -d '{"operation":"checkpoint_wal"}')
 echo "${MAINT_RES}" | grep -q '"message":' || assert_fail "Maintenance operation failed: ${MAINT_RES}"
 assert_pass "WAL checkpoint executed"
+
+# -----------------------------------------------------------------------------
+# SUITE 9: Organizations, Teams & Enterprise Access
+# -----------------------------------------------------------------------------
+echo -e "\n${BLUE}=== [9/10] ORGANIZATIONS, TEAMS & ENTERPRISE COLLABORATION ===${NC}"
+
+ORG_NAME="org-${TIMESTAMP}"
+
+log_test "Create Organization (POST /api/v1/orgs)"
+ORG_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/orgs" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"${ORG_NAME}\",\"full_name\":\"Enterprise QA Org\",\"description\":\"Team organization for QA automation\"}")
+echo "${ORG_RES}" | grep -q "\"name\":\"${ORG_NAME}\"" || assert_fail "Failed to create organization: ${ORG_RES}"
+assert_pass "Organization created"
+
+log_test "Inspect Organization profile and metadata"
+ORG_META=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" "${PROGIT_URL}/api/v1/orgs/${ORG_NAME}")
+echo "${ORG_META}" | grep -q "\"full_name\":\"Enterprise QA Org\"" || assert_fail "Org metadata mismatch: ${ORG_META}"
+echo "${ORG_META}" | grep -q '"is_admin":true' || assert_fail "Org creator should be org admin"
+assert_pass "Organization metadata verified"
+
+log_test "Add Stranger as Member to Organization"
+ADD_MEMBER_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/orgs/${ORG_NAME}/members" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"${STRANGER_USER}\",\"role\":\"member\"}")
+echo "${ADD_MEMBER_RES}" | grep -q "Member added to organization successfully" || assert_fail "Failed to add org member: ${ADD_MEMBER_RES}"
+assert_pass "Organization member added"
+
+log_test "List Organization Members"
+ORG_MEMBERS=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" "${PROGIT_URL}/api/v1/orgs/${ORG_NAME}/members")
+echo "${ORG_MEMBERS}" | grep -q "\"username\":\"${STRANGER_USER}\"" || assert_fail "Stranger missing from org members: ${ORG_MEMBERS}"
+assert_pass "Organization members enumerated"
+
+log_test "Create Organization Team (Developers)"
+CREATE_TEAM_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/orgs/${ORG_NAME}/teams" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Developers","description":"Core development team","permission":"write"}')
+echo "${CREATE_TEAM_RES}" | grep -q '"name":"Developers"' || assert_fail "Failed to create team: ${CREATE_TEAM_RES}"
+assert_pass "Organization team created"
+
+log_test "Create Organization-owned Repository"
+ORG_REPO_NAME="service-backend"
+ORG_REPO_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"${ORG_REPO_NAME}\",\"owner\":\"${ORG_NAME}\",\"description\":\"Backend microservice\",\"private\":false,\"auto_init\":true}")
+echo "${ORG_REPO_RES}" | grep -q "\"name\":\"${ORG_REPO_NAME}\"" || assert_fail "Failed to create org repository: ${ORG_REPO_RES}"
+echo "${ORG_REPO_RES}" | grep -q "\"owner_name\":\"${ORG_NAME}\"" || assert_fail "Org repo owner mismatch: ${ORG_REPO_RES}"
+assert_pass "Organization repository created"
+
+log_test "List Repositories owned by Organization"
+ORG_REPOS_LIST=$(curl -s "${PROGIT_URL}/api/v1/orgs/${ORG_NAME}/repos")
+echo "${ORG_REPOS_LIST}" | grep -q "\"name\":\"${ORG_REPO_NAME}\"" || assert_fail "Org repo not in org repos list: ${ORG_REPOS_LIST}"
+assert_pass "Org repository enumerated"
+
+# -----------------------------------------------------------------------------
+# SUITE 10: Projects & Kanban Boards
+# -----------------------------------------------------------------------------
+echo -e "\n${BLUE}=== [10/10] PROJECTS & KANBAN BOARDS ===${NC}"
+
+log_test "Create Repository Project Board"
+PROJ_CREATE_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/projects" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Q1 Release Planning","description":"Tracking core deliverables for release"}')
+echo "${PROJ_CREATE_RES}" | grep -q '"title":"Q1 Release Planning"' || assert_fail "Failed to create project: ${PROJ_CREATE_RES}"
+PROJECT_ID=$(echo "${PROJ_CREATE_RES}" | python3 -c "import sys, json; print(json.load(sys.stdin)['id'])")
+assert_pass "Project board created (id: ${PROJECT_ID})"
+
+log_test "Verify default Kanban Columns (To do, In progress, Done)"
+PROJ_BOARD_RES=$(curl -s "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/projects/${PROJECT_ID}")
+echo "${PROJ_BOARD_RES}" | grep -q '"title":"To do"' || assert_fail "Missing 'To do' column: ${PROJ_BOARD_RES}"
+echo "${PROJ_BOARD_RES}" | grep -q '"title":"In progress"' || assert_fail "Missing 'In progress' column: ${PROJ_BOARD_RES}"
+echo "${PROJ_BOARD_RES}" | grep -q '"title":"Done"' || assert_fail "Missing 'Done' column: ${PROJ_BOARD_RES}"
+TODO_COL_ID=$(echo "${PROJ_BOARD_RES}" | python3 -c "import sys, json; print(next(c['id'] for c in json.load(sys.stdin)['columns'] if c['title'] == 'To do'))")
+DONE_COL_ID=$(echo "${PROJ_BOARD_RES}" | python3 -c "import sys, json; print(next(c['id'] for c in json.load(sys.stdin)['columns'] if c['title'] == 'Done'))")
+assert_pass "Default columns verified"
+
+log_test "Add Custom Column to Project (In Review)"
+ADD_COL_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/projects/${PROJECT_ID}/columns" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"In Review"}')
+echo "${ADD_COL_RES}" | grep -q '"title":"In Review"' || assert_fail "Failed to add column: ${ADD_COL_RES}"
+assert_pass "Custom column added"
+
+log_test "Create Task Card in To Do Column"
+ADD_CARD_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/projects/${PROJECT_ID}/cards" \
+  -H "Content-Type: application/json" \
+  -d "{\"column_id\":${TODO_COL_ID},\"content\":\"Implement OAuth2 Provider support\"}")
+echo "${ADD_CARD_RES}" | grep -q "OAuth2 Provider" || assert_fail "Failed to create card: ${ADD_CARD_RES}"
+CARD_ID=$(echo "${ADD_CARD_RES}" | python3 -c "import sys, json; print(json.load(sys.stdin)['id'])")
+assert_pass "Task card created (id: ${CARD_ID})"
+
+log_test "Move Card from 'To do' to 'Done'"
+MOVE_CARD_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X PUT "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/projects/${PROJECT_ID}/cards/${CARD_ID}" \
+  -H "Content-Type: application/json" \
+  -d "{\"column_id\":${DONE_COL_ID},\"order_num\":0}")
+echo "${MOVE_CARD_RES}" | grep -q '"message":"Card moved successfully"' || assert_fail "Failed to move card: ${MOVE_CARD_RES}"
+assert_pass "Card moved to Done"
+
+log_test "Verify Project Progress Metrics (total_cards=1, done_cards=1)"
+PROJ_UPDATED=$(curl -s "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/projects/${PROJECT_ID}")
+echo "${PROJ_UPDATED}" | grep -q '"total_cards":1' || assert_fail "total_cards metric incorrect: ${PROJ_UPDATED}"
+echo "${PROJ_UPDATED}" | grep -q '"done_cards":1' || assert_fail "done_cards metric incorrect: ${PROJ_UPDATED}"
+assert_pass "Progress metrics 100% accurate"
 
 # -----------------------------------------------------------------------------
 # SUMMARY & SCORECARD

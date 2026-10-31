@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository } from '../lib/api';
+import { api, Repository, CollaboratorUser } from '../lib/api';
 import { RepoNav } from '../components/RepoNav';
 import { 
   Settings, 
@@ -11,7 +11,10 @@ import {
   ExternalLink,
   Save,
   Lock,
-  Unlock
+  Unlock,
+  Users,
+  UserPlus,
+  Shield
 } from 'lucide-react';
 
 interface RepoSettingsProps {
@@ -25,6 +28,13 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Collaborators
+  const [collaborators, setCollaborators] = useState<CollaboratorUser[]>([]);
+  const [newCollabUser, setNewCollabUser] = useState('');
+  const [newCollabMode, setNewCollabMode] = useState('write');
+  const [collabMsg, setCollabMsg] = useState('');
+  const [addingCollab, setAddingCollab] = useState(false);
 
   // Editable fields
   const [description, setDescription] = useState('');
@@ -45,6 +55,9 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
         setEnablePages(r.repository.enable_pages === true);
         setPagesBranch(r.repository.pages_branch || 'gh-pages');
         setPagesFolder(r.repository.pages_folder || '/');
+
+        const collabs = await api.getCollaborators(owner, repoName);
+        setCollaborators(collabs || []);
       } catch (err) {
         console.error(err);
       } finally {
@@ -53,6 +66,35 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
     }
     load();
   }, [owner, repoName]);
+
+  const handleAddCollaborator = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCollabUser.trim()) return;
+    try {
+      setAddingCollab(true);
+      setCollabMsg('');
+      await api.addCollaborator(owner, repoName, newCollabUser.trim(), newCollabMode);
+      setCollabMsg(`Collaborator @${newCollabUser} added with ${newCollabMode} permissions`);
+      setNewCollabUser('');
+      const collabs = await api.getCollaborators(owner, repoName);
+      setCollaborators(collabs || []);
+      setTimeout(() => setCollabMsg(''), 4000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to add collaborator');
+    } finally {
+      setAddingCollab(false);
+    }
+  };
+
+  const handleRemoveCollaborator = async (username: string) => {
+    if (!confirm(`Are you sure you want to remove collaborator @${username}?`)) return;
+    try {
+      await api.removeCollaborator(owner, repoName, username);
+      setCollaborators(prev => prev.filter(c => c.username !== username));
+    } catch (err: any) {
+      alert(err.message || 'Failed to remove collaborator');
+    }
+  };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -285,6 +327,104 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
             </div>
           </div>
         </form>
+
+        {/* Collaborators & Access Controls */}
+        <div className="p-6 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm space-y-5">
+          <div className="flex items-center justify-between border-b border-gray-200 dark:border-dark-border pb-3">
+            <div className="flex items-center space-x-2">
+              <Users className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <h2 className="font-bold text-base text-gray-900 dark:text-white">
+                Collaborators & Edit Permissions
+              </h2>
+            </div>
+            <span className="text-xs text-gray-500 dark:text-dark-muted">
+              {collaborators.length} active {collaborators.length === 1 ? 'collaborator' : 'collaborators'}
+            </span>
+          </div>
+
+          <p className="text-xs text-gray-500 dark:text-dark-muted">
+            Grant users write or admin permissions to allow them to push commits, edit files online, upload documents, and manage project boards.
+          </p>
+
+          {collabMsg && (
+            <div className="p-2.5 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-center">
+              <Check className="w-4 h-4 mr-1.5 flex-shrink-0" />
+              {collabMsg}
+            </div>
+          )}
+
+          {/* Add collaborator form */}
+          <form onSubmit={handleAddCollaborator} className="flex flex-col sm:flex-row items-center gap-2">
+            <input
+              type="text"
+              required
+              value={newCollabUser}
+              onChange={(e) => setNewCollabUser(e.target.value)}
+              placeholder="Username to invite..."
+              className="w-full sm:flex-1 px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+            <select
+              value={newCollabMode}
+              onChange={(e) => setNewCollabMode(e.target.value)}
+              className="w-full sm:w-44 px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            >
+              <option value="write">Write (Edit & Upload)</option>
+              <option value="admin">Admin (Full Access)</option>
+              <option value="read">Read Only</option>
+            </select>
+            <button
+              type="submit"
+              disabled={addingCollab}
+              className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors whitespace-nowrap"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>{addingCollab ? 'Adding...' : 'Add Collaborator'}</span>
+            </button>
+          </form>
+
+          {/* Collaborator List */}
+          <div className="divide-y divide-gray-100 dark:divide-dark-border/40 border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden">
+            {collaborators.length === 0 ? (
+              <div className="p-4 text-center text-xs text-gray-400">
+                No external collaborators have been added yet.
+              </div>
+            ) : (
+              collaborators.map((c) => (
+                <div key={c.user_id} className="p-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-dark-hover/30 text-xs">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
+                      {c.username.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900 dark:text-white">@{c.username}</p>
+                      {c.full_name && <p className="text-gray-400 text-[11px]">{c.full_name}</p>}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <span className={`px-2 py-0.5 rounded text-[11px] font-semibold uppercase ${
+                      c.mode === 'admin' 
+                        ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300'
+                        : c.mode === 'write'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                        : 'bg-gray-100 text-gray-700 dark:bg-dark-hover dark:text-gray-300'
+                    }`}>
+                      {c.mode}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveCollaborator(c.username)}
+                      className="p-1 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                      title="Remove collaborator"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
 
         {/* Danger Zone */}
         <div className="p-6 rounded-xl border border-red-300 dark:border-red-900/60 bg-red-50/30 dark:bg-red-950/20 shadow-sm space-y-4">

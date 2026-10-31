@@ -186,7 +186,22 @@ type Organization struct {
 	AvatarURL   string    `json:"avatar_url"`
 	Location    string    `json:"location"`
 	Website     string    `json:"website"`
+	NumMembers  int       `json:"num_members,omitempty"`
+	NumRepos    int       `json:"num_repos,omitempty"`
+	NumTeams    int       `json:"num_teams,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type OrgMember struct {
+	OrgID     int64     `json:"org_id"`
+	UserID    int64     `json:"user_id"`
+	Username  string    `json:"username"`
+	FullName  string    `json:"full_name"`
+	Email     string    `json:"email"`
+	AvatarURL string    `json:"avatar_url"`
+	Role      string    `json:"role"` // "owner", "admin", "member"
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type Team struct {
@@ -195,6 +210,63 @@ type Team struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Permission  string    `json:"permission"` // "read", "write", "admin"
+	NumMembers  int       `json:"num_members,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+type TeamMember struct {
+	TeamID    int64     `json:"team_id"`
+	UserID    int64     `json:"user_id"`
+	Username  string    `json:"username"`
+	FullName  string    `json:"full_name"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type CollaboratorUser struct {
+	UserID    int64     `json:"user_id"`
+	Username  string    `json:"username"`
+	Email     string    `json:"email"`
+	FullName  string    `json:"full_name"`
+	AvatarURL string    `json:"avatar_url"`
+	Mode      string    `json:"mode"` // "read", "write", "admin"
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type Project struct {
+	ID          int64           `json:"id"`
+	RepoID      int64           `json:"repo_id"`
+	Title       string          `json:"title"`
+	Description string          `json:"description"`
+	IsClosed    bool            `json:"is_closed"`
+	CreatorID   int64           `json:"creator_id"`
+	CreatorName string          `json:"creator_name,omitempty"`
+	Columns     []ProjectColumn `json:"columns,omitempty"`
+	TotalCards  int             `json:"total_cards,omitempty"`
+	DoneCards   int             `json:"done_cards,omitempty"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+}
+
+type ProjectColumn struct {
+	ID        int64         `json:"id"`
+	ProjectID int64         `json:"project_id"`
+	Title     string        `json:"title"`
+	OrderNum  int           `json:"order_num"`
+	Cards     []ProjectCard `json:"cards,omitempty"`
+	CreatedAt time.Time     `json:"created_at"`
+}
+
+type ProjectCard struct {
+	ID          int64     `json:"id"`
+	ColumnID    int64     `json:"column_id"`
+	ProjectID   int64     `json:"project_id"`
+	IssueID     *int64    `json:"issue_id,omitempty"`
+	Issue       *Issue    `json:"issue,omitempty"`
+	Content     string    `json:"content"`
+	OrderNum    int       `json:"order_num"`
+	CreatorID   int64     `json:"creator_id"`
+	CreatorName string    `json:"creator_name,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 

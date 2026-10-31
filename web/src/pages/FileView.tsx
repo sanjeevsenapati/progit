@@ -26,6 +26,7 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
   const [size, setSize] = useState(0);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [canWrite, setCanWrite] = useState(false);
 
   // Delete modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -37,6 +38,7 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
       try {
         const r = await api.getRepo(owner, repoName);
         setRepoData(r.repository);
+        setCanWrite(Boolean(r.can_write || r.permissions?.write));
 
         const b = await api.getBlob(owner, repoName, branch, filePath);
         setContent(b.content);
@@ -132,15 +134,17 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
             </div>
 
             <div className="flex items-center space-x-2">
-              {/* Edit file online */}
-              <a
-                href={`/${owner}/${repoName}/edit/${branch}/${filePath}`}
-                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text shadow-sm"
-                title="Edit this file online"
-              >
-                <Edit2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>Edit</span>
-              </a>
+              {/* Edit file online (restricted to users with write access) */}
+              {canWrite && (
+                <a
+                  href={`/${owner}/${repoName}/edit/${branch}/${filePath}`}
+                  className="inline-flex items-center space-x-1 px-2.5 py-1 rounded border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text shadow-sm"
+                  title="Edit this file online"
+                >
+                  <Edit2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Edit</span>
+                </a>
+              )}
 
               {/* Copy Raw */}
               <button
@@ -161,14 +165,16 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
                 <span>Raw</span>
               </a>
 
-              {/* Delete file */}
-              <button
-                onClick={() => setShowDeleteModal(true)}
-                className="inline-flex items-center space-x-1 px-2 py-1 rounded border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/20 hover:bg-red-100 text-red-600 dark:text-red-400"
-                title="Delete this file"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              {/* Delete file (restricted to users with write access) */}
+              {canWrite && (
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="inline-flex items-center space-x-1 px-2 py-1 rounded border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/20 hover:bg-red-100 text-red-600 dark:text-red-400"
+                  title="Delete this file"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
 

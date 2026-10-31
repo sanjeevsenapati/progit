@@ -1,16 +1,36 @@
-import React, { useState } from 'react';
-import { api } from '../lib/api';
+import React, { useEffect, useState } from 'react';
+import { api, Organization } from '../lib/api';
 import { useAuth } from '../lib/theme';
-import { GitBranch, Lock, Globe, AlertCircle } from 'lucide-react';
+import { GitBranch, Lock, Globe, AlertCircle, Building2 } from 'lucide-react';
 
 export const NewRepo: React.FC = () => {
   const { user } = useAuth();
   const [name, setName] = useState('');
+  const [selectedOwner, setSelectedOwner] = useState('');
+  const [orgs, setOrgs] = useState<Organization[]>([]);
   const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [autoInit, setAutoInit] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setSelectedOwner(user.username);
+    }
+    const params = new URLSearchParams(window.location.search);
+    const initialOwner = params.get('owner');
+    if (initialOwner) {
+      setSelectedOwner(initialOwner);
+    }
+
+    api.listUserOrgs().then((list) => {
+      setOrgs(list || []);
+      if (initialOwner) {
+        setSelectedOwner(initialOwner);
+      }
+    }).catch(console.error);
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,6 +40,7 @@ export const NewRepo: React.FC = () => {
     try {
       const repo = await api.createRepo({
         name,
+        owner: selectedOwner || (user ? user.username : undefined),
         description,
         private: isPrivate,
         auto_init: autoInit,
@@ -54,23 +75,39 @@ export const NewRepo: React.FC = () => {
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
-            Repository Name *
+            Owner & Repository Name *
           </label>
-          <div className="flex items-center space-x-2">
-            <span className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-dark-hover border border-gray-300 dark:border-dark-border text-sm font-semibold text-gray-700 dark:text-dark-text">
-              {user ? user.username : 'owner'} /
-            </span>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            {/* Owner Dropdown */}
+            <div className="sm:w-56">
+              <select
+                value={selectedOwner}
+                onChange={(e) => setSelectedOwner(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-gray-50 dark:bg-dark-hover border border-gray-300 dark:border-dark-border text-sm font-semibold text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                {user && <option value={user.username}>{user.username} (personal)</option>}
+                {orgs.map((o) => (
+                  <option key={o.id} value={o.name}>
+                    {o.name} (organization)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <span className="hidden sm:inline text-gray-400 dark:text-dark-muted font-bold text-base">/</span>
+
+            {/* Repository Name Input */}
             <input
               type="text"
               required
               value={name}
-              onChange={e => setName(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-lg bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+              onChange={(e) => setName(e.target.value)}
+              className="flex-1 px-3 py-2 rounded-lg bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-mono"
               placeholder="my-awesome-project"
             />
           </div>
           <p className="text-xs text-gray-500 dark:text-dark-muted mt-1">
-            Great repository names are short and memorable.
+            Choose whether to create under your personal account or an organization you manage.
           </p>
         </div>
 

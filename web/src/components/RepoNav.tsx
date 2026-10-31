@@ -11,14 +11,15 @@ import {
   GitBranch, 
   History,
   BookOpen,
-  Globe
+  Globe,
+  Kanban
 } from 'lucide-react';
 
 interface RepoNavProps {
   repo: Repository;
   isStarred?: boolean;
   onToggleStar?: () => void;
-  activeTab: 'code' | 'issues' | 'pulls' | 'commits' | 'branches' | 'settings' | 'wiki' | 'pages';
+  activeTab: 'code' | 'issues' | 'pulls' | 'commits' | 'branches' | 'settings' | 'wiki' | 'pages' | 'projects';
 }
 
 export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar, activeTab }) => {
@@ -145,6 +146,18 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar,
           >
             <GitBranch className="w-4 h-4" />
             <span>Branches</span>
+          </a>
+
+          <a
+            href={`${basePath}/projects`}
+            className={`flex items-center space-x-2 py-3 px-3 border-b-2 font-medium transition-colors whitespace-nowrap ${
+              activeTab === 'projects'
+                ? 'border-emerald-600 text-gray-900 dark:text-white font-semibold'
+                : 'border-transparent text-gray-500 dark:text-dark-muted hover:text-gray-700 dark:hover:text-dark-text'
+            }`}
+          >
+            <Kanban className="w-4 h-4" />
+            <span>Projects</span>
           </a>
 
           {repo.enable_wiki !== false && (

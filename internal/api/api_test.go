@@ -323,4 +323,158 @@ func TestWikiAndPagesWorkflow(t *testing.T) {
 	}
 }
 
+func TestPermissionsAndSecurity(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	// 1. Create two users: owner and stranger
+	owner, _ := database.CreateUser("owner-user", "owner@example.com", "hash", "Owner", false)
+	stranger, _ := database.CreateUser("stranger-user", "stranger@example.com", "hash", "Stranger", false)
+
+	tokOwner, _ := database.CreateAccessToken(owner.ID, "tok-owner", "pgt_owner_token_12345", "repo,user")
+	tokStranger, _ := database.CreateAccessToken(stranger.ID, "tok-stranger", "pgt_stranger_token_12345", "repo,user")
+	_ = tokOwner
+	_ = tokStranger
+
+	// Create repository for owner
+	repo, err := database.CreateRepository(owner.ID, "secure-vault", "Confidential repo", true)
+	if err != nil {
+		t.Fatalf("failed to create repo: %v", err)
+	}
+
+	// 2. Unauthenticated write attempt to /contents/test.txt -> 401
+	fileBody := map[string]any{
+		"branch":  "main",
+		"content": "Secret content",
+		"message": "Unauthenticated file creation",
+	}
+	fBytes, _ := json.Marshal(fileBody)
+
+	reqUnauth := httptest.NewRequest("POST", "/api/v1/repos/owner-user/secure-vault/contents/test.txt", bytes.NewReader(fBytes))
+	reqUnauth.Header.Set("Content-Type", "application/json")
+	recUnauth := httptest.NewRecorder()
+	router.ServeHTTP(recUnauth, reqUnauth)
+
+	if recUnauth.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 Unauthorized for unauthenticated write, got %d", recUnauth.Code)
+	}
+
+	// 3. Stranger write attempt without permission -> 403 Forbidden
+	reqStranger := httptest.NewRequest("POST", "/api/v1/repos/owner-user/secure-vault/contents/test.txt", bytes.NewReader(fBytes))
+	reqStranger.Header.Set("Authorization", "Bearer pgt_stranger_token_12345")
+	reqStranger.Header.Set("Content-Type", "application/json")
+	recStranger := httptest.NewRecorder()
+	router.ServeHTTP(recStranger, reqStranger)
+
+	if recStranger.Code != http.StatusForbidden {
+		t.Errorf("expected 403 Forbidden for stranger write, got %d", recStranger.Code)
+	}
+
+	// 4. Add stranger as collaborator with write mode
+	reqAddCollab := httptest.NewRequest("PUT", "/api/v1/repos/owner-user/secure-vault/collaborators/stranger-user", bytes.NewReader([]byte(`{"mode":"write"}`)))
+	reqAddCollab.Header.Set("Authorization", "Bearer pgt_owner_token_12345")
+	reqAddCollab.Header.Set("Content-Type", "application/json")
+	recAddCollab := httptest.NewRecorder()
+	router.ServeHTTP(recAddCollab, reqAddCollab)
+
+	if recAddCollab.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK adding collaborator, got %d: %s", recAddCollab.Code, recAddCollab.Body.String())
+	}
+
+	// Verify stranger now has write access in repo data
+	reqGetRepo := httptest.NewRequest("GET", "/api/v1/repos/owner-user/secure-vault", nil)
+	reqGetRepo.Header.Set("Authorization", "Bearer pgt_stranger_token_12345")
+	recGetRepo := httptest.NewRecorder()
+	router.ServeHTTP(recGetRepo, reqGetRepo)
+
+	if recGetRepo.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK getting repo, got %d", recGetRepo.Code)
+	}
+	var repoRes map[string]any
+	_ = json.Unmarshal(recGetRepo.Body.Bytes(), &repoRes)
+	if repoRes["can_write"] != true {
+		t.Errorf("expected can_write: true for collaborator with write mode, got %v", repoRes["can_write"])
+	}
+
+	_ = repo
+}
+
+func TestOrganizationsAndProjectsAPI(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	user, _ := database.CreateUser("org-creator", "creator@example.com", "hash", "Creator", false)
+	_, _ = database.CreateAccessToken(user.ID, "tok", "pgt_org_creator_token_12345", "repo,user")
+
+	// 1. Create Organization via API
+	orgPayload := map[string]any{
+		"name":        "google-open-source",
+		"full_name":   "Google Open Source",
+		"description": "Open source projects from Google",
+		"location":    "Mountain View, CA",
+		"website":     "https://opensource.google",
+	}
+	orgBytes, _ := json.Marshal(orgPayload)
+	reqOrg := httptest.NewRequest("POST", "/api/v1/orgs", bytes.NewReader(orgBytes))
+	reqOrg.Header.Set("Authorization", "Bearer pgt_org_creator_token_12345")
+	reqOrg.Header.Set("Content-Type", "application/json")
+	recOrg := httptest.NewRecorder()
+	router.ServeHTTP(recOrg, reqOrg)
+
+	if recOrg.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for org, got %d: %s", recOrg.Code, recOrg.Body.String())
+	}
+
+	// 2. Create Project on a repo
+	repo, _ := database.CreateRepository(user.ID, "test-board-repo", "", false)
+	_ = repo
+
+	projPayload := map[string]any{
+		"title":       "2026 Engineering Goals",
+		"description": "Visual Kanban Roadmap",
+	}
+	projBytes, _ := json.Marshal(projPayload)
+	reqProj := httptest.NewRequest("POST", "/api/v1/repos/org-creator/test-board-repo/projects", bytes.NewReader(projBytes))
+	reqProj.Header.Set("Authorization", "Bearer pgt_org_creator_token_12345")
+	reqProj.Header.Set("Content-Type", "application/json")
+	recProj := httptest.NewRecorder()
+	router.ServeHTTP(recProj, reqProj)
+
+	if recProj.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for project, got %d: %s", recProj.Code, recProj.Body.String())
+	}
+
+	var proj database.Project
+	_ = json.Unmarshal(recProj.Body.Bytes(), &proj)
+	if proj.Title != "2026 Engineering Goals" || len(proj.Columns) != 3 {
+		t.Errorf("unexpected project: %+v", proj)
+	}
+
+	// 3. Create Card in column 1
+	cardPayload := map[string]any{
+		"column_id": proj.Columns[0].ID,
+		"content":   "Write unit test suites",
+		"order_num": 1,
+	}
+	cardBytes, _ := json.Marshal(cardPayload)
+	reqCard := httptest.NewRequest("POST", "/api/v1/repos/org-creator/test-board-repo/projects/1/cards", bytes.NewReader(cardBytes))
+	reqCard.Header.Set("Authorization", "Bearer pgt_org_creator_token_12345")
+	reqCard.Header.Set("Content-Type", "application/json")
+	recCard := httptest.NewRecorder()
+	router.ServeHTTP(recCard, reqCard)
+
+	if recCard.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for card, got %d: %s", recCard.Code, recCard.Body.String())
+	}
+
+	// 4. List Projects
+	reqList := httptest.NewRequest("GET", "/api/v1/repos/org-creator/test-board-repo/projects", nil)
+	recList := httptest.NewRecorder()
+	router.ServeHTTP(recList, reqList)
+
+	if recList.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for list projects, got %d", recList.Code)
+	}
+}
+
 

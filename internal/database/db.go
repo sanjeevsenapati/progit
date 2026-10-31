@@ -234,6 +234,84 @@ func runMigrations(db *sql.DB) error {
 		duration_ms INTEGER NOT NULL,
 		delivered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
+
+	CREATE TABLE IF NOT EXISTS organizations (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+		full_name TEXT NOT NULL DEFAULT '',
+		description TEXT NOT NULL DEFAULT '',
+		avatar_url TEXT NOT NULL DEFAULT '',
+		location TEXT NOT NULL DEFAULT '',
+		website TEXT NOT NULL DEFAULT '',
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS org_members (
+		org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		role TEXT NOT NULL DEFAULT 'member',
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY(org_id, user_id)
+	);
+
+	CREATE TABLE IF NOT EXISTS teams (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+		name TEXT NOT NULL,
+		description TEXT NOT NULL DEFAULT '',
+		permission TEXT NOT NULL DEFAULT 'write',
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(org_id, name)
+	);
+
+	CREATE TABLE IF NOT EXISTS team_members (
+		team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY(team_id, user_id)
+	);
+
+	CREATE TABLE IF NOT EXISTS team_repos (
+		team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+		repo_id INTEGER NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY(team_id, repo_id)
+	);
+
+	CREATE TABLE IF NOT EXISTS projects (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		repo_id INTEGER NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+		title TEXT NOT NULL,
+		description TEXT NOT NULL DEFAULT '',
+		is_closed BOOLEAN NOT NULL DEFAULT 0,
+		creator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_projects_repo ON projects(repo_id);
+
+	CREATE TABLE IF NOT EXISTS project_columns (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+		title TEXT NOT NULL,
+		order_num INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_project_columns ON project_columns(project_id, order_num);
+
+	CREATE TABLE IF NOT EXISTS project_cards (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		column_id INTEGER NOT NULL REFERENCES project_columns(id) ON DELETE CASCADE,
+		project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+		issue_id INTEGER REFERENCES issues(id) ON DELETE SET NULL,
+		content TEXT NOT NULL DEFAULT '',
+		order_num INTEGER NOT NULL DEFAULT 0,
+		creator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_project_cards ON project_cards(column_id, order_num);
 	`
 
 	if _, err := db.Exec(schema); err != nil {
@@ -674,6 +752,7 @@ func CanUserAccessRepo(user *User, repo *Repository, writeRequired bool) bool {
 		return true
 	}
 
+	// 1. Direct collaborator check
 	var mode string
 	err := DB.QueryRow(`SELECT mode FROM collaborators WHERE repo_id = ? AND user_id = ?`, repo.ID, user.ID).Scan(&mode)
 	if err == nil {
@@ -682,6 +761,35 @@ func CanUserAccessRepo(user *User, repo *Repository, writeRequired bool) bool {
 		}
 		return mode == "write" || mode == "admin"
 	}
+
+	// 2. Organization check (if repo is owned by an organization)
+	var orgID int64
+	err = DB.QueryRow(`SELECT id FROM organizations WHERE name = ? COLLATE NOCASE`, repo.OwnerName).Scan(&orgID)
+	if err == nil {
+		var role string
+		err = DB.QueryRow(`SELECT role FROM org_members WHERE org_id = ? AND user_id = ?`, orgID, user.ID).Scan(&role)
+		if err == nil {
+			if role == "owner" || role == "admin" {
+				return true
+			}
+			if !writeRequired {
+				return true
+			}
+			// For regular members, check team permissions
+			var count int
+			_ = DB.QueryRow(`
+				SELECT COUNT(*) FROM team_members tm
+				JOIN teams t ON tm.team_id = t.id
+				LEFT JOIN team_repos tr ON t.id = tr.team_id
+				WHERE t.org_id = ? AND tm.user_id = ? AND (t.permission = 'write' OR t.permission = 'admin')
+				AND (tr.repo_id = ? OR tr.repo_id IS NULL)
+			`, orgID, user.ID, repo.ID).Scan(&count)
+			if count > 0 {
+				return true
+			}
+		}
+	}
+
 	return false
 }
 
@@ -953,5 +1061,533 @@ func ListActivities(limit int) ([]*Activity, error) {
 		list = append(list, act)
 	}
 	return list, rows.Err()
+}
+
+// Collaborator Methods
+
+func AddCollaborator(repoID, userID int64, mode string) error {
+	if mode == "" {
+		mode = "write"
+	}
+	_, err := DB.Exec(`
+		INSERT INTO collaborators (repo_id, user_id, mode)
+		VALUES (?, ?, ?)
+		ON CONFLICT(repo_id, user_id) DO UPDATE SET mode = excluded.mode
+	`, repoID, userID, mode)
+	return err
+}
+
+func RemoveCollaborator(repoID, userID int64) error {
+	_, err := DB.Exec(`DELETE FROM collaborators WHERE repo_id = ? AND user_id = ?`, repoID, userID)
+	return err
+}
+
+func ListCollaborators(repoID int64) ([]CollaboratorUser, error) {
+	rows, err := DB.Query(`
+		SELECT u.id, u.username, u.email, u.full_name, u.avatar_url, c.mode, c.created_at
+		FROM collaborators c
+		JOIN users u ON c.user_id = u.id
+		WHERE c.repo_id = ?
+		ORDER BY c.created_at ASC
+	`, repoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []CollaboratorUser
+	for rows.Next() {
+		var c CollaboratorUser
+		if err := rows.Scan(&c.UserID, &c.Username, &c.Email, &c.FullName, &c.AvatarURL, &c.Mode, &c.CreatedAt); err != nil {
+			return nil, err
+		}
+		result = append(result, c)
+	}
+	return result, nil
+}
+
+// Organization Methods
+
+func CreateOrganization(name, fullName, description, location, website string, creatorID int64) (*Organization, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, fmt.Errorf("organization name is required")
+	}
+
+	var userExists int
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM users WHERE username = ? COLLATE NOCASE`, name).Scan(&userExists)
+	if userExists > 0 {
+		return nil, fmt.Errorf("name '%s' is already taken", name)
+	}
+
+	tx, err := DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	orgEmail := fmt.Sprintf("%s@org.progit.local", strings.ToLower(name))
+	_, err = tx.Exec(`
+		INSERT INTO users (username, email, password_hash, full_name, is_admin)
+		VALUES (?, ?, 'disabled', ?, 0)
+	`, name, orgEmail, fullName)
+	if err != nil {
+		return nil, fmt.Errorf("create organization account stub: %w", err)
+	}
+
+	res, err := tx.Exec(`
+		INSERT INTO organizations (name, full_name, description, location, website)
+		VALUES (?, ?, ?, ?, ?)
+	`, name, fullName, description, location, website)
+	if err != nil {
+		return nil, fmt.Errorf("create organization: %w", err)
+	}
+	orgID, _ := res.LastInsertId()
+
+	_, err = tx.Exec(`
+		INSERT INTO org_members (org_id, user_id, role)
+		VALUES (?, ?, 'owner')
+	`, orgID, creatorID)
+	if err != nil {
+		return nil, fmt.Errorf("add org owner: %w", err)
+	}
+
+	_, err = tx.Exec(`
+		INSERT INTO teams (org_id, name, description, permission)
+		VALUES (?, 'Owners', 'Organization Administrators with full access', 'admin')
+	`, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("create owners team: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return GetOrgByID(orgID)
+}
+
+func GetOrgByID(id int64) (*Organization, error) {
+	org := &Organization{}
+	err := DB.QueryRow(`
+		SELECT id, name, full_name, description, avatar_url, location, website, created_at, updated_at
+		FROM organizations WHERE id = ?
+	`, id).Scan(&org.ID, &org.Name, &org.FullName, &org.Description, &org.AvatarURL, &org.Location, &org.Website, &org.CreatedAt, &org.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM org_members WHERE org_id = ?`, org.ID).Scan(&org.NumMembers)
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM repositories WHERE owner_name = ? COLLATE NOCASE`, org.Name).Scan(&org.NumRepos)
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM teams WHERE org_id = ?`, org.ID).Scan(&org.NumTeams)
+	return org, nil
+}
+
+func GetOrgByName(name string) (*Organization, error) {
+	org := &Organization{}
+	err := DB.QueryRow(`
+		SELECT id, name, full_name, description, avatar_url, location, website, created_at, updated_at
+		FROM organizations WHERE name = ? COLLATE NOCASE
+	`, strings.TrimSpace(name)).Scan(&org.ID, &org.Name, &org.FullName, &org.Description, &org.AvatarURL, &org.Location, &org.Website, &org.CreatedAt, &org.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM org_members WHERE org_id = ?`, org.ID).Scan(&org.NumMembers)
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM repositories WHERE owner_name = ? COLLATE NOCASE`, org.Name).Scan(&org.NumRepos)
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM teams WHERE org_id = ?`, org.ID).Scan(&org.NumTeams)
+	return org, nil
+}
+
+func ListUserOrganizations(userID int64) ([]Organization, error) {
+	rows, err := DB.Query(`
+		SELECT o.id, o.name, o.full_name, o.description, o.avatar_url, o.location, o.website, o.created_at, o.updated_at
+		FROM organizations o
+		JOIN org_members om ON o.id = om.org_id
+		WHERE om.user_id = ?
+		ORDER BY o.name ASC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []Organization
+	for rows.Next() {
+		var o Organization
+		if err := rows.Scan(&o.ID, &o.Name, &o.FullName, &o.Description, &o.AvatarURL, &o.Location, &o.Website, &o.CreatedAt, &o.UpdatedAt); err != nil {
+			return nil, err
+		}
+		_ = DB.QueryRow(`SELECT COUNT(*) FROM org_members WHERE org_id = ?`, o.ID).Scan(&o.NumMembers)
+		_ = DB.QueryRow(`SELECT COUNT(*) FROM repositories WHERE owner_name = ? COLLATE NOCASE`, o.Name).Scan(&o.NumRepos)
+		list = append(list, o)
+	}
+	return list, nil
+}
+
+func ListAllOrganizations() ([]Organization, error) {
+	rows, err := DB.Query(`
+		SELECT id, name, full_name, description, avatar_url, location, website, created_at, updated_at
+		FROM organizations
+		ORDER BY name ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []Organization
+	for rows.Next() {
+		var o Organization
+		if err := rows.Scan(&o.ID, &o.Name, &o.FullName, &o.Description, &o.AvatarURL, &o.Location, &o.Website, &o.CreatedAt, &o.UpdatedAt); err != nil {
+			return nil, err
+		}
+		_ = DB.QueryRow(`SELECT COUNT(*) FROM org_members WHERE org_id = ?`, o.ID).Scan(&o.NumMembers)
+		_ = DB.QueryRow(`SELECT COUNT(*) FROM repositories WHERE owner_name = ? COLLATE NOCASE`, o.Name).Scan(&o.NumRepos)
+		list = append(list, o)
+	}
+	return list, nil
+}
+
+func AddOrgMember(orgID, userID int64, role string) error {
+	if role == "" {
+		role = "member"
+	}
+	_, err := DB.Exec(`
+		INSERT INTO org_members (org_id, user_id, role)
+		VALUES (?, ?, ?)
+		ON CONFLICT(org_id, user_id) DO UPDATE SET role = excluded.role
+	`, orgID, userID, role)
+	return err
+}
+
+func RemoveOrgMember(orgID, userID int64) error {
+	_, err := DB.Exec(`DELETE FROM org_members WHERE org_id = ? AND user_id = ?`, orgID, userID)
+	return err
+}
+
+func ListOrgMembers(orgID int64) ([]OrgMember, error) {
+	rows, err := DB.Query(`
+		SELECT om.org_id, om.user_id, u.username, u.full_name, u.email, u.avatar_url, om.role, om.created_at
+		FROM org_members om
+		JOIN users u ON om.user_id = u.id
+		WHERE om.org_id = ?
+		ORDER BY om.role DESC, u.username ASC
+	`, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []OrgMember
+	for rows.Next() {
+		var m OrgMember
+		if err := rows.Scan(&m.OrgID, &m.UserID, &m.Username, &m.FullName, &m.Email, &m.AvatarURL, &m.Role, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		members = append(members, m)
+	}
+	return members, nil
+}
+
+func IsOrgAdmin(orgID, userID int64) bool {
+	var role string
+	err := DB.QueryRow(`SELECT role FROM org_members WHERE org_id = ? AND user_id = ?`, orgID, userID).Scan(&role)
+	if err != nil {
+		return false
+	}
+	return role == "owner" || role == "admin"
+}
+
+func CreateTeam(orgID int64, name, description, permission string) (*Team, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, fmt.Errorf("team name required")
+	}
+	if permission == "" {
+		permission = "write"
+	}
+	res, err := DB.Exec(`
+		INSERT INTO teams (org_id, name, description, permission)
+		VALUES (?, ?, ?, ?)
+	`, orgID, name, description, permission)
+	if err != nil {
+		return nil, err
+	}
+	id, _ := res.LastInsertId()
+	return &Team{
+		ID:          id,
+		OrgID:       orgID,
+		Name:        name,
+		Description: description,
+		Permission:  permission,
+		CreatedAt:   time.Now(),
+	}, nil
+}
+
+func ListTeams(orgID int64) ([]Team, error) {
+	rows, err := DB.Query(`
+		SELECT id, org_id, name, description, permission, created_at
+		FROM teams
+		WHERE org_id = ?
+		ORDER BY name ASC
+	`, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var teams []Team
+	for rows.Next() {
+		var t Team
+		if err := rows.Scan(&t.ID, &t.OrgID, &t.Name, &t.Description, &t.Permission, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		_ = DB.QueryRow(`SELECT COUNT(*) FROM team_members WHERE team_id = ?`, t.ID).Scan(&t.NumMembers)
+		teams = append(teams, t)
+	}
+	return teams, nil
+}
+
+func AddTeamMember(teamID, userID int64) error {
+	_, err := DB.Exec(`
+		INSERT OR IGNORE INTO team_members (team_id, user_id)
+		VALUES (?, ?)
+	`, teamID, userID)
+	return err
+}
+
+func RemoveTeamMember(teamID, userID int64) error {
+	_, err := DB.Exec(`DELETE FROM team_members WHERE team_id = ? AND user_id = ?`, teamID, userID)
+	return err
+}
+
+// Project Methods
+
+func CreateProject(repoID, creatorID int64, title, description string) (*Project, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return nil, fmt.Errorf("project title is required")
+	}
+
+	tx, err := DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec(`
+		INSERT INTO projects (repo_id, title, description, creator_id)
+		VALUES (?, ?, ?, ?)
+	`, repoID, title, description, creatorID)
+	if err != nil {
+		return nil, err
+	}
+	projectID, _ := res.LastInsertId()
+
+	defaultCols := []string{"To do", "In progress", "Done"}
+	for i, col := range defaultCols {
+		_, err := tx.Exec(`
+			INSERT INTO project_columns (project_id, title, order_num)
+			VALUES (?, ?, ?)
+		`, projectID, col, i+1)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return GetProjectByID(projectID)
+}
+
+func GetProjectByID(id int64) (*Project, error) {
+	p := &Project{}
+	err := DB.QueryRow(`
+		SELECT p.id, p.repo_id, p.title, p.description, p.is_closed, p.creator_id, u.username, p.created_at, p.updated_at
+		FROM projects p
+		JOIN users u ON p.creator_id = u.id
+		WHERE p.id = ?
+	`, id).Scan(&p.ID, &p.RepoID, &p.Title, &p.Description, &p.IsClosed, &p.CreatorID, &p.CreatorName, &p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	cols, err := ListProjectColumns(p.ID)
+	if err == nil {
+		p.Columns = cols
+	}
+
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM project_cards WHERE project_id = ?`, p.ID).Scan(&p.TotalCards)
+	_ = DB.QueryRow(`
+		SELECT COUNT(*) FROM project_cards pc
+		JOIN project_columns col ON pc.column_id = col.id
+		WHERE pc.project_id = ? AND col.title = 'Done'
+	`, p.ID).Scan(&p.DoneCards)
+
+	return p, nil
+}
+
+func ListRepoProjects(repoID int64) ([]Project, error) {
+	rows, err := DB.Query(`
+		SELECT p.id, p.repo_id, p.title, p.description, p.is_closed, p.creator_id, u.username, p.created_at, p.updated_at
+		FROM projects p
+		JOIN users u ON p.creator_id = u.id
+		WHERE p.repo_id = ?
+		ORDER BY p.is_closed ASC, p.created_at DESC
+	`, repoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var projects []Project
+	for rows.Next() {
+		var p Project
+		if err := rows.Scan(&p.ID, &p.RepoID, &p.Title, &p.Description, &p.IsClosed, &p.CreatorID, &p.CreatorName, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, err
+		}
+		_ = DB.QueryRow(`SELECT COUNT(*) FROM project_cards WHERE project_id = ?`, p.ID).Scan(&p.TotalCards)
+		_ = DB.QueryRow(`
+			SELECT COUNT(*) FROM project_cards pc
+			JOIN project_columns col ON pc.column_id = col.id
+			WHERE pc.project_id = ? AND col.title = 'Done'
+		`, p.ID).Scan(&p.DoneCards)
+		projects = append(projects, p)
+	}
+	return projects, nil
+}
+
+func UpdateProject(id int64, title, description string, isClosed bool) error {
+	_, err := DB.Exec(`
+		UPDATE projects SET title = ?, description = ?, is_closed = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, title, description, isClosed, id)
+	return err
+}
+
+func DeleteProject(id int64) error {
+	_, err := DB.Exec(`DELETE FROM projects WHERE id = ?`, id)
+	return err
+}
+
+func ListProjectColumns(projectID int64) ([]ProjectColumn, error) {
+	rows, err := DB.Query(`
+		SELECT id, project_id, title, order_num, created_at
+		FROM project_columns
+		WHERE project_id = ?
+		ORDER BY order_num ASC, id ASC
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cols []ProjectColumn
+	for rows.Next() {
+		var c ProjectColumn
+		if err := rows.Scan(&c.ID, &c.ProjectID, &c.Title, &c.OrderNum, &c.CreatedAt); err != nil {
+			return nil, err
+		}
+		cards, _ := ListColumnCards(c.ID)
+		c.Cards = cards
+		cols = append(cols, c)
+	}
+	return cols, nil
+}
+
+func CreateProjectColumn(projectID int64, title string, orderNum int) (*ProjectColumn, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return nil, fmt.Errorf("column title is required")
+	}
+	res, err := DB.Exec(`
+		INSERT INTO project_columns (project_id, title, order_num)
+		VALUES (?, ?, ?)
+	`, projectID, title, orderNum)
+	if err != nil {
+		return nil, err
+	}
+	id, _ := res.LastInsertId()
+	return &ProjectColumn{
+		ID:        id,
+		ProjectID: projectID,
+		Title:     title,
+		OrderNum:  orderNum,
+		CreatedAt: time.Now(),
+	}, nil
+}
+
+func DeleteProjectColumn(columnID int64) error {
+	_, err := DB.Exec(`DELETE FROM project_columns WHERE id = ?`, columnID)
+	return err
+}
+
+func ListColumnCards(columnID int64) ([]ProjectCard, error) {
+	rows, err := DB.Query(`
+		SELECT pc.id, pc.column_id, pc.project_id, pc.issue_id, pc.content, pc.order_num, pc.creator_id, u.username, pc.created_at, pc.updated_at
+		FROM project_cards pc
+		JOIN users u ON pc.creator_id = u.id
+		WHERE pc.column_id = ?
+		ORDER BY pc.order_num ASC, pc.id ASC
+	`, columnID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cards []ProjectCard
+	for rows.Next() {
+		var c ProjectCard
+		if err := rows.Scan(&c.ID, &c.ColumnID, &c.ProjectID, &c.IssueID, &c.Content, &c.OrderNum, &c.CreatorID, &c.CreatorName, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if c.IssueID != nil {
+			issue, _ := GetIssueByID(*c.IssueID)
+			c.Issue = issue
+		}
+		cards = append(cards, c)
+	}
+	return cards, nil
+}
+
+func CreateProjectCard(projectID, columnID, creatorID int64, issueID *int64, content string, orderNum int) (*ProjectCard, error) {
+	res, err := DB.Exec(`
+		INSERT INTO project_cards (project_id, column_id, creator_id, issue_id, content, order_num)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, projectID, columnID, creatorID, issueID, content, orderNum)
+	if err != nil {
+		return nil, err
+	}
+	cardID, _ := res.LastInsertId()
+	c := &ProjectCard{
+		ID:        cardID,
+		ProjectID: projectID,
+		ColumnID:  columnID,
+		CreatorID: creatorID,
+		IssueID:   issueID,
+		Content:   content,
+		OrderNum:  orderNum,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	if issueID != nil {
+		c.Issue, _ = GetIssueByID(*issueID)
+	}
+	return c, nil
+}
+
+func MoveProjectCard(cardID, targetColumnID int64, orderNum int) error {
+	_, err := DB.Exec(`
+		UPDATE project_cards
+		SET column_id = ?, order_num = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, targetColumnID, orderNum, cardID)
+	return err
+}
+
+func DeleteProjectCard(cardID int64) error {
+	_, err := DB.Exec(`DELETE FROM project_cards WHERE id = ?`, cardID)
+	return err
 }
 
