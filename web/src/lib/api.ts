@@ -626,6 +626,8 @@ export const api = {
       app_name: string;
       domain: string;
       http_port: number;
+      https_port?: number;
+      protocol?: string;
       root_url: string;
       database_path: string;
       repositories_path: string;
@@ -637,6 +639,8 @@ export const api = {
     app_name: string;
     domain: string;
     http_port: number;
+    https_port?: number;
+    protocol?: string;
     root_url: string;
     admin_username: string;
     admin_email: string;

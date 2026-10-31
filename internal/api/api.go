@@ -44,6 +44,11 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 	w.Header().Set("X-XSS-Protection", "1; mode=block")
 
+	// HSTS when HTTPS is active or configured
+	if r.cfg.Server.HSTSMaxAge > 0 && (req.TLS != nil || req.Header.Get("X-Forwarded-Proto") == "https" || r.cfg.Server.Protocol == "https") {
+		w.Header().Set("Strict-Transport-Security", fmt.Sprintf("max-age=%d; includeSubDomains; preload", r.cfg.Server.HSTSMaxAge))
+	}
+
 	// Allow CORS for API during development
 	if strings.HasPrefix(req.URL.Path, "/api/") {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -2742,6 +2747,8 @@ func (r *Router) handleInstallStatus(w http.ResponseWriter, req *http.Request) {
 		"app_name":          r.cfg.Server.AppName,
 		"domain":            r.cfg.Server.Domain,
 		"http_port":         r.cfg.Server.HTTPPort,
+		"https_port":        r.cfg.Server.HTTPSPort,
+		"protocol":          r.cfg.Server.Protocol,
 		"root_url":          r.cfg.Server.RootURL,
 		"database_path":     r.cfg.Database.Path,
 		"repositories_path": r.cfg.Repository.Root,
@@ -2760,6 +2767,8 @@ func (r *Router) handleInstall(w http.ResponseWriter, req *http.Request) {
 		AppName       string `json:"app_name"`
 		Domain        string `json:"domain"`
 		HTTPPort      int    `json:"http_port"`
+		HTTPSPort     int    `json:"https_port"`
+		Protocol      string `json:"protocol"`
 		RootURL       string `json:"root_url"`
 		AdminUsername string `json:"admin_username"`
 		AdminEmail    string `json:"admin_email"`
@@ -2795,6 +2804,15 @@ func (r *Router) handleInstall(w http.ResponseWriter, req *http.Request) {
 	}
 	if body.HTTPPort > 0 {
 		r.cfg.Server.HTTPPort = body.HTTPPort
+	}
+	if body.HTTPSPort > 0 {
+		r.cfg.Server.HTTPSPort = body.HTTPSPort
+	}
+	if body.Protocol != "" {
+		r.cfg.Server.Protocol = strings.ToLower(body.Protocol)
+		if r.cfg.Server.Protocol == "https" {
+			r.cfg.Security.CookieSecure = true
+		}
 	}
 	if body.RootURL != "" {
 		r.cfg.Server.RootURL = body.RootURL
@@ -2865,6 +2883,11 @@ func (r *Router) handleAdminStats(w http.ResponseWriter, req *http.Request) {
 		"ssh_port":              r.cfg.SSH.Port,
 		"domain":                r.cfg.Server.Domain,
 		"http_port":             r.cfg.Server.HTTPPort,
+		"https_port":            r.cfg.Server.HTTPSPort,
+		"protocol":              r.cfg.Server.Protocol,
+		"is_https":              r.cfg.Server.Protocol == "https",
+		"enable_acme":           r.cfg.Server.EnableACME,
+		"generate_local_cert":   r.cfg.Server.GenerateLocalCert,
 		"root_url":              r.cfg.Server.RootURL,
 		"app_name":              r.cfg.Server.AppName,
 		"go_version":            runtime.Version(),

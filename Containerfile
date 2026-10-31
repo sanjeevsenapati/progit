@@ -40,13 +40,15 @@ RUN apk add --no-cache git ca-certificates tzdata curl && \
 COPY --from=backend-builder /progit /usr/local/bin/progit
 
 # Setup persistent directory structure with correct ownership
-RUN mkdir -p /data/db /data/repositories /data/config /data/logs /data/ssh && \
+RUN mkdir -p /data/db /data/repositories /data/config /data/config/https /data/logs /data/ssh && \
     chown -R progit:progit /data
 
 # Default production configuration via environment
 ENV PROGIT_APP_NAME="ProGit" \
     PROGIT_DOMAIN="localhost" \
     PROGIT_HTTP_PORT=3000 \
+    PROGIT_HTTPS_PORT=3443 \
+    PROGIT_PROTOCOL="http" \
     PROGIT_ROOT_URL="http://localhost:3000/" \
     PROGIT_DB_PATH="/data/db/progit.db" \
     PROGIT_REPO_ROOT="/data/repositories" \
@@ -57,10 +59,10 @@ ENV PROGIT_APP_NAME="ProGit" \
 USER progit:progit
 WORKDIR /data
 
-EXPOSE 3000 2222
+EXPOSE 3000 3443 2222 80 443
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+  CMD curl -k -f http://localhost:3000/api/health || curl -k -f https://localhost:3443/api/health || exit 1
 
 ENTRYPOINT ["/usr/local/bin/progit"]
 CMD ["web"]

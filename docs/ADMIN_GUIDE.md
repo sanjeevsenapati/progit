@@ -105,3 +105,59 @@ All admin endpoints require an active session or Personal Access Token from a us
 | `DELETE` | `/api/v1/admin/repos/{id}` | Admin deletes any repository from database and disk |
 | `POST` | `/api/v1/admin/maintenance` | Run maintenance: `checkpoint_wal` or `vacuum` |
 
+---
+
+## 4. Configuring HTTPS & TLS
+
+ProGit includes native, pure-Go HTTPS support with zero CGO dependencies.
+
+### 4.1 Zero-Config Self-Signed HTTPS (Development & Internal LAN)
+To enable HTTPS with automatic ECDSA self-signed certificate generation:
+```ini
+[server]
+PROTOCOL = https
+HTTPS_PORT = 3443
+REDIRECT_OTHER_PORT = true
+HTTP_PORT = 3000
+GENERATE_LOCAL_CERT = true
+CERT_FILE = custom/https/cert.pem
+KEY_FILE = custom/https/key.pem
+HSTS_MAX_AGE = 31536000
+```
+Or via environment variables:
+```bash
+PROGIT_PROTOCOL="https"
+PROGIT_HTTPS_PORT=3443
+PROGIT_REDIRECT_OTHER_PORT="true"
+PROGIT_HTTP_PORT=3000
+```
+When ProGit launches, it automatically generates a secure ECDSA P-256 certificate with SANs covering `DOMAIN`, `localhost`, `127.0.0.1`, `::1`, and local IP addresses. It starts the HTTPS server on port 3443 and an HTTP-to-HTTPS redirect server on port 3000.
+
+### 4.2 Custom TLS Certificates (Production with Enterprise CA)
+Place your `.crt` or `.pem` and `.key` files on disk:
+```ini
+[server]
+PROTOCOL = https
+HTTPS_PORT = 443
+CERT_FILE = /etc/ssl/certs/progit.crt
+KEY_FILE = /etc/ssl/private/progit.key
+REDIRECT_OTHER_PORT = true
+HTTP_PORT = 80
+HSTS_MAX_AGE = 31536000
+```
+
+### 4.3 Automated Let's Encrypt / ACME
+For public domains with automated TLS certificate issuance and zero-downtime renewal:
+```ini
+[server]
+PROTOCOL = https
+HTTPS_PORT = 443
+HTTP_PORT = 80
+ENABLE_ACME = true
+ACME_DOMAIN = git.yourcompany.com
+ACME_EMAIL = devops@yourcompany.com
+ACME_DIR = /data/config/https/acme
+REDIRECT_OTHER_PORT = true
+```
+ProGit automatically responds to ACME challenges, issues the certificate, and manages renewals.
+

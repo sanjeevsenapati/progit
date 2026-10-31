@@ -4,10 +4,12 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,11 +18,14 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/crypto/acme/autocert"
+
 	"progit.io/progit/internal/api"
 	"progit.io/progit/internal/auth"
 	"progit.io/progit/internal/config"
 	"progit.io/progit/internal/database"
 	"progit.io/progit/internal/git"
+	"progit.io/progit/internal/https"
 	"progit.io/progit/internal/ssh"
 	"progit.io/progit/internal/ui"
 )
@@ -123,20 +128,103 @@ func runWeb(args []string) {
 		spaHandler(w, r)
 	})
 
-	listenAddr := fmt.Sprintf("0.0.0.0:%d", cfg.Server.HTTPPort)
-	server := &http.Server{
-		Addr:         listenAddr,
-		Handler:      rootHandler,
-		ReadTimeout:  10 * time.Minute, // Support large git push payloads
-		WriteTimeout: 10 * time.Minute,
-	}
+	var (
+		server      *http.Server
+		redirectSrv *http.Server
+	)
 
-	go func() {
-		log.Printf("[ProGit] Starting %s server on %s (Root URL: %s)", cfg.Server.AppName, listenAddr, cfg.Server.RootURL)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("[ProGit] HTTP server listen failed: %v", err)
+	isHTTPS := strings.ToLower(cfg.Server.Protocol) == "https"
+
+	if isHTTPS {
+		var (
+			tlsConfig   *tls.Config
+			autocertMgr *autocert.Manager
+		)
+
+		if cfg.Server.EnableACME {
+			domain := cfg.Server.ACMEDomain
+			if domain == "" {
+				domain = cfg.Server.Domain
+			}
+			log.Printf("[ProGit] Initializing ACME (Let's Encrypt) TLS for domain '%s'...", domain)
+			tlsConfig, autocertMgr = https.MakeACMETLSConfig(cfg.Server.ACMEDirectory, cfg.Server.ACMEEmail, domain)
+		} else {
+			certFile := cfg.Server.CertFile
+			keyFile := cfg.Server.KeyFile
+			log.Printf("[ProGit] Loading HTTPS TLS certificate (cert: %s, key: %s)...", certFile, keyFile)
+			tlsCert, err := https.LoadOrGenerateCert(certFile, keyFile, cfg.Server.Domain, cfg.Server.GenerateLocalCert)
+			if err != nil {
+				log.Fatalf("[ProGit] Failed to initialize HTTPS certificate: %v", err)
+			}
+			tlsConfig = https.MakeTLSConfig(tlsCert, tls.VersionTLS12)
 		}
-	}()
+
+		httpsPort := cfg.Server.HTTPSPort
+		if httpsPort <= 0 {
+			httpsPort = 3443
+		}
+		httpsListenAddr := fmt.Sprintf("0.0.0.0:%d", httpsPort)
+
+		server = &http.Server{
+			Addr:         httpsListenAddr,
+			Handler:      rootHandler,
+			TLSConfig:    tlsConfig,
+			ReadTimeout:  10 * time.Minute,
+			WriteTimeout: 10 * time.Minute,
+		}
+
+		go func() {
+			log.Printf("[ProGit] Starting %s HTTPS server on %s (Root URL: %s)", cfg.Server.AppName, httpsListenAddr, cfg.Server.RootURL)
+			ln, err := net.Listen("tcp", httpsListenAddr)
+			if err != nil {
+				log.Fatalf("[ProGit] HTTPS listener failed on %s: %v", httpsListenAddr, err)
+			}
+			tlsListener := tls.NewListener(ln, tlsConfig)
+			if err := server.Serve(tlsListener); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("[ProGit] HTTPS server listen failed: %v", err)
+			}
+		}()
+
+		// Optional HTTP to HTTPS redirect server
+		if cfg.Server.RedirectOtherPort && cfg.Server.HTTPPort != httpsPort && cfg.Server.HTTPPort > 0 {
+			httpPort := cfg.Server.HTTPPort
+			httpListenAddr := fmt.Sprintf("0.0.0.0:%d", httpPort)
+
+			var redirectHandler http.Handler = https.HTTPToHTTPSRedirectHandler(httpsPort, cfg.Server.Domain)
+			if autocertMgr != nil {
+				redirectHandler = autocertMgr.HTTPHandler(redirectHandler)
+			}
+
+			redirectSrv = &http.Server{
+				Addr:         httpListenAddr,
+				Handler:      redirectHandler,
+				ReadTimeout:  10 * time.Second,
+				WriteTimeout: 10 * time.Second,
+			}
+
+			go func() {
+				log.Printf("[ProGit] Starting HTTP->HTTPS redirect listener on %s (redirecting to port %d)", httpListenAddr, httpsPort)
+				if err := redirectSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					log.Printf("[ProGit] Warning: HTTP redirect server stopped: %v", err)
+				}
+			}()
+		}
+	} else {
+		listenAddr := fmt.Sprintf("0.0.0.0:%d", cfg.Server.HTTPPort)
+		server = &http.Server{
+			Addr:         listenAddr,
+			Handler:      rootHandler,
+			ReadTimeout:  10 * time.Minute, // Support large git push payloads
+			WriteTimeout: 10 * time.Minute,
+		}
+
+		go func() {
+			log.Printf("[ProGit] Starting %s server on %s (Root URL: %s)", cfg.Server.AppName, listenAddr, cfg.Server.RootURL)
+			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("[ProGit] HTTP server listen failed: %v", err)
+			}
+		}()
+	}
 
 	// Graceful shutdown handling
 	quit := make(chan os.Signal, 1)
@@ -148,7 +236,10 @@ func runWeb(args []string) {
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Printf("[ProGit] HTTP shutdown error: %v", err)
+		log.Printf("[ProGit] Server shutdown error: %v", err)
+	}
+	if redirectSrv != nil {
+		_ = redirectSrv.Shutdown(ctx)
 	}
 	if sshServer != nil {
 		_ = sshServer.Close()

@@ -7,7 +7,9 @@ export const Install: React.FC = () => {
   const { setUser } = useAuth();
   const [appName, setAppName] = useState('ProGit');
   const [domain, setDomain] = useState('localhost');
+  const [protocol, setProtocol] = useState<'http' | 'https'>('http');
   const [httpPort, setHttpPort] = useState(3000);
+  const [httpsPort, setHttpsPort] = useState(3443);
   const [rootUrl, setRootUrl] = useState('http://localhost:3000/');
   const [adminUsername, setAdminUsername] = useState('admin');
   const [adminEmail, setAdminEmail] = useState('');
@@ -26,7 +28,11 @@ export const Install: React.FC = () => {
         setInstallLocked(s.install_locked);
         if (s.app_name) setAppName(s.app_name);
         if (s.domain) setDomain(s.domain);
+        if (s.protocol && (s.protocol === 'http' || s.protocol === 'https')) {
+          setProtocol(s.protocol);
+        }
         if (s.http_port) setHttpPort(s.http_port);
+        if (s.https_port) setHttpsPort(s.https_port);
         if (s.root_url) setRootUrl(s.root_url);
       } catch (err) {
         console.error(err);
@@ -37,16 +43,36 @@ export const Install: React.FC = () => {
     checkStatus();
   }, []);
 
+  const computeRootUrl = (proto: string, dom: string, hPort: number, sPort: number) => {
+    if (proto === 'https') {
+      if (sPort === 443) return `https://${dom}/`;
+      return `https://${dom}:${sPort}/`;
+    }
+    if (hPort === 80) return `http://${dom}/`;
+    return `http://${dom}:${hPort}/`;
+  };
+
+  const handleProtocolChange = (newProto: 'http' | 'https') => {
+    setProtocol(newProto);
+    setRootUrl(computeRootUrl(newProto, domain, httpPort, httpsPort));
+  };
+
   const handleDomainChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const d = e.target.value;
     setDomain(d);
-    setRootUrl(`http://${d}:${httpPort}/`);
+    setRootUrl(computeRootUrl(protocol, d, httpPort, httpsPort));
   };
 
   const handlePortChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const p = parseInt(e.target.value, 10) || 3000;
     setHttpPort(p);
-    setRootUrl(`http://${domain}:${p}/`);
+    setRootUrl(computeRootUrl(protocol, domain, p, httpsPort));
+  };
+
+  const handleHttpsPortChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const p = parseInt(e.target.value, 10) || 3443;
+    setHttpsPort(p);
+    setRootUrl(computeRootUrl(protocol, domain, httpPort, p));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -67,7 +93,9 @@ export const Install: React.FC = () => {
       const res = await api.install({
         app_name: appName,
         domain,
+        protocol,
         http_port: httpPort,
+        https_port: protocol === 'https' ? httpsPort : undefined,
         root_url: rootUrl,
         admin_username: adminUsername,
         admin_email: adminEmail,
@@ -175,19 +203,50 @@ export const Install: React.FC = () => {
                 className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500"
               />
             </div>
+
             <div>
               <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
-                HTTP Port
+                Protocol
               </label>
-              <input
-                type="number"
-                value={httpPort}
-                onChange={handlePortChange}
-                required
+              <select
+                value={protocol}
+                onChange={e => handleProtocolChange(e.target.value as 'http' | 'https')}
                 className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500"
-              />
+              >
+                <option value="http">HTTP (Standard)</option>
+                <option value="https">HTTPS (TLS Encrypted)</option>
+              </select>
             </div>
-            <div>
+
+            {protocol === 'https' ? (
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                  HTTPS Port
+                </label>
+                <input
+                  type="number"
+                  value={httpsPort}
+                  onChange={handleHttpsPortChange}
+                  required
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                  HTTP Port
+                </label>
+                <input
+                  type="number"
+                  value={httpPort}
+                  onChange={handlePortChange}
+                  required
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            )}
+
+            <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
                 Application Root URL
               </label>
@@ -196,8 +255,14 @@ export const Install: React.FC = () => {
                 value={rootUrl}
                 onChange={e => setRootUrl(e.target.value)}
                 required
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 font-mono text-xs"
               />
+              {protocol === 'https' && (
+                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center">
+                  <Shield className="w-3 h-3 mr-1" />
+                  HTTPS enabled: Automatic ECDSA self-signed certificate or Let's Encrypt ACME with HSTS.
+                </p>
+              )}
             </div>
           </div>
         </div>

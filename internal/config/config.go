@@ -19,12 +19,22 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	AppName     string
-	Domain      string
-	HTTPPort    int
-	RootURL     string
-	Protocol    string
-	OfflineMode bool
+	AppName           string
+	Domain            string
+	HTTPPort          int
+	HTTPSPort         int
+	RootURL           string
+	Protocol          string // "http" or "https"
+	OfflineMode       bool
+	CertFile          string
+	KeyFile           string
+	GenerateLocalCert bool
+	EnableACME        bool
+	ACMEDomain        string
+	ACMEEmail         string
+	ACMEDirectory     string
+	RedirectOtherPort bool
+	HSTSMaxAge        int
 }
 
 type DatabaseConfig struct {
@@ -64,12 +74,22 @@ var App *Config
 func DefaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
-			AppName:     "ProGit",
-			Domain:      "localhost",
-			HTTPPort:    3000,
-			RootURL:     "http://localhost:3000/",
-			Protocol:    "http",
-			OfflineMode: false,
+			AppName:           "ProGit",
+			Domain:            "localhost",
+			HTTPPort:          3000,
+			HTTPSPort:         3443,
+			RootURL:           "http://localhost:3000/",
+			Protocol:          "http",
+			OfflineMode:       false,
+			CertFile:          "custom/https/cert.pem",
+			KeyFile:           "custom/https/key.pem",
+			GenerateLocalCert: true,
+			EnableACME:        false,
+			ACMEDomain:        "",
+			ACMEEmail:         "",
+			ACMEDirectory:     "custom/https/acme",
+			RedirectOtherPort: true,
+			HSTSMaxAge:        31536000,
 		},
 		Database: DatabaseConfig{
 			Type:         "sqlite",
@@ -142,8 +162,53 @@ func Load(configPath string) (*Config, error) {
 			cfg.Server.HTTPPort = port
 		}
 	}
+	if val := os.Getenv("PROGIT_PROTOCOL"); val != "" {
+		cfg.Server.Protocol = strings.ToLower(val)
+	}
+	if val := os.Getenv("PROGIT_HTTPS_PORT"); val != "" {
+		if port, err := strconv.Atoi(val); err == nil {
+			cfg.Server.HTTPSPort = port
+		}
+	}
+	if val := os.Getenv("PROGIT_CERT_FILE"); val != "" {
+		cfg.Server.CertFile = val
+	}
+	if val := os.Getenv("PROGIT_KEY_FILE"); val != "" {
+		cfg.Server.KeyFile = val
+	}
+	if val := os.Getenv("PROGIT_GENERATE_LOCAL_CERT"); val != "" {
+		cfg.Server.GenerateLocalCert = strings.ToLower(val) == "true" || val == "1"
+	}
+	if val := os.Getenv("PROGIT_ENABLE_ACME"); val != "" {
+		cfg.Server.EnableACME = strings.ToLower(val) == "true" || val == "1"
+	}
+	if val := os.Getenv("PROGIT_ACME_DOMAIN"); val != "" {
+		cfg.Server.ACMEDomain = val
+	}
+	if val := os.Getenv("PROGIT_ACME_EMAIL"); val != "" {
+		cfg.Server.ACMEEmail = val
+	}
+	if val := os.Getenv("PROGIT_ACME_DIR"); val != "" {
+		cfg.Server.ACMEDirectory = val
+	}
+	if val := os.Getenv("PROGIT_REDIRECT_OTHER_PORT"); val != "" {
+		cfg.Server.RedirectOtherPort = strings.ToLower(val) == "true" || val == "1"
+	} else if val := os.Getenv("PROGIT_HTTPS_REDIRECT"); val != "" {
+		cfg.Server.RedirectOtherPort = strings.ToLower(val) == "true" || val == "1"
+	}
+	if val := os.Getenv("PROGIT_HSTS_MAX_AGE"); val != "" {
+		if age, err := strconv.Atoi(val); err == nil {
+			cfg.Server.HSTSMaxAge = age
+		}
+	}
 	if val := os.Getenv("PROGIT_ROOT_URL"); val != "" {
 		cfg.Server.RootURL = val
+	} else if cfg.Server.Protocol == "https" && cfg.Server.RootURL == "http://localhost:3000/" {
+		if cfg.Server.HTTPSPort == 443 {
+			cfg.Server.RootURL = fmt.Sprintf("https://%s/", cfg.Server.Domain)
+		} else {
+			cfg.Server.RootURL = fmt.Sprintf("https://%s:%d/", cfg.Server.Domain, cfg.Server.HTTPSPort)
+		}
 	}
 	if val := os.Getenv("PROGIT_DB_PATH"); val != "" {
 		cfg.Database.Path = val
@@ -164,6 +229,8 @@ func Load(configPath string) (*Config, error) {
 	}
 	if val := os.Getenv("PROGIT_COOKIE_SECURE"); val != "" {
 		cfg.Security.CookieSecure = strings.ToLower(val) == "true" || val == "1"
+	} else if cfg.Server.Protocol == "https" {
+		cfg.Security.CookieSecure = true
 	}
 
 	// Ensure storage paths are absolute
@@ -223,12 +290,36 @@ func parseINIFile(path string, cfg *Config) error {
 				if p, err := strconv.Atoi(val); err == nil {
 					cfg.Server.HTTPPort = p
 				}
+			case "HTTPS_PORT":
+				if p, err := strconv.Atoi(val); err == nil {
+					cfg.Server.HTTPSPort = p
+				}
 			case "ROOT_URL":
 				cfg.Server.RootURL = val
 			case "PROTOCOL":
-				cfg.Server.Protocol = val
+				cfg.Server.Protocol = strings.ToLower(val)
 			case "OFFLINE_MODE":
 				cfg.Server.OfflineMode = val == "true" || val == "1"
+			case "CERT_FILE":
+				cfg.Server.CertFile = val
+			case "KEY_FILE":
+				cfg.Server.KeyFile = val
+			case "GENERATE_LOCAL_CERT":
+				cfg.Server.GenerateLocalCert = val == "true" || val == "1"
+			case "ENABLE_ACME":
+				cfg.Server.EnableACME = val == "true" || val == "1"
+			case "ACME_DOMAIN":
+				cfg.Server.ACMEDomain = val
+			case "ACME_EMAIL":
+				cfg.Server.ACMEEmail = val
+			case "ACME_DIR", "ACME_DIRECTORY":
+				cfg.Server.ACMEDirectory = val
+			case "REDIRECT_OTHER_PORT", "ENABLE_HTTPS_REDIRECT":
+				cfg.Server.RedirectOtherPort = val == "true" || val == "1"
+			case "HSTS_MAX_AGE":
+				if age, err := strconv.Atoi(val); err == nil {
+					cfg.Server.HSTSMaxAge = age
+				}
 			}
 		case "database":
 			switch key {
@@ -295,9 +386,19 @@ func Save(configPath string, cfg *Config) error {
 	sb.WriteString(fmt.Sprintf("APP_NAME = %s\n", cfg.Server.AppName))
 	sb.WriteString(fmt.Sprintf("DOMAIN = %s\n", cfg.Server.Domain))
 	sb.WriteString(fmt.Sprintf("HTTP_PORT = %d\n", cfg.Server.HTTPPort))
+	sb.WriteString(fmt.Sprintf("HTTPS_PORT = %d\n", cfg.Server.HTTPSPort))
 	sb.WriteString(fmt.Sprintf("ROOT_URL = %s\n", cfg.Server.RootURL))
 	sb.WriteString(fmt.Sprintf("PROTOCOL = %s\n", cfg.Server.Protocol))
-	sb.WriteString(fmt.Sprintf("OFFLINE_MODE = %v\n\n", cfg.Server.OfflineMode))
+	sb.WriteString(fmt.Sprintf("OFFLINE_MODE = %v\n", cfg.Server.OfflineMode))
+	sb.WriteString(fmt.Sprintf("CERT_FILE = %s\n", cfg.Server.CertFile))
+	sb.WriteString(fmt.Sprintf("KEY_FILE = %s\n", cfg.Server.KeyFile))
+	sb.WriteString(fmt.Sprintf("GENERATE_LOCAL_CERT = %v\n", cfg.Server.GenerateLocalCert))
+	sb.WriteString(fmt.Sprintf("ENABLE_ACME = %v\n", cfg.Server.EnableACME))
+	sb.WriteString(fmt.Sprintf("ACME_DOMAIN = %s\n", cfg.Server.ACMEDomain))
+	sb.WriteString(fmt.Sprintf("ACME_EMAIL = %s\n", cfg.Server.ACMEEmail))
+	sb.WriteString(fmt.Sprintf("ACME_DIR = %s\n", cfg.Server.ACMEDirectory))
+	sb.WriteString(fmt.Sprintf("REDIRECT_OTHER_PORT = %v\n", cfg.Server.RedirectOtherPort))
+	sb.WriteString(fmt.Sprintf("HSTS_MAX_AGE = %d\n\n", cfg.Server.HSTSMaxAge))
 
 	sb.WriteString("[database]\n")
 	sb.WriteString(fmt.Sprintf("TYPE = %s\n", cfg.Database.Type))

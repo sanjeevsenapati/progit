@@ -89,6 +89,11 @@ grep -qi "Gogs source code" "${JS_FILE}" || assert_fail "Frontpage missing 'Buil
 grep -qi "Prettier" "${JS_FILE}" || assert_fail "Prettier theme / editor missing in bundle"
 assert_pass "Frontpage attributions and Prettier theme confirmed"
 
+log_test "Verify HSTS security headers & HTTPS readiness"
+HSTS_HEADER=$(curl -s -I -H "X-Forwarded-Proto: https" "${PROGIT_URL}/api/health" | grep -i "strict-transport-security" || true)
+echo "${HSTS_HEADER}" | grep -q "max-age=" || assert_fail "Missing Strict-Transport-Security header when HTTPS requested"
+assert_pass "HSTS header enforced"
+
 # -----------------------------------------------------------------------------
 # SUITE 2: Installation Wizard & Super Admin Setup
 # -----------------------------------------------------------------------------
@@ -634,6 +639,8 @@ log_test "Verify Super Admin Telemetry API (/api/v1/admin/stats)"
 ADMIN_STATS=$(curl -s -b "${TEST_DIR}/admin_cookies.txt" "${PROGIT_URL}/api/v1/admin/stats")
 echo "${ADMIN_STATS}" | grep -q '"users_count":' || assert_fail "Admin stats missing users_count"
 echo "${ADMIN_STATS}" | grep -q '"memory_alloc_mb":' || assert_fail "Admin stats missing memory telemetry"
+echo "${ADMIN_STATS}" | grep -q '"is_https":' || assert_fail "Admin stats missing is_https"
+echo "${ADMIN_STATS}" | grep -q '"https_port":' || assert_fail "Admin stats missing https_port"
 assert_pass "System telemetry operational"
 
 log_test "Trigger Database Maintenance (SQLite WAL Checkpoint)"

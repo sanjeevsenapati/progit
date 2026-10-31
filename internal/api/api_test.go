@@ -717,5 +717,99 @@ func TestBranchManagementAndDetails(t *testing.T) {
 	_ = cfg
 }
 
+func TestHTTPSConfigurationAndHeaders(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	// 1. Enable HTTPS on router config
+	router.cfg.Server.Protocol = "https"
+	router.cfg.Server.HTTPSPort = 3443
+	router.cfg.Server.HSTSMaxAge = 31536000
+
+	// 2. Request /api/health should have Strict-Transport-Security header
+	req := httptest.NewRequest("GET", "/api/health", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", rec.Code)
+	}
+
+	hsts := rec.Header().Get("Strict-Transport-Security")
+	if hsts != "max-age=31536000; includeSubDomains; preload" {
+		t.Errorf("expected HSTS header, got %q", hsts)
+	}
+
+	// 3. Install wizard with HTTPS protocol and port
+	installBody := map[string]any{
+		"app_name":       "ProGit Secure",
+		"domain":         "secure.git.local",
+		"http_port":      3000,
+		"https_port":     3443,
+		"protocol":       "https",
+		"root_url":       "https://secure.git.local:3443/",
+		"admin_username": "secadmin",
+		"admin_email":    "secadmin@example.com",
+		"admin_password": "Password123456!",
+	}
+	bodyBytes, _ := json.Marshal(installBody)
+	reqInstall := httptest.NewRequest("POST", "/api/v1/install", bytes.NewReader(bodyBytes))
+	reqInstall.Header.Set("Content-Type", "application/json")
+	recInstall := httptest.NewRecorder()
+	router.ServeHTTP(recInstall, reqInstall)
+
+	if recInstall.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for install, got %d: %s", recInstall.Code, recInstall.Body.String())
+	}
+
+	// Verify CookieSecure is true
+	if !router.cfg.Security.CookieSecure {
+		t.Errorf("expected CookieSecure to be true when Protocol is https")
+	}
+
+	// Verify session cookie has Secure attribute
+	cookies := recInstall.Result().Cookies()
+	var sessionCookie *http.Cookie
+	for _, c := range cookies {
+		if c.Name == auth.SessionCookieName {
+			sessionCookie = c
+			break
+		}
+	}
+	if sessionCookie == nil {
+		t.Fatalf("session cookie not found")
+	}
+	if !sessionCookie.Secure {
+		t.Errorf("expected session cookie to have Secure=true")
+	}
+
+	var installRes map[string]any
+	_ = json.Unmarshal(recInstall.Body.Bytes(), &installRes)
+	token := installRes["token"].(string)
+
+	// 4. Admin stats should reflect HTTPS parameters
+	reqStats := httptest.NewRequest("GET", "/api/v1/admin/stats", nil)
+	reqStats.Header.Set("Authorization", "Bearer "+token)
+	recStats := httptest.NewRecorder()
+	router.ServeHTTP(recStats, reqStats)
+
+	if recStats.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for stats, got %d: %s", recStats.Code, recStats.Body.String())
+	}
+
+	var stats map[string]any
+	_ = json.Unmarshal(recStats.Body.Bytes(), &stats)
+	if stats["is_https"] != true {
+		t.Errorf("expected is_https true, got %v", stats["is_https"])
+	}
+	if stats["protocol"] != "https" {
+		t.Errorf("expected protocol https, got %v", stats["protocol"])
+	}
+	if stats["https_port"] != float64(3443) {
+		t.Errorf("expected https_port 3443, got %v", stats["https_port"])
+	}
+}
+
+
 
 

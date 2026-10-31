@@ -21,6 +21,7 @@ podman run -d \
   --name "${CONTAINER_NAME}" \
   --restart=unless-stopped \
   -p 3000:3000 \
+  -p 3443:3443 \
   -p 2222:2222 \
   -v progit-data:/data/db:Z \
   -v progit-repositories:/data/repositories:Z \
@@ -30,8 +31,8 @@ podman run -d \
 
 echo "==> Container deployed. Waiting for health check..."
 for i in {1..20}; do
-    if curl -s http://localhost:3000/api/health >/dev/null 2>&1; then
-        echo "==> ProGit is UP and HEALTHY on http://localhost:3000"
+    if curl -k -s http://localhost:3000/api/health >/dev/null 2>&1 || curl -k -s https://localhost:3443/api/health >/dev/null 2>&1; then
+        echo "==> ProGit is UP and HEALTHY on port 3000 (HTTP) and 3443 (HTTPS)"
         exit 0
     fi
     sleep 1
