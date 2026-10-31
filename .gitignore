@@ -1,0 +1,33 @@
+# Binaries and build artifacts (root only)
+/progit
+/progit.exe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Runtime data & repositories
+data/
+backups/
+*.db
+*.db-wal
+*.db-shm
+*.log
+
+# Frontend dependencies and local build outputs
+node_modules/
+web/node_modules/
+web/dist/
+.vite/
+
+# Archives & Temporary files
+*.tar.gz
+*.zip
+*.tmp
+*.swp
+*~
+.DS_Store
+
+# Environment & local credentials
+.env
+conf/app.ini.local
