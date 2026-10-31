@@ -187,6 +187,11 @@ export const App: React.FC = () => {
       }
     }
 
+    // Single segment fallback: /:username (e.g. /sanjeev like GitHub)
+    if (segments.length === 1) {
+      return <UserProfile username={segments[0]} />;
+    }
+
     // 404 Not Found fallback
     return (
       <div className="py-24 text-center space-y-3">

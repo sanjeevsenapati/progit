@@ -7,8 +7,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"progit.io/progit/internal/auth"
 	"progit.io/progit/internal/config"
 	"progit.io/progit/internal/database"
 )
@@ -476,5 +478,81 @@ func TestOrganizationsAndProjectsAPI(t *testing.T) {
 		t.Fatalf("expected 200 OK for list projects, got %d", recList.Code)
 	}
 }
+
+func TestUserSettingsAndProfileOverview(t *testing.T) {
+	router, _ := setupTestRouter(t)
+
+	// 1. Create a user
+	pwdHash, _ := auth.HashPassword("Password123!")
+	u, err := database.CreateUser("settings_user", "settings@example.com", pwdHash, "Settings User", false)
+	if err != nil {
+		t.Fatalf("create user failed: %v", err)
+	}
+	_, _ = database.CreateAccessToken(u.ID, "settings-token", "pgt_settings_token_12345", "repo,user")
+
+	// 2. Verify empty keys return `[]` not `null`
+	reqKeys := httptest.NewRequest("GET", "/api/v1/user/keys", nil)
+	reqKeys.Header.Set("Authorization", "Bearer pgt_settings_token_12345")
+	recKeys := httptest.NewRecorder()
+	router.ServeHTTP(recKeys, reqKeys)
+	if recKeys.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", recKeys.Code)
+	}
+	if strings.TrimSpace(recKeys.Body.String()) != "[]" {
+		t.Errorf("expected empty array `[]` for keys, got %s", recKeys.Body.String())
+	}
+
+	// 3. Update Profile Settings
+	settingsPayload := map[string]any{
+		"full_name":  "Updated Settings User",
+		"bio":        "Building open source software with ProGit",
+		"location":   "Seattle, WA",
+		"website":    "https://example.com/settings",
+		"avatar_url": "https://example.com/avatar.png",
+	}
+	sBytes, _ := json.Marshal(settingsPayload)
+	reqUpdate := httptest.NewRequest("PUT", "/api/v1/user/settings", bytes.NewReader(sBytes))
+	reqUpdate.Header.Set("Authorization", "Bearer pgt_settings_token_12345")
+	reqUpdate.Header.Set("Content-Type", "application/json")
+	recUpdate := httptest.NewRecorder()
+	router.ServeHTTP(recUpdate, reqUpdate)
+
+	if recUpdate.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for update settings, got %d: %s", recUpdate.Code, recUpdate.Body.String())
+	}
+
+	// 4. Update Password
+	pwdPayload := map[string]any{
+		"old_password": "Password123!",
+		"new_password": "NewSecretPassword2026!",
+	}
+	pBytes, _ := json.Marshal(pwdPayload)
+	reqPwd := httptest.NewRequest("PUT", "/api/v1/user/password", bytes.NewReader(pBytes))
+	reqPwd.Header.Set("Authorization", "Bearer pgt_settings_token_12345")
+	reqPwd.Header.Set("Content-Type", "application/json")
+	recPwd := httptest.NewRecorder()
+	router.ServeHTTP(recPwd, reqPwd)
+
+	if recPwd.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for update password, got %d: %s", recPwd.Code, recPwd.Body.String())
+	}
+
+	// 5. Verify User Profile Overview
+	reqProfile := httptest.NewRequest("GET", "/api/v1/users/settings_user", nil)
+	recProfile := httptest.NewRecorder()
+	router.ServeHTTP(recProfile, reqProfile)
+
+	if recProfile.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for profile, got %d", recProfile.Code)
+	}
+
+	var profMap map[string]any
+	_ = json.Unmarshal(recProfile.Body.Bytes(), &profMap)
+	userObj := profMap["user"].(map[string]any)
+	if userObj["full_name"] != "Updated Settings User" || userObj["location"] != "Seattle, WA" {
+		t.Errorf("unexpected profile data: %+v", userObj)
+	}
+}
+
 
 

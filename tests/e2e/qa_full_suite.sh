@@ -177,7 +177,64 @@ KEY_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1
   -H "Content-Type: application/json" \
   -d "{\"title\":\"QA Test Key\",\"key\":\"${DEV_PUB_KEY}\"}")
 echo "${KEY_RES}" | grep -q '"fingerprint":' || assert_fail "Failed to add SSH key: ${KEY_RES}"
-assert_pass "SSH key registered"
+KEY_ID=$(echo "${KEY_RES}" | python3 -c "import sys, json; print(json.load(sys.stdin)['id'])")
+assert_pass "SSH key registered (id: ${KEY_ID})"
+
+log_test "List SSH Public Keys (Verify JSON array serialization)"
+KEYS_LIST=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" "${PROGIT_URL}/api/v1/user/keys")
+echo "${KEYS_LIST}" | grep -q "QA Test Key" || assert_fail "SSH keys list missing newly added key: ${KEYS_LIST}"
+assert_pass "SSH keys enumerated as array"
+
+log_test "Update User Profile Settings (PUT /api/v1/user/settings)"
+SETTINGS_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X PUT "${PROGIT_URL}/api/v1/user/settings" \
+  -H "Content-Type: application/json" \
+  -d '{"full_name":"Lead Software Architect","bio":"Passionate full-stack developer building scalable platforms","location":"Bangalore, India","website":"https://progit.io"}')
+echo "${SETTINGS_RES}" | grep -q "Lead Software Architect" || assert_fail "Profile update failed: ${SETTINGS_RES}"
+echo "${SETTINGS_RES}" | grep -q "Bangalore, India" || assert_fail "Location update failed: ${SETTINGS_RES}"
+assert_pass "Profile settings updated"
+
+log_test "Update User Password (PUT /api/v1/user/password)"
+CHANGE_PWD_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X PUT "${PROGIT_URL}/api/v1/user/password" \
+  -H "Content-Type: application/json" \
+  -d "{\"old_password\":\"${DEV_PASS}\",\"new_password\":\"NewSecurePass2026!\"}")
+echo "${CHANGE_PWD_RES}" | grep -q "Password updated successfully" || assert_fail "Password change failed: ${CHANGE_PWD_RES}"
+# Re-login with new password to ensure session validity
+REAUTH_RES=$(curl -s -c "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"${DEV_USER}\",\"password\":\"NewSecurePass2026!\"}")
+echo "${REAUTH_RES}" | grep -q "Login successful" || assert_fail "Login with updated password failed: ${REAUTH_RES}"
+DEV_PASS="NewSecurePass2026!"
+assert_pass "Password changed and re-authenticated"
+
+log_test "Inspect User Dashboard Overview API (/api/v1/user/dashboard)"
+DASH_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" "${PROGIT_URL}/api/v1/user/dashboard")
+echo "${DASH_RES}" | grep -q '"repositories":' || assert_fail "Dashboard missing repositories: ${DASH_RES}"
+echo "${DASH_RES}" | grep -q '"activities":' || assert_fail "Dashboard missing activities: ${DASH_RES}"
+echo "${DASH_RES}" | grep -q '"organizations":' || assert_fail "Dashboard missing organizations: ${DASH_RES}"
+assert_pass "Dashboard overview API verified"
+
+log_test "Inspect User Profile Overview API (/api/v1/users/:username)"
+PROF_RES=$(curl -s "${PROGIT_URL}/api/v1/users/${DEV_USER}")
+echo "${PROF_RES}" | grep -q "Lead Software Architect" || assert_fail "Profile overview missing full_name: ${PROF_RES}"
+echo "${PROF_RES}" | grep -q "Bangalore, India" || assert_fail "Profile overview missing location: ${PROF_RES}"
+echo "${PROF_RES}" | grep -q '"repositories":' || assert_fail "Profile overview missing repositories: ${PROF_RES}"
+assert_pass "Profile overview API verified"
+
+log_test "Delete SSH Public Key (DELETE /api/v1/user/keys/:id)"
+DEL_KEY_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X DELETE "${PROGIT_URL}/api/v1/user/keys/${KEY_ID}")
+echo "${DEL_KEY_RES}" | grep -q "Key deleted successfully" || assert_fail "Delete key failed: ${DEL_KEY_RES}"
+POST_DEL_KEYS=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" "${PROGIT_URL}/api/v1/user/keys")
+echo "${POST_DEL_KEYS}" | grep -q "QA Test Key" && assert_fail "Deleted key still in list: ${POST_DEL_KEYS}"
+assert_pass "SSH key deleted and removed"
+
+# Register Ed25519 key again so SSH git CLI tests in Suite 5 continue working seamlessly
+ssh-keygen -t ed25519 -N "" -f "${TEST_DIR}/id_ed25519_new" -C "${DEV_EMAIL}" >/dev/null 2>&1
+DEV_NEW_PUB=$(cat "${TEST_DIR}/id_ed25519_new.pub")
+mv -f "${TEST_DIR}/id_ed25519_new" "${TEST_DIR}/id_ed25519"
+mv -f "${TEST_DIR}/id_ed25519_new.pub" "${TEST_DIR}/id_ed25519.pub"
+curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/user/keys" \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"QA Git CLI Key\",\"key\":\"${DEV_NEW_PUB}\"}" >/dev/null
 
 # -----------------------------------------------------------------------------
 # SUITE 4: Repository Management & Visibility Controls

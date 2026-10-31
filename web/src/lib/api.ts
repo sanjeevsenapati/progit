@@ -289,7 +289,13 @@ export const api = {
 
   // Dashboard & Explore
   async getDashboard() {
-    return fetchJSON<{ user: User; repositories: Repository[]; activities: Activity[] }>('/api/v1/user/dashboard');
+    return fetchJSON<{
+      user: User;
+      repositories: Repository[];
+      activities: Activity[];
+      organizations?: Organization[];
+      starred?: Repository[];
+    }>('/api/v1/user/dashboard');
   },
 
   async explore() {
@@ -511,7 +517,34 @@ export const api = {
   },
 
   async getUserProfile(username: string) {
-    return fetchJSON<{ user: User; repositories: Repository[] }>(`/api/v1/users/${username}`);
+    return fetchJSON<{
+      user: User;
+      repositories: Repository[];
+      activities?: Activity[];
+      organizations?: Organization[];
+      starred?: Repository[];
+    }>(`/api/v1/users/${username}`);
+  },
+
+  async updateUserSettings(data: {
+    full_name?: string;
+    email?: string;
+    bio?: string;
+    location?: string;
+    website?: string;
+    avatar_url?: string;
+  }) {
+    return fetchJSON<User>('/api/v1/user/settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateUserPassword(data: { old_password: string; new_password: string }) {
+    return fetchJSON<{ message: string }>('/api/v1/user/password', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   },
 
   // Wiki

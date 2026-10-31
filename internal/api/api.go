@@ -79,6 +79,9 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("GET /api/v1/user/keys", r.handleListSSHKeys)
 	r.mux.HandleFunc("POST /api/v1/user/keys", r.handleCreateSSHKey)
 	r.mux.HandleFunc("DELETE /api/v1/user/keys/{id}", r.handleDeleteSSHKey)
+	r.mux.HandleFunc("PATCH /api/v1/user/settings", r.handleUpdateUserSettings)
+	r.mux.HandleFunc("PUT /api/v1/user/settings", r.handleUpdateUserSettings)
+	r.mux.HandleFunc("PUT /api/v1/user/password", r.handleUpdateUserPassword)
 	r.mux.HandleFunc("GET /api/v1/users/{username}", r.handleGetUserProfile)
 
 	// Repositories
@@ -387,12 +390,28 @@ func (r *Router) handleUserDashboard(w http.ResponseWriter, req *http.Request) {
 	}
 
 	repos, _ := database.ListUserRepositories(user.ID, true)
-	activities, _ := database.ListActivities(20)
+	if repos == nil {
+		repos = []*database.Repository{}
+	}
+	activities, _ := database.ListActivities(30)
+	if activities == nil {
+		activities = []*database.Activity{}
+	}
+	orgs, _ := database.ListUserOrganizations(user.ID)
+	if orgs == nil {
+		orgs = []database.Organization{}
+	}
+	starred, _ := database.ListStarredRepositories(user.ID)
+	if starred == nil {
+		starred = []*database.Repository{}
+	}
 
 	jsonResponse(w, http.StatusOK, map[string]any{
-		"user":         user,
-		"repositories": repos,
-		"activities":   activities,
+		"user":          user,
+		"repositories":  repos,
+		"activities":    activities,
+		"organizations": orgs,
+		"starred":       starred,
 	})
 }
 
@@ -524,7 +543,86 @@ func (r *Router) handleDeleteSSHKey(w http.ResponseWriter, req *http.Request) {
 	}
 	keyID, _ := strconv.ParseInt(req.PathValue("id"), 10, 64)
 	_ = database.DeleteSSHKey(user.ID, keyID)
-	jsonResponse(w, http.StatusOK, map[string]string{"message": "Key deleted"})
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "Key deleted successfully"})
+}
+
+func (r *Router) handleUpdateUserSettings(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	var body struct {
+		FullName  string `json:"full_name"`
+		Email     string `json:"email"`
+		Bio       string `json:"bio"`
+		Location  string `json:"location"`
+		Website   string `json:"website"`
+		AvatarURL string `json:"avatar_url"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	updated, err := database.UpdateUserProfile(user.ID, body.FullName, body.Email, body.Bio, body.Location, body.Website, body.AvatarURL)
+	if err != nil {
+		if strings.Contains(err.Error(), "already in use") {
+			jsonError(w, http.StatusConflict, err.Error())
+			return
+		}
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, updated)
+}
+
+func (r *Router) handleUpdateUserPassword(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	var body struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	var hash string
+	if err := database.DB.QueryRow(`SELECT password_hash FROM users WHERE id = ?`, user.ID).Scan(&hash); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if !auth.CheckPassword(body.OldPassword, hash) {
+		jsonError(w, http.StatusBadRequest, "Current password does not match")
+		return
+	}
+
+	if len(body.NewPassword) < 6 {
+		jsonError(w, http.StatusBadRequest, "New password must be at least 6 characters")
+		return
+	}
+
+	newHash, err := auth.HashPassword(body.NewPassword)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "Failed to hash password")
+		return
+	}
+
+	if err := database.UpdateUserPasswordHash(user.ID, newHash); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "Password updated successfully"})
 }
 
 func (r *Router) handleGetUserProfile(w http.ResponseWriter, req *http.Request) {
@@ -535,10 +633,31 @@ func (r *Router) handleGetUserProfile(w http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	repos, _ := database.ListUserRepositories(targetUser.ID, false)
+	currentUser := auth.AuthenticateRequest(req)
+	includePrivate := (currentUser != nil && (currentUser.IsAdmin || currentUser.ID == targetUser.ID))
+	repos, _ := database.ListUserRepositories(targetUser.ID, includePrivate)
+	if repos == nil {
+		repos = []*database.Repository{}
+	}
+	activities, _ := database.ListUserActivities(targetUser.ID, 30)
+	if activities == nil {
+		activities = []*database.Activity{}
+	}
+	orgs, _ := database.ListUserOrganizations(targetUser.ID)
+	if orgs == nil {
+		orgs = []database.Organization{}
+	}
+	starred, _ := database.ListStarredRepositories(targetUser.ID)
+	if starred == nil {
+		starred = []*database.Repository{}
+	}
+
 	jsonResponse(w, http.StatusOK, map[string]any{
-		"user":         targetUser,
-		"repositories": repos,
+		"user":          targetUser,
+		"repositories":  repos,
+		"activities":    activities,
+		"organizations": orgs,
+		"starred":       starred,
 	})
 }
 

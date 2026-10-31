@@ -418,6 +418,37 @@ func UpdateUserStatus(userID int64, isActive bool) error {
 	return err
 }
 
+func UpdateUserProfile(userID int64, fullName, email, bio, location, website, avatarURL string) (*User, error) {
+	email = strings.TrimSpace(email)
+	if email != "" {
+		var existingID int64
+		err := DB.QueryRow(`SELECT id FROM users WHERE email = ? AND id != ?`, email, userID).Scan(&existingID)
+		if err == nil {
+			return nil, fmt.Errorf("email '%s' is already in use", email)
+		}
+	}
+	_, err := DB.Exec(`
+		UPDATE users
+		SET full_name = ?,
+		    email = CASE WHEN ? != '' THEN ? ELSE email END,
+		    bio = ?,
+		    location = ?,
+		    website = ?,
+		    avatar_url = ?,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, fullName, email, email, bio, location, website, avatarURL, userID)
+	if err != nil {
+		return nil, err
+	}
+	return GetUserByID(userID)
+}
+
+func UpdateUserPasswordHash(userID int64, newHash string) error {
+	_, err := DB.Exec(`UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, newHash, userID)
+	return err
+}
+
 func DeleteUser(userID int64) error {
 	repos, _ := ListUserRepositories(userID, true)
 	for _, r := range repos {
@@ -498,7 +529,7 @@ func ListAccessTokensByUserID(userID int64) ([]*AccessToken, error) {
 	}
 	defer rows.Close()
 
-	var list []*AccessToken
+	list := []*AccessToken{}
 	for rows.Next() {
 		t := &AccessToken{}
 		if err := rows.Scan(&t.ID, &t.UserID, &t.Name, &t.TokenPrefix, &t.Scopes, &t.CreatedAt, &t.LastUsedAt); err != nil {
@@ -559,7 +590,7 @@ func ListSSHKeysByUserID(userID int64) ([]*SSHKey, error) {
 	}
 	defer rows.Close()
 
-	var list []*SSHKey
+	list := []*SSHKey{}
 	for rows.Next() {
 		k := &SSHKey{}
 		if err := rows.Scan(&k.ID, &k.UserID, &k.Title, &k.Fingerprint, &k.PublicKey, &k.CreatedAt); err != nil {
@@ -739,6 +770,38 @@ func HasStarred(userID, repoID int64) bool {
 	var exists int
 	_ = DB.QueryRow(`SELECT COUNT(*) FROM stars WHERE user_id = ? AND repo_id = ?`, userID, repoID).Scan(&exists)
 	return exists > 0
+}
+
+func ListStarredRepositories(userID int64) ([]*Repository, error) {
+	query := `
+		SELECT r.id, r.owner_id, u.username, r.name, r.description, r.is_private, r.is_fork, r.fork_parent_id,
+		       r.default_branch, r.num_stars, r.num_forks, r.num_watches, r.num_issues, r.num_pulls, r.size_bytes, r.is_archived,
+		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.created_at, r.updated_at
+		FROM repositories r
+		JOIN users u ON u.id = r.owner_id
+		JOIN stars s ON s.repo_id = r.id
+		WHERE s.user_id = ?
+		ORDER BY s.created_at DESC
+	`
+	rows, err := DB.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	list := []*Repository{}
+	for rows.Next() {
+		r := &Repository{}
+		if err := rows.Scan(
+			&r.ID, &r.OwnerID, &r.OwnerName, &r.Name, &r.Description, &r.IsPrivate, &r.IsFork, &r.ForkParentID,
+			&r.DefaultBranch, &r.NumStars, &r.NumForks, &r.NumWatches, &r.NumIssues, &r.NumPulls, &r.SizeBytes, &r.IsArchived,
+			&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.CreatedAt, &r.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		list = append(list, r)
+	}
+	return list, rows.Err()
 }
 
 func CanUserAccessRepo(user *User, repo *Repository, writeRequired bool) bool {
@@ -1052,7 +1115,35 @@ func ListActivities(limit int) ([]*Activity, error) {
 	}
 	defer rows.Close()
 
-	var list []*Activity
+	list := []*Activity{}
+	for rows.Next() {
+		act := &Activity{}
+		if err := rows.Scan(&act.ID, &act.UserID, &act.Username, &act.RepoID, &act.RepoName, &act.OpType, &act.Content, &act.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, act)
+	}
+	return list, rows.Err()
+}
+
+func ListUserActivities(userID int64, limit int) ([]*Activity, error) {
+	if limit <= 0 {
+		limit = 30
+	}
+	rows, err := DB.Query(`
+		SELECT a.id, a.user_id, u.username, a.repo_id, COALESCE(r.name, ''), a.op_type, a.content, a.created_at
+		FROM activities a
+		JOIN users u ON u.id = a.user_id
+		LEFT JOIN repositories r ON r.id = a.repo_id
+		WHERE a.user_id = ?
+		ORDER BY a.created_at DESC LIMIT ?
+	`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	list := []*Activity{}
 	for rows.Next() {
 		act := &Activity{}
 		if err := rows.Scan(&act.ID, &act.UserID, &act.Username, &act.RepoID, &act.RepoName, &act.OpType, &act.Content, &act.CreatedAt); err != nil {
