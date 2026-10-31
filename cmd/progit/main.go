@@ -114,7 +114,7 @@ func runWeb(args []string) {
 		}
 
 		// 2. Try REST API, Health checks, and ProGit Pages
-		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/pages/") {
+		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/pages/") || r.URL.Path == "/pages" {
 			apiRouter.ServeHTTP(w, r)
 			return
 		}

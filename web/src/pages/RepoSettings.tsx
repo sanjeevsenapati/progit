@@ -41,7 +41,7 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
   const [isPrivate, setIsPrivate] = useState(false);
   const [enableWiki, setEnableWiki] = useState(true);
   const [enablePages, setEnablePages] = useState(false);
-  const [pagesBranch, setPagesBranch] = useState('gh-pages');
+  const [pagesBranch, setPagesBranch] = useState('main');
   const [pagesFolder, setPagesFolder] = useState('/');
 
   useEffect(() => {
@@ -53,7 +53,7 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
         setIsPrivate(r.repository.is_private);
         setEnableWiki(r.repository.enable_wiki !== false);
         setEnablePages(r.repository.enable_pages === true);
-        setPagesBranch(r.repository.pages_branch || 'gh-pages');
+        setPagesBranch(r.repository.pages_branch || r.repository.default_branch || 'main');
         setPagesFolder(r.repository.pages_folder || '/');
 
         const collabs = await api.getCollaborators(owner, repoName);

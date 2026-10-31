@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -167,6 +168,7 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("DELETE /api/v1/repos/{owner}/{repo}/projects/{id}/cards/{card_id}", r.handleDeleteProjectCard)
 
 	// Static Pages Web Hosting
+	r.mux.HandleFunc("GET /pages/{owner}/{repo}", r.handleServePagesRedirect)
 	r.mux.HandleFunc("GET /pages/{owner}/{repo}/{path...}", r.handleServePages)
 
 	// Installation Wizard
@@ -1956,12 +1958,52 @@ func (r *Router) handleGetPagesConfig(w http.ResponseWriter, req *http.Request) 
 
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
 	branches, _ := git.GetBranches(repoDir)
+	if branches == nil {
+		branches = []string{}
+	}
 
-	pagesURL := fmt.Sprintf("%spages/%s/%s/", r.cfg.Server.RootURL, owner, repoName)
+	pagesBranch := repo.PagesBranch
+	branchExists := false
+	for _, b := range branches {
+		if b == pagesBranch {
+			branchExists = true
+			break
+		}
+	}
+	if !branchExists {
+		if repo.DefaultBranch != "" {
+			for _, b := range branches {
+				if b == repo.DefaultBranch {
+					pagesBranch = repo.DefaultBranch
+					branchExists = true
+					break
+				}
+			}
+		}
+		if !branchExists {
+			for _, b := range branches {
+				if b == "gh-pages" || b == "main" || b == "master" {
+					pagesBranch = b
+					branchExists = true
+					break
+				}
+			}
+		}
+		if !branchExists && len(branches) > 0 {
+			pagesBranch = branches[0]
+			branchExists = true
+		}
+		if pagesBranch == "" {
+			pagesBranch = "main"
+		}
+	}
+
+	rootURL := strings.TrimRight(r.cfg.Server.RootURL, "/") + "/"
+	pagesURL := fmt.Sprintf("%spages/%s/%s/", rootURL, owner, repoName)
 
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"enable_pages": repo.EnablePages,
-		"pages_branch": repo.PagesBranch,
+		"pages_branch": pagesBranch,
 		"pages_folder": repo.PagesFolder,
 		"pages_url":    pagesURL,
 		"branches":     branches,
@@ -1999,9 +2041,14 @@ func (r *Router) handleUpdatePagesConfig(w http.ResponseWriter, req *http.Reques
 		return
 	}
 
+	body.PagesBranch = strings.TrimSpace(body.PagesBranch)
 	if body.PagesBranch == "" {
-		body.PagesBranch = "gh-pages"
+		body.PagesBranch = repo.DefaultBranch
+		if body.PagesBranch == "" {
+			body.PagesBranch = "main"
+		}
 	}
+	body.PagesFolder = strings.TrimSpace(body.PagesFolder)
 	if body.PagesFolder == "" {
 		body.PagesFolder = "/"
 	}
@@ -2012,7 +2059,8 @@ func (r *Router) handleUpdatePagesConfig(w http.ResponseWriter, req *http.Reques
 	}
 
 	updatedRepo, _ := database.GetRepositoryByID(repo.ID)
-	pagesURL := fmt.Sprintf("%spages/%s/%s/", r.cfg.Server.RootURL, owner, repoName)
+	rootURL := strings.TrimRight(r.cfg.Server.RootURL, "/") + "/"
+	pagesURL := fmt.Sprintf("%spages/%s/%s/", rootURL, owner, repoName)
 
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"message":    "Pages configuration updated",
@@ -2073,11 +2121,20 @@ func (r *Router) handleUpdateRepoSettings(w http.ResponseWriter, req *http.Reque
 	}
 	pBranch := repo.PagesBranch
 	if body.PagesBranch != nil {
-		pBranch = *body.PagesBranch
+		pBranch = strings.TrimSpace(*body.PagesBranch)
+	}
+	if pBranch == "" {
+		pBranch = repo.DefaultBranch
+		if pBranch == "" {
+			pBranch = "main"
+		}
 	}
 	pFolder := repo.PagesFolder
 	if body.PagesFolder != nil {
-		pFolder = *body.PagesFolder
+		pFolder = strings.TrimSpace(*body.PagesFolder)
+	}
+	if pFolder == "" {
+		pFolder = "/"
 	}
 
 	if err := database.UpdateRepositorySettings(repo.ID, desc, priv, wiki, pages, pBranch, pFolder); err != nil {
@@ -2087,6 +2144,16 @@ func (r *Router) handleUpdateRepoSettings(w http.ResponseWriter, req *http.Reque
 
 	updatedRepo, _ := database.GetRepositoryByID(repo.ID)
 	jsonResponse(w, http.StatusOK, updatedRepo)
+}
+
+func (r *Router) handleServePagesRedirect(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	target := fmt.Sprintf("/pages/%s/%s/", owner, repoName)
+	if req.URL.RawQuery != "" {
+		target += "?" + req.URL.RawQuery
+	}
+	http.Redirect(w, req, target, http.StatusMovedPermanently)
 }
 
 func (r *Router) handleServePages(w http.ResponseWriter, req *http.Request) {
@@ -2101,79 +2168,133 @@ func (r *Router) handleServePages(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if !repo.EnablePages {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte("ProGit Pages is not enabled for this repository."))
+		renderPagesMessage(w, http.StatusNotFound, "ProGit Pages Disabled", fmt.Sprintf("ProGit Pages is currently disabled for repository <strong>%s/%s</strong>.<br><br>The repository administrator can enable it under <strong>Settings &rarr; ProGit Pages</strong>.", htmlEscape(owner), htmlEscape(repoName)), repo)
 		return
 	}
 
 	if repo.IsPrivate {
 		user := auth.AuthenticateRequest(req)
 		if !database.CanUserAccessRepo(user, repo, false) {
-			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			w.WriteHeader(http.StatusForbidden)
-			_, _ = w.Write([]byte("Access to private repository Pages requires authentication."))
+			renderPagesMessage(w, http.StatusForbidden, "Authentication Required", fmt.Sprintf("Repository <strong>%s/%s</strong> is private. Please sign in to an account with access to view this site.", htmlEscape(owner), htmlEscape(repoName)), repo)
 			return
 		}
 	}
 
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
+	branches, _ := git.GetBranches(repoDir)
+
+	// Determine branch to serve with smart fallback
 	branch := repo.PagesBranch
-	if branch == "" {
-		branch = "gh-pages"
+	branchFound := false
+	for _, b := range branches {
+		if b == branch {
+			branchFound = true
+			break
+		}
 	}
+
+	if !branchFound {
+		candidates := []string{repo.DefaultBranch, "main", "gh-pages", "master"}
+		for _, cand := range candidates {
+			if cand == "" {
+				continue
+			}
+			for _, b := range branches {
+				if b == cand {
+					branch = b
+					branchFound = true
+					break
+				}
+			}
+			if branchFound {
+				break
+			}
+		}
+		if !branchFound && len(branches) > 0 {
+			branch = branches[0]
+			branchFound = true
+		}
+	}
+
+	if !branchFound {
+		renderPagesMessage(w, http.StatusOK, "Repository Is Empty", fmt.Sprintf("Repository <strong>%s/%s</strong> does not have any branches or commits yet.<br><br>Push commits to publish your site.", htmlEscape(owner), htmlEscape(repoName)), repo)
+		return
+	}
+
 	folder := strings.Trim(repo.PagesFolder, "/")
-
-	// Default file
 	subPath = strings.TrimPrefix(subPath, "/")
-	if subPath == "" || strings.HasSuffix(subPath, "/") {
-		subPath = filepath.Join(subPath, "index.html")
-	}
 
-	filePath := subPath
-	if folder != "" {
-		filePath = filepath.Join(folder, subPath)
-	}
+	isIndexRequest := subPath == "" || strings.HasSuffix(subPath, "/")
 
-	content, err := git.GetRaw(repoDir, branch, filePath)
-	if err != nil {
-		if strings.HasSuffix(filePath, "index.html") {
-			baseDir := filepath.Dir(filePath)
-			mdPath := filepath.Join(baseDir, "index.md")
-			if baseDir == "." {
-				mdPath = "index.md"
+	var content []byte
+	var resolvedPath string
+
+	if isIndexRequest {
+		indexNames := []string{"index.html", "index.htm", "index.md", "README.md", "readme.md", "Readme.md"}
+		var searchPaths []string
+
+		for _, name := range indexNames {
+			if folder != "" {
+				searchPaths = append(searchPaths, filepath.Join(folder, subPath, name))
 			}
-			content, err = git.GetRaw(repoDir, branch, mdPath)
-			if err != nil {
-				readmePath := filepath.Join(baseDir, "README.md")
-				if baseDir == "." {
-					readmePath = "README.md"
-				}
-				content, err = git.GetRaw(repoDir, branch, readmePath)
-				if err == nil {
-					filePath = readmePath
-				}
-			} else {
-				filePath = mdPath
+			searchPaths = append(searchPaths, filepath.Join(subPath, name))
+		}
+
+		for _, p := range searchPaths {
+			cleanP := filepath.Clean(p)
+			if c, err := git.GetRaw(repoDir, branch, cleanP); err == nil && len(c) > 0 {
+				content = c
+				resolvedPath = cleanP
+				break
 			}
 		}
-	}
-
-	if err != nil {
-		custom404Path := "404.html"
+	} else {
+		var searchPaths []string
 		if folder != "" {
-			custom404Path = filepath.Join(folder, "404.html")
+			searchPaths = append(searchPaths, filepath.Join(folder, subPath))
 		}
-		if notFoundContent, err404 := git.GetRaw(repoDir, branch, custom404Path); err404 == nil {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.WriteHeader(http.StatusNotFound)
-			_, _ = w.Write(notFoundContent)
+		searchPaths = append(searchPaths, subPath)
+
+		for _, p := range searchPaths {
+			cleanP := filepath.Clean(p)
+			if c, err := git.GetRaw(repoDir, branch, cleanP); err == nil {
+				content = c
+				resolvedPath = cleanP
+				break
+			}
+		}
+	}
+
+	if resolvedPath == "" {
+		var custom404Paths []string
+		if folder != "" {
+			custom404Paths = append(custom404Paths, filepath.Join(folder, "404.html"))
+		}
+		custom404Paths = append(custom404Paths, "404.html")
+
+		for _, p := range custom404Paths {
+			cleanP := filepath.Clean(p)
+			if c404, err := git.GetRaw(repoDir, branch, cleanP); err == nil && len(c404) > 0 {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(c404)
+				return
+			}
+		}
+
+		if isIndexRequest {
+			renderPagesWelcome(w, repo, branch, folder)
 			return
 		}
+
 		http.NotFound(w, req)
 		return
 	}
 
+	servePagesContent(w, resolvedPath, content, repo)
+}
+
+func servePagesContent(w http.ResponseWriter, filePath string, content []byte, repo *database.Repository) {
 	ext := strings.ToLower(filepath.Ext(filePath))
 	switch ext {
 	case ".html", ".htm":
@@ -2183,37 +2304,86 @@ func (r *Router) handleServePages(w http.ResponseWriter, req *http.Request) {
 	case ".md":
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		html := fmt.Sprintf(`<!DOCTYPE html>
+		htmlBody := renderMarkdownToHTML(string(content))
+		title := filepath.Base(filePath)
+		page := fmt.Sprintf(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>%s/%s - ProGit Pages</title>
+  <title>%s - %s/%s - ProGit Pages</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #24292f; background: #fff; }
-    @media (prefers-color-scheme: dark) { body { color: #c9d1d9; background: #0d1117; } a { color: #58a6ff; } }
-    pre { background: #f6f8fa; padding: 16px; border-radius: 6px; overflow: auto; }
-    code { font-family: monospace; font-size: 85%%; }
-    h1, h2, h3 { border-bottom: 1px solid #d0d7de; padding-bottom: 8px; }
-    footer { margin-top: 50px; font-size: 12px; color: #57606a; border-top: 1px solid #d0d7de; padding-top: 10px; }
+    :root {
+      --bg: #ffffff;
+      --text: #24292f;
+      --border: #d0d7de;
+      --code-bg: #f6f8fa;
+      --accent: #0969da;
+      --blockquote: #57606a;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --text: #c9d1d9;
+        --border: #30363d;
+        --code-bg: #161b22;
+        --accent: #58a6ff;
+        --blockquote: #8b949e;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      max-width: 860px;
+      margin: 40px auto;
+      padding: 0 24px;
+      color: var(--text);
+      background-color: var(--bg);
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1, h2, h3, h4, h5, h6 { margin-top: 24px; margin-bottom: 16px; font-weight: 600; line-height: 1.25; }
+    h1 { font-size: 2em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
+    h2 { font-size: 1.5em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
+    h3 { font-size: 1.25em; }
+    p, ul, ol, table, pre { margin-top: 0; margin-bottom: 16px; }
+    ul, ol { padding-left: 2em; }
+    li + li { margin-top: 0.25em; }
+    code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-size: 85%%; background: var(--code-bg); padding: 0.2em 0.4em; border-radius: 6px; }
+    pre { background: var(--code-bg); padding: 16px; border-radius: 8px; overflow: auto; border: 1px solid var(--border); }
+    pre code { background: transparent; padding: 0; font-size: 90%%; }
+    blockquote { padding: 0 1em; color: var(--blockquote); border-left: 0.25em solid var(--border); margin: 0 0 16px 0; }
+    hr { height: 0.25em; padding: 0; margin: 24px 0; background-color: var(--border); border: 0; }
+    header.site-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 16px; margin-bottom: 24px; border-bottom: 1px solid var(--border); font-size: 14px; }
+    header.site-header a { font-weight: 600; }
+    footer.site-footer { margin-top: 60px; font-size: 12px; color: var(--blockquote); border-top: 1px solid var(--border); padding-top: 16px; display: flex; justify-content: space-between; align-items: center; }
   </style>
 </head>
 <body>
-  <div class="content"><pre style="background:transparent;border:none;white-space:pre-wrap;font-family:inherit;">%s</pre></div>
-  <footer>Published with ProGit Pages • Repository: <a href="/%s/%s">%s/%s</a></footer>
+  <header class="site-header">
+    <div><strong><a href="/%s/%s">%s / %s</a></strong> &bull; ProGit Pages</div>
+    <div><a href="/%s/%s">View Code &rarr;</a></div>
+  </header>
+  <main class="markdown-body">
+    %s
+  </main>
+  <footer class="site-footer">
+    <span>Published with <strong>ProGit Pages</strong></span>
+    <span>Source: <a href="/%s/%s">%s/%s</a></span>
+  </footer>
 </body>
-</html>`, repo.OwnerName, repo.Name, strings.ReplaceAll(string(content), "<", "&lt;"), repo.OwnerName, repo.Name, repo.OwnerName, repo.Name)
-		_, _ = w.Write([]byte(html))
+</html>`, htmlEscape(title), htmlEscape(repo.OwnerName), htmlEscape(repo.Name), htmlEscape(repo.OwnerName), htmlEscape(repo.Name), htmlEscape(repo.OwnerName), htmlEscape(repo.Name), htmlEscape(repo.OwnerName), htmlEscape(repo.Name), htmlBody, htmlEscape(repo.OwnerName), htmlEscape(repo.Name), htmlEscape(repo.OwnerName), htmlEscape(repo.Name))
+		_, _ = w.Write([]byte(page))
 	case ".css":
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(content)
-	case ".js":
+	case ".js", ".mjs":
 		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(content)
 	case ".json":
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(content)
 	case ".svg":
@@ -2232,8 +2402,24 @@ func (r *Router) handleServePages(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "image/gif")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(content)
+	case ".webp":
+		w.Header().Set("Content-Type", "image/webp")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(content)
 	case ".ico":
 		w.Header().Set("Content-Type", "image/x-icon")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(content)
+	case ".woff":
+		w.Header().Set("Content-Type", "font/woff")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(content)
+	case ".woff2":
+		w.Header().Set("Content-Type", "font/woff2")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(content)
+	case ".ttf":
+		w.Header().Set("Content-Type", "font/ttf")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(content)
 	default:
@@ -2241,6 +2427,307 @@ func (r *Router) handleServePages(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(content)
 	}
+}
+
+func renderPagesWelcome(w http.ResponseWriter, repo *database.Repository, branch, folder string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+
+	sourceDisplay := branch
+	if folder != "" && folder != "/" {
+		sourceDisplay += " (" + folder + ")"
+	}
+
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>%s/%s - ProGit Pages</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --emerald: #10b981;
+      --emerald-dark: #059669;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #090d16;
+        --card-bg: #111827;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --border: #1f2937;
+        --emerald: #10b981;
+        --emerald-dark: #34d399;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      max-width: 580px;
+      width: 100%%;
+      padding: 36px 32px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+      text-align: center;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.12);
+      color: var(--emerald-dark);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      margin-bottom: 16px;
+    }
+    .badge svg { width: 14px; height: 14px; }
+    h1 { font-size: 24px; font-weight: 800; margin: 0 0 10px; }
+    p { font-size: 14px; color: var(--muted); line-height: 1.6; margin: 0 0 24px; }
+    .source-box {
+      background: rgba(100, 116, 139, 0.07);
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 24px;
+      text-align: left;
+    }
+    .source-box strong { color: var(--text); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 18px;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .btn-primary { background: #10b981; color: #ffffff; }
+    .btn-primary:hover { background: #059669; }
+    .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-secondary:hover { background: rgba(100, 116, 139, 0.1); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">
+      <svg fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+      ProGit Pages Active
+    </div>
+    <h1>%s / %s</h1>
+    <p>Your ProGit Pages site is active and ready, but no <code>index.html</code> or <code>README.md</code> was found in your publishing source.</p>
+    <div class="source-box">
+      <div>Source Branch: <strong>%s</strong></div>
+      <div style="margin-top: 4px;">Target Folder: <strong>%s</strong></div>
+    </div>
+    <div class="actions">
+      <a class="btn btn-primary" href="/%s/%s/new/%s">Create index.html</a>
+      <a class="btn btn-secondary" href="/%s/%s">Browse Repository</a>
+      <a class="btn btn-secondary" href="/%s/%s/pages">Pages Settings</a>
+    </div>
+  </div>
+</body>
+</html>`, htmlEscape(repo.OwnerName), htmlEscape(repo.Name), htmlEscape(repo.OwnerName), htmlEscape(repo.Name), htmlEscape(sourceDisplay), htmlEscape(folder), htmlEscape(repo.OwnerName), htmlEscape(repo.Name), htmlEscape(branch), htmlEscape(repo.OwnerName), htmlEscape(repo.Name), htmlEscape(repo.OwnerName), htmlEscape(repo.Name))
+	_, _ = w.Write([]byte(html))
+}
+
+func renderPagesMessage(w http.ResponseWriter, status int, title, message string, repo *database.Repository) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+
+	owner := "Repository"
+	name := ""
+	if repo != nil {
+		owner = repo.OwnerName
+		name = repo.Name
+	}
+
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>%s - ProGit Pages</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #090d16;
+        --card-bg: #111827;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --border: #1f2937;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      max-width: 540px;
+      width: 100%%;
+      padding: 36px 32px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+      text-align: center;
+    }
+    h1 { font-size: 22px; font-weight: 800; margin: 0 0 12px; }
+    p { font-size: 14px; color: var(--muted); line-height: 1.6; margin: 0 0 24px; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: 8px;
+      text-decoration: none;
+      background: #10b981;
+      color: #ffffff;
+    }
+    .btn:hover { background: #059669; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>%s</h1>
+    <p>%s</p>
+    <a class="btn" href="/%s/%s">Go to Repository</a>
+  </div>
+</body>
+</html>`, htmlEscape(title), htmlEscape(title), message, htmlEscape(owner), htmlEscape(name))
+	_, _ = w.Write([]byte(html))
+}
+
+var (
+	mdCodeBlockRegex  = regexp.MustCompile("(?s)```([a-zA-Z0-9_-]*)\n(.*?)```")
+	mdInlineCodeRegex = regexp.MustCompile("`([^`]+)`")
+	mdLinkRegex       = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+	mdBoldRegex       = regexp.MustCompile(`\*\*([^*]+)\*\*`)
+	mdItalicRegex     = regexp.MustCompile(`\*([^*]+)\*`)
+)
+
+func renderMarkdownToHTML(md string) string {
+	var codeBlocks []string
+	md = mdCodeBlockRegex.ReplaceAllStringFunc(md, func(match string) string {
+		sub := mdCodeBlockRegex.FindStringSubmatch(match)
+		code := htmlEscape(sub[2])
+		token := fmt.Sprintf("@@CODEBLOCK_%d@@", len(codeBlocks))
+		codeBlocks = append(codeBlocks, fmt.Sprintf("<pre><code>%s</code></pre>", code))
+		return token
+	})
+
+	lines := strings.Split(md, "\n")
+	var out []string
+	inList := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		if strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* ") {
+			if !inList {
+				out = append(out, "<ul>")
+				inList = true
+			}
+			item := strings.TrimSpace(trimmed[2:])
+			out = append(out, fmt.Sprintf("<li>%s</li>", formatInlineMarkdown(item)))
+			continue
+		} else if inList {
+			out = append(out, "</ul>")
+			inList = false
+		}
+
+		if trimmed == "" {
+			continue
+		}
+
+		if strings.HasPrefix(trimmed, "# ") {
+			out = append(out, fmt.Sprintf("<h1>%s</h1>", formatInlineMarkdown(strings.TrimSpace(trimmed[2:]))))
+		} else if strings.HasPrefix(trimmed, "## ") {
+			out = append(out, fmt.Sprintf("<h2>%s</h2>", formatInlineMarkdown(strings.TrimSpace(trimmed[3:]))))
+		} else if strings.HasPrefix(trimmed, "### ") {
+			out = append(out, fmt.Sprintf("<h3>%s</h3>", formatInlineMarkdown(strings.TrimSpace(trimmed[4:]))))
+		} else if strings.HasPrefix(trimmed, "#### ") {
+			out = append(out, fmt.Sprintf("<h4>%s</h4>", formatInlineMarkdown(strings.TrimSpace(trimmed[5:]))))
+		} else if strings.HasPrefix(trimmed, "> ") {
+			out = append(out, fmt.Sprintf("<blockquote><p>%s</p></blockquote>", formatInlineMarkdown(strings.TrimSpace(trimmed[2:]))))
+		} else if strings.HasPrefix(trimmed, "---") || strings.HasPrefix(trimmed, "***") {
+			out = append(out, "<hr>")
+		} else if strings.HasPrefix(trimmed, "@@CODEBLOCK_") && strings.HasSuffix(trimmed, "@@") {
+			out = append(out, trimmed)
+		} else {
+			out = append(out, fmt.Sprintf("<p>%s</p>", formatInlineMarkdown(trimmed)))
+		}
+	}
+
+	if inList {
+		out = append(out, "</ul>")
+	}
+
+	result := strings.Join(out, "\n")
+	for idx, cb := range codeBlocks {
+		token := fmt.Sprintf("@@CODEBLOCK_%d@@", idx)
+		result = strings.Replace(result, token, cb, 1)
+	}
+
+	return result
+}
+
+func formatInlineMarkdown(s string) string {
+	s = htmlEscape(s)
+	s = mdInlineCodeRegex.ReplaceAllString(s, "<code>$1</code>")
+	s = mdBoldRegex.ReplaceAllString(s, "<strong>$1</strong>")
+	s = mdItalicRegex.ReplaceAllString(s, "<em>$1</em>")
+	s = mdLinkRegex.ReplaceAllString(s, `<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>`)
+	return s
+}
+
+func htmlEscape(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, `"`, "&quot;")
+	s = strings.ReplaceAll(s, "'", "&#39;")
+	return s
 }
 
 // Installation Handlers

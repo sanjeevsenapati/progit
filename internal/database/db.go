@@ -128,7 +128,7 @@ func runMigrations(db *sql.DB) error {
 		is_archived BOOLEAN NOT NULL DEFAULT 0,
 		enable_wiki BOOLEAN NOT NULL DEFAULT 1,
 		enable_pages BOOLEAN NOT NULL DEFAULT 0,
-		pages_branch TEXT NOT NULL DEFAULT 'gh-pages',
+		pages_branch TEXT NOT NULL DEFAULT 'main',
 		pages_folder TEXT NOT NULL DEFAULT '/',
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -321,8 +321,9 @@ func runMigrations(db *sql.DB) error {
 	// Migration columns for existing databases
 	_, _ = db.Exec(`ALTER TABLE repositories ADD COLUMN enable_wiki BOOLEAN NOT NULL DEFAULT 1`)
 	_, _ = db.Exec(`ALTER TABLE repositories ADD COLUMN enable_pages BOOLEAN NOT NULL DEFAULT 0`)
-	_, _ = db.Exec(`ALTER TABLE repositories ADD COLUMN pages_branch TEXT NOT NULL DEFAULT 'gh-pages'`)
+	_, _ = db.Exec(`ALTER TABLE repositories ADD COLUMN pages_branch TEXT NOT NULL DEFAULT 'main'`)
 	_, _ = db.Exec(`ALTER TABLE repositories ADD COLUMN pages_folder TEXT NOT NULL DEFAULT '/'`)
+	_, _ = db.Exec(`UPDATE repositories SET pages_branch = default_branch WHERE pages_branch = 'gh-pages' OR pages_branch = ''`)
 
 	return nil
 }
@@ -612,7 +613,7 @@ func CreateRepository(ownerID int64, name, description string, isPrivate bool) (
 	name = strings.TrimSpace(name)
 	res, err := DB.Exec(`
 		INSERT INTO repositories (owner_id, name, description, is_private, default_branch, enable_wiki, enable_pages, pages_branch, pages_folder)
-		VALUES (?, ?, ?, ?, 'main', 1, 0, 'gh-pages', '/')
+		VALUES (?, ?, ?, ?, 'main', 1, 0, 'main', '/')
 	`, ownerID, name, description, isPrivate)
 	if err != nil {
 		return nil, err

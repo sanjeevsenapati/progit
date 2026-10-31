@@ -86,6 +86,12 @@ export const App: React.FC = () => {
       return <UserProfile username={username} />;
     }
 
+    // ProGit Pages static hosting passthrough
+    if (path.startsWith('/pages/')) {
+      window.location.reload();
+      return null;
+    }
+
     // Repository Routes: /:owner/:repo/...
     const segments = path.split('/').filter(Boolean);
     if (segments.length >= 2) {

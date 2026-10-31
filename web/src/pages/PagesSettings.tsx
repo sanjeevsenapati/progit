@@ -47,9 +47,24 @@ export const PagesSettings: React.FC<PagesSettingsProps> = ({ owner, repo: repoN
       const configRes = await api.getPagesConfig(owner, repoName);
       setPagesConfig(configRes);
       setEnablePages(configRes.enable_pages);
-      setPagesBranch(configRes.pages_branch || (repoRes.branches.includes('gh-pages') ? 'gh-pages' : repoRes.repository.default_branch || 'main'));
+      const availBranches = configRes.branches || repoRes.branches || [];
+      setBranches(availBranches);
+      let selectedBranch = configRes.pages_branch;
+      if (!selectedBranch || (availBranches.length > 0 && !availBranches.includes(selectedBranch))) {
+        if (availBranches.includes(repoRes.repository.default_branch)) {
+          selectedBranch = repoRes.repository.default_branch;
+        } else if (availBranches.includes('main')) {
+          selectedBranch = 'main';
+        } else if (availBranches.includes('gh-pages')) {
+          selectedBranch = 'gh-pages';
+        } else if (availBranches.length > 0) {
+          selectedBranch = availBranches[0];
+        } else {
+          selectedBranch = repoRes.repository.default_branch || 'main';
+        }
+      }
+      setPagesBranch(selectedBranch);
       setPagesFolder(configRes.pages_folder || '/');
-      setBranches(configRes.branches || repoRes.branches || []);
     } catch (err) {
       console.error('Failed to load pages config:', err);
     } finally {

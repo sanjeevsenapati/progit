@@ -324,6 +324,41 @@ func TestWikiAndPagesWorkflow(t *testing.T) {
 	if !bytes.Contains(recServePages.Body.Bytes(), []byte("wiki-demo")) {
 		t.Errorf("expected page output to contain 'wiki-demo', got %s", recServePages.Body.String())
 	}
+
+	// 9. Redirect without trailing slash: GET /pages/alice/wiki-demo -> 301
+	reqRedirect := httptest.NewRequest("GET", "/pages/alice/wiki-demo", nil)
+	recRedirect := httptest.NewRecorder()
+	router.ServeHTTP(recRedirect, reqRedirect)
+	if recRedirect.Code != http.StatusMovedPermanently {
+		t.Errorf("expected 301 Moved Permanently, got %d", recRedirect.Code)
+	}
+	if recRedirect.Header().Get("Location") != "/pages/alice/wiki-demo/" {
+		t.Errorf("expected Location /pages/alice/wiki-demo/, got %s", recRedirect.Header().Get("Location"))
+	}
+
+	// 10. Test Smart Branch Fallback: set pages_branch to nonexistent 'gh-pages'
+	badBranchBody := map[string]any{
+		"enable_pages": true,
+		"pages_branch": "gh-pages",
+		"pages_folder": "/",
+	}
+	badBranchBytes, _ := json.Marshal(badBranchBody)
+	reqBadBranch := httptest.NewRequest("POST", "/api/v1/repos/alice/wiki-demo/pages", bytes.NewReader(badBranchBytes))
+	reqBadBranch.Header.Set("Authorization", "Bearer "+token)
+	reqBadBranch.Header.Set("Content-Type", "application/json")
+	recBadBranch := httptest.NewRecorder()
+	router.ServeHTTP(recBadBranch, reqBadBranch)
+	if recBadBranch.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for pages config, got %d", recBadBranch.Code)
+	}
+
+	// Now fetch /pages/alice/wiki-demo/ - must fall back to 'main' and return 200 OK, NOT 404!
+	reqFallback := httptest.NewRequest("GET", "/pages/alice/wiki-demo/", nil)
+	recFallback := httptest.NewRecorder()
+	router.ServeHTTP(recFallback, reqFallback)
+	if recFallback.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK with branch fallback, got %d: %s", recFallback.Code, recFallback.Body.String())
+	}
 }
 
 func TestPermissionsAndSecurity(t *testing.T) {
