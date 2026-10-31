@@ -78,6 +78,17 @@ EXPLORE_HTML=$(curl -s -f "${PROGIT_URL}/explore")
 echo "${EXPLORE_HTML}" | grep -q 'id="root"' || assert_fail "SPA fallback failed for /explore"
 assert_pass "SPA fallback functional"
 
+log_test "Verify Frontpage Attributions & Prettier: Prodevans, Sanjeev Senapati, Gogs credit"
+ASSET_JS=$(echo "${ROOT_HTML}" | grep -o 'src="/assets/index-[^"]*\.js"' | head -n1 | cut -d'"' -f2)
+[ -n "${ASSET_JS}" ] || assert_fail "Could not find JS asset in root HTML"
+JS_FILE="${TEST_DIR}/bundle.js"
+curl -s -f "${PROGIT_URL}${ASSET_JS}" -o "${JS_FILE}"
+grep -qi "Prodevans" "${JS_FILE}" || assert_fail "Frontpage missing 'Supported by Prodevans'"
+grep -qi "Sanjeev Senapati" "${JS_FILE}" || assert_fail "Frontpage missing 'Created by Sanjeev Senapati'"
+grep -qi "Gogs source code" "${JS_FILE}" || assert_fail "Frontpage missing 'Built on top of Gogs source code'"
+grep -qi "Prettier" "${JS_FILE}" || assert_fail "Prettier theme / editor missing in bundle"
+assert_pass "Frontpage attributions and Prettier theme confirmed"
+
 # -----------------------------------------------------------------------------
 # SUITE 2: Installation Wizard & Super Admin Setup
 # -----------------------------------------------------------------------------
@@ -274,6 +285,41 @@ echo "${STAR_RES}" | grep -q '"starred":true' || assert_fail "Failed to star rep
 UNSTAR_RES=$(curl -s -b "${TEST_DIR}/admin_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/star")
 echo "${UNSTAR_RES}" | grep -q '"starred":false' || assert_fail "Failed to unstar repo: ${UNSTAR_RES}"
 assert_pass "Star toggle functional"
+
+# -----------------------------------------------------------------------------
+# SUITE 4B: Branch Management & UI Branch Operations
+# -----------------------------------------------------------------------------
+echo -e "\n${BLUE}=== [4B/10] BRANCH MANAGEMENT & UI BRANCH LIFECYCLE ===${NC}"
+
+log_test "List Repository Branches (GET /api/v1/repos/:owner/:repo/branches)"
+BRANCHES_RES=$(curl -s "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/branches")
+echo "${BRANCHES_RES}" | grep -q "main" || assert_fail "Branches missing main: ${BRANCHES_RES}"
+assert_pass "Branches listed"
+
+log_test "List Branch Details with commit info (GET /branches?detail=true)"
+BRANCH_DETAILS=$(curl -s "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/branches?detail=true")
+echo "${BRANCH_DETAILS}" | grep -q '"is_default":true' || assert_fail "Branch details missing is_default: ${BRANCH_DETAILS}"
+echo "${BRANCH_DETAILS}" | grep -q '"commit_sha":' || assert_fail "Branch details missing commit_sha: ${BRANCH_DETAILS}"
+assert_pass "Branch details retrieved with commit info"
+
+log_test "Create New Branch via UI API (POST /branches)"
+CREATE_BRANCH_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/branches" \
+  -H "Content-Type: application/json" \
+  -d '{"branch_name":"ui-feature-branch","base_ref":"main"}')
+echo "${CREATE_BRANCH_RES}" | grep -q '"branch":"ui-feature-branch"' || assert_fail "Failed to create branch: ${CREATE_BRANCH_RES}"
+assert_pass "Branch created successfully via UI API"
+
+log_test "Enforce Branch Protection: Block Deleting Default Branch (DELETE /branches/main)"
+DEL_MAIN_CODE=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -w "%{http_code}" -o /dev/null -X DELETE "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/branches/main")
+[ "${DEL_MAIN_CODE}" = "400" ] || assert_fail "Expected 400 when attempting to delete main, got ${DEL_MAIN_CODE}"
+assert_pass "Default branch deletion blocked"
+
+log_test "Delete Non-Default Branch via UI API (DELETE /branches/:branch)"
+DEL_BRANCH_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X DELETE "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/branches/ui-feature-branch")
+echo "${DEL_BRANCH_RES}" | grep -q "Branch deleted successfully" || assert_fail "Failed to delete branch: ${DEL_BRANCH_RES}"
+POST_DEL_BRANCHES=$(curl -s "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/branches")
+echo "${POST_DEL_BRANCHES}" | grep -q "ui-feature-branch" && assert_fail "Deleted branch still exists: ${POST_DEL_BRANCHES}"
+assert_pass "Branch deleted successfully"
 
 # -----------------------------------------------------------------------------
 # SUITE 5: Git CLI Operations (Smart HTTP & Native SSH)

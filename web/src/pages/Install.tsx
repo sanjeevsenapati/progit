@@ -299,6 +299,15 @@ export const Install: React.FC = () => {
           </button>
         </div>
       </form>
+
+      <div className="text-center text-xs text-gray-500 dark:text-dark-muted space-y-1 pt-4 border-t border-gray-200 dark:border-dark-border/40">
+        <p>
+          Supported by <span className="font-semibold text-emerald-600 dark:text-emerald-400">Prodevans</span> • Created by <span className="font-semibold text-gray-900 dark:text-white">Sanjeev Senapati</span>
+        </p>
+        <p className="text-[11px] text-gray-400">
+          Credit: Built on top of Gogs source code. Released under the MIT License.
+        </p>
+      </div>
     </div>
   );
 };

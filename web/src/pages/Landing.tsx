@@ -1,14 +1,24 @@
 import React from 'react';
-import { GitBranch, Shield, Zap, Terminal, Server, CheckCircle2 } from 'lucide-react';
+import { GitBranch, Shield, Zap, Terminal, Server, CheckCircle2, Heart, ExternalLink, Award } from 'lucide-react';
 
 export const Landing: React.FC = () => {
   return (
     <div className="min-h-[calc(100vh-3.5rem)] flex flex-col justify-between">
       {/* Hero Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto text-center">
-        <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 mb-8">
-          <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>ProGit 1.0 — Production-Ready Self-Hosted Git Hosting</span>
+        {/* Attribution Badges */}
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-8">
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+            <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>ProGit 1.0 — Production-Ready Self-Hosted Git Hosting</span>
+          </div>
+          <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-dark-hover text-gray-700 dark:text-dark-text border border-gray-300 dark:border-dark-border">
+            <span>Supported by</span>
+            <strong className="text-emerald-600 dark:text-emerald-400 font-bold">Prodevans</strong>
+            <span className="text-gray-400">•</span>
+            <span>Created by</span>
+            <strong className="text-gray-900 dark:text-white font-bold">Sanjeev Senapati</strong>
+          </div>
         </div>
 
         <h1 className="text-4xl sm:text-6xl font-extrabold text-gray-900 dark:text-white tracking-tight leading-tight">
@@ -75,11 +85,60 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
+      {/* Sponsorship, Creator & Open Source Heritage Section */}
+      <section className="py-12 bg-gray-50 dark:bg-dark-bg/60 border-t border-gray-200 dark:border-dark-border">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface p-8 shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div>
+                <div className="inline-flex items-center space-x-1.5 text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2">
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>Sponsorship & Backing</span>
+                </div>
+                <h4 className="text-base font-bold text-gray-900 dark:text-white mb-2">Supported by Prodevans</h4>
+                <p className="text-xs text-gray-600 dark:text-dark-muted leading-relaxed">
+                  Enterprise-grade infrastructure, DevOps automation, continuous verification, and production backing proudly supported by <strong>Prodevans</strong>.
+                </p>
+              </div>
+
+              <div>
+                <div className="inline-flex items-center space-x-1.5 text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 mb-2">
+                  <Award className="w-3.5 h-3.5" />
+                  <span>Lead Architect</span>
+                </div>
+                <h4 className="text-base font-bold text-gray-900 dark:text-white mb-2">Created by Sanjeev Senapati</h4>
+                <p className="text-xs text-gray-600 dark:text-dark-muted leading-relaxed">
+                  Architected and engineered by <strong>Sanjeev Senapati</strong> as a modern, high-performance, developer-centric self-hosted Git platform.
+                </p>
+              </div>
+
+              <div>
+                <div className="inline-flex items-center space-x-1.5 text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2">
+                  <Heart className="w-3.5 h-3.5" />
+                  <span>Open Source Heritage</span>
+                </div>
+                <h4 className="text-base font-bold text-gray-900 dark:text-white mb-2">Built on Top of Gogs Source Code</h4>
+                <p className="text-xs text-gray-600 dark:text-dark-muted leading-relaxed">
+                  Credit: This project is built on top of the <strong>Gogs source code</strong>, modernized with pure Go SQLite WAL architecture, native SSH daemon, and a GitHub-grade SPA interface.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
-      <footer className="py-6 border-t border-gray-200 dark:border-dark-border text-center text-xs text-gray-500 dark:text-dark-muted">
-        <p>© 2026 ProGit Project. Released under the MIT License.</p>
+      <footer className="py-8 border-t border-gray-200 dark:border-dark-border text-center text-xs text-gray-500 dark:text-dark-muted space-y-2">
+        <p className="font-medium text-gray-700 dark:text-dark-text">
+          Supported by <span className="font-bold text-emerald-600 dark:text-emerald-400">Prodevans</span> • Created by <span className="font-bold text-gray-900 dark:text-white">Sanjeev Senapati</span>
+        </p>
+        <p className="text-gray-600 dark:text-dark-muted">
+          Credit: This is built on the top of Gogs source code. Released under the MIT License.
+        </p>
+        <p className="text-[11px] text-gray-400">
+          © {new Date().getFullYear()} ProGit Project. All rights reserved.
+        </p>
       </footer>
     </div>
   );
 };
-

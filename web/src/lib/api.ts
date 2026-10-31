@@ -78,6 +78,15 @@ export interface Commit {
   timestamp: string;
 }
 
+export interface BranchDetail {
+  name: string;
+  is_default: boolean;
+  commit_sha: string;
+  commit_message: string;
+  author_name: string;
+  commit_time: number;
+}
+
 export interface FileDiff {
   old_path: string;
   new_path: string;
@@ -366,10 +375,20 @@ export const api = {
     return fetchJSON<string[]>(`/api/v1/repos/${owner}/${repo}/branches`);
   },
 
+  async getBranchDetails(owner: string, repo: string) {
+    return fetchJSON<BranchDetail[]>(`/api/v1/repos/${owner}/${repo}/branches?detail=true`);
+  },
+
   async createBranch(owner: string, repo: string, branchName: string, baseRef?: string) {
-    return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}/branches`, {
+    return fetchJSON<{ message: string; branch?: string }>(`/api/v1/repos/${owner}/${repo}/branches`, {
       method: 'POST',
       body: JSON.stringify({ branch_name: branchName, base_ref: baseRef }),
+    });
+  },
+
+  async deleteBranch(owner: string, repo: string, branchName: string) {
+    return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}/branches/${encodeURIComponent(branchName)}`, {
+      method: 'DELETE',
     });
   },
 

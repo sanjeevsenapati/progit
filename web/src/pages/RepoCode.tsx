@@ -41,6 +41,9 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
   const [canWrite, setCanWrite] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showBranchDropdown, setShowBranchDropdown] = useState(false);
+  const [branchFilter, setBranchFilter] = useState('');
+  const [creatingBranch, setCreatingBranch] = useState(false);
 
   useEffect(() => {
     async function loadRepo() {
@@ -99,6 +102,23 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleQuickCreateBranch = async (name: string) => {
+    const cleanName = name.trim();
+    if (!cleanName || creatingBranch) return;
+    try {
+      setCreatingBranch(true);
+      await api.createBranch(owner, repoName, cleanName, currentBranch);
+      setBranches(prev => [...prev, cleanName]);
+      setShowBranchDropdown(false);
+      setBranchFilter('');
+      handleBranchChange(cleanName);
+    } catch (err: any) {
+      alert(err.message || 'Failed to create branch');
+    } finally {
+      setCreatingBranch(false);
+    }
+  };
+
   if (loading && !repoData) {
     return <div className="py-20 text-center text-sm text-gray-400">Loading repository...</div>;
   }
@@ -126,21 +146,104 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
         {/* Controls: Branch Switcher & Clone Popover */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
-            {/* Branch Selector */}
+            {/* Branch Selector Popover */}
             <div className="relative">
-              <select
-                value={currentBranch}
-                onChange={e => handleBranchChange(e.target.value)}
-                className="appearance-none pl-8 pr-8 py-1.5 text-xs font-semibold rounded-lg bg-gray-50 dark:bg-dark-surface border border-gray-300 dark:border-dark-border text-gray-800 dark:text-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-sm"
+              <button
+                type="button"
+                onClick={() => setShowBranchDropdown(!showBranchDropdown)}
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-50 dark:bg-dark-surface border border-gray-300 dark:border-dark-border text-gray-800 dark:text-white hover:bg-gray-100 dark:hover:bg-dark-hover shadow-sm"
               >
-                {branches.map(b => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
-              <GitBranch className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-gray-500 pointer-events-none" />
+                <GitBranch className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span className="font-mono">{currentBranch}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+              </button>
+
+              {showBranchDropdown && (
+                <div className="absolute left-0 mt-1 w-72 rounded-xl bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border shadow-xl z-50 overflow-hidden">
+                  <div className="p-2.5 border-b border-gray-100 dark:border-dark-border flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-900 dark:text-white">Switch branches</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowBranchDropdown(false)}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text"
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  {/* Filter input */}
+                  <div className="p-2 border-b border-gray-100 dark:border-dark-border">
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Find or create a branch..."
+                      value={branchFilter}
+                      onChange={(e) => setBranchFilter(e.target.value)}
+                      className="w-full px-2.5 py-1 text-xs rounded border border-gray-300 dark:border-dark-border bg-gray-50 dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+                    />
+                  </div>
+
+                  {/* Quick create branch option if filter doesn't match existing */}
+                  {canWrite && branchFilter.trim() && !branches.includes(branchFilter.trim()) && (
+                    <button
+                      type="button"
+                      disabled={creatingBranch}
+                      onClick={() => handleQuickCreateBranch(branchFilter.trim())}
+                      className="w-full p-2.5 text-left text-xs bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-b border-gray-100 dark:border-dark-border flex items-center space-x-2 font-medium"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span className="truncate">
+                        Create branch <strong className="font-mono">{branchFilter.trim()}</strong> from <span className="font-mono">{currentBranch}</span>
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Branch List */}
+                  <div className="max-h-56 overflow-y-auto divide-y divide-gray-50 dark:divide-dark-border/40">
+                    {branches
+                      .filter((b) => b.toLowerCase().includes(branchFilter.toLowerCase()))
+                      .map((b) => (
+                        <button
+                          key={b}
+                          type="button"
+                          onClick={() => {
+                            setShowBranchDropdown(false);
+                            setBranchFilter('');
+                            handleBranchChange(b);
+                          }}
+                          className={`w-full px-3 py-2 text-left text-xs font-mono flex items-center justify-between hover:bg-gray-50 dark:hover:bg-dark-hover transition-colors ${
+                            b === currentBranch
+                              ? 'text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50/30 dark:bg-emerald-950/10'
+                              : 'text-gray-700 dark:text-dark-text'
+                          }`}
+                        >
+                          <span className="truncate">{b}</span>
+                          {b === currentBranch && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                        </button>
+                      ))}
+                  </div>
+
+                  {/* Footer link to full branches page */}
+                  <div className="p-2 bg-gray-50 dark:bg-dark-hover/40 border-t border-gray-100 dark:border-dark-border text-center">
+                    <a
+                      href={`/${owner}/${repoName}/branches`}
+                      className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
+                    >
+                      View all branches ({branches.length})
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Direct Link to all branches */}
+            <a
+              href={`/${owner}/${repoName}/branches`}
+              className="hidden sm:inline-flex items-center space-x-1 text-xs font-semibold text-gray-500 dark:text-dark-muted hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+            >
+              <GitBranch className="w-3.5 h-3.5" />
+              <span>{branches.length} branches</span>
+            </a>
 
             {/* Breadcrumb Path */}
             <div className="flex items-center space-x-1.5 text-sm font-semibold">

@@ -410,6 +410,16 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Dashboard Footer Attribution */}
+        <div className="pt-8 pb-4 text-center text-xs text-gray-500 dark:text-dark-muted border-t border-gray-200 dark:border-dark-border/40 mt-8 space-y-1">
+          <p>
+            Supported by <span className="font-semibold text-emerald-600 dark:text-emerald-400">Prodevans</span> • Created by <span className="font-semibold text-gray-900 dark:text-white">Sanjeev Senapati</span>
+          </p>
+          <p className="text-[11px] text-gray-400">
+            Credit: Built on top of Gogs source code. Released under the MIT License.
+          </p>
+        </div>
       </div>
     </div>
   );

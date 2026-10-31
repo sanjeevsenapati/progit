@@ -13,6 +13,7 @@ import (
 	"progit.io/progit/internal/auth"
 	"progit.io/progit/internal/config"
 	"progit.io/progit/internal/database"
+	"progit.io/progit/internal/git"
 )
 
 func setupTestRouter(t *testing.T) (*Router, func()) {
@@ -552,6 +553,133 @@ func TestUserSettingsAndProfileOverview(t *testing.T) {
 	if userObj["full_name"] != "Updated Settings User" || userObj["location"] != "Seattle, WA" {
 		t.Errorf("unexpected profile data: %+v", userObj)
 	}
+}
+
+func TestBranchManagementAndDetails(t *testing.T) {
+	router, cfg := setupTestRouter(t)
+
+	// 1. Create a user and repo with README
+	pwdHash, _ := auth.HashPassword("BranchPass123!")
+	u, err := database.CreateUser("branch_user", "branch@example.com", pwdHash, "Branch Master", false)
+	if err != nil {
+		t.Fatalf("create user failed: %v", err)
+	}
+	tokenStr := "pgt_branch_token_9999"
+	_, _ = database.CreateAccessToken(u.ID, "branch-token", tokenStr, "repo")
+
+	repoPayload := map[string]any{
+		"name":        "branch-repo",
+		"description": "Testing UI branch management",
+		"private":     false,
+		"auto_init":   true,
+	}
+	rBytes, _ := json.Marshal(repoPayload)
+	reqRepo := httptest.NewRequest("POST", "/api/v1/repos", bytes.NewReader(rBytes))
+	reqRepo.Header.Set("Authorization", "Bearer "+tokenStr)
+	reqRepo.Header.Set("Content-Type", "application/json")
+	recRepo := httptest.NewRecorder()
+	router.ServeHTTP(recRepo, reqRepo)
+	if recRepo.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for repo creation, got %d: %s", recRepo.Code, recRepo.Body.String())
+	}
+
+	// 2. List Branches (default format: string array)
+	reqList := httptest.NewRequest("GET", "/api/v1/repos/branch_user/branch-repo/branches", nil)
+	recList := httptest.NewRecorder()
+	router.ServeHTTP(recList, reqList)
+	if recList.Code != http.StatusOK {
+		t.Fatalf("expected 200 for branch list, got %d", recList.Code)
+	}
+	var branches []string
+	if err := json.Unmarshal(recList.Body.Bytes(), &branches); err != nil {
+		t.Fatalf("failed to decode branches array: %v", err)
+	}
+	if len(branches) != 1 || branches[0] != "main" {
+		t.Fatalf("expected ['main'], got %v", branches)
+	}
+
+	// 3. List Branches with ?detail=true
+	reqDetails := httptest.NewRequest("GET", "/api/v1/repos/branch_user/branch-repo/branches?detail=true", nil)
+	recDetails := httptest.NewRecorder()
+	router.ServeHTTP(recDetails, reqDetails)
+	if recDetails.Code != http.StatusOK {
+		t.Fatalf("expected 200 for branch details, got %d", recDetails.Code)
+	}
+	var details []git.BranchDetail
+	if err := json.Unmarshal(recDetails.Body.Bytes(), &details); err != nil {
+		t.Fatalf("failed to decode branch details: %v", err)
+	}
+	if len(details) != 1 || details[0].Name != "main" || !details[0].IsDefault || details[0].CommitSHA == "" {
+		t.Fatalf("unexpected branch details: %+v", details)
+	}
+
+	// 4. Create new branch `feature-payment` based on `main`
+	createPayload := map[string]any{
+		"branch_name": "feature-payment",
+		"base_ref":    "main",
+	}
+	cBytes, _ := json.Marshal(createPayload)
+	reqCreate := httptest.NewRequest("POST", "/api/v1/repos/branch_user/branch-repo/branches", bytes.NewReader(cBytes))
+	reqCreate.Header.Set("Authorization", "Bearer "+tokenStr)
+	reqCreate.Header.Set("Content-Type", "application/json")
+	recCreate := httptest.NewRecorder()
+	router.ServeHTTP(recCreate, reqCreate)
+	if recCreate.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for branch create, got %d: %s", recCreate.Code, recCreate.Body.String())
+	}
+
+	// 5. Create another branch `staging`
+	createStaging := map[string]any{
+		"branch_name": "staging",
+		"base_ref":    "main",
+	}
+	sBytes, _ := json.Marshal(createStaging)
+	reqStaging := httptest.NewRequest("POST", "/api/v1/repos/branch_user/branch-repo/branches", bytes.NewReader(sBytes))
+	reqStaging.Header.Set("Authorization", "Bearer "+tokenStr)
+	reqStaging.Header.Set("Content-Type", "application/json")
+	recStaging := httptest.NewRecorder()
+	router.ServeHTTP(recStaging, reqStaging)
+	if recStaging.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for staging branch, got %d: %s", recStaging.Code, recStaging.Body.String())
+	}
+
+	// 6. Verify branches list contains all 3
+	recList2 := httptest.NewRecorder()
+	router.ServeHTTP(recList2, reqList)
+	var branches2 []string
+	_ = json.Unmarshal(recList2.Body.Bytes(), &branches2)
+	if len(branches2) != 3 {
+		t.Fatalf("expected 3 branches, got %v", branches2)
+	}
+
+	// 7. Verify cannot delete default branch `main`
+	reqDelMain := httptest.NewRequest("DELETE", "/api/v1/repos/branch_user/branch-repo/branches/main", nil)
+	reqDelMain.Header.Set("Authorization", "Bearer "+tokenStr)
+	recDelMain := httptest.NewRecorder()
+	router.ServeHTTP(recDelMain, reqDelMain)
+	if recDelMain.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 when deleting default branch, got %d", recDelMain.Code)
+	}
+
+	// 8. Delete non-default branch `feature-payment`
+	reqDelFeat := httptest.NewRequest("DELETE", "/api/v1/repos/branch_user/branch-repo/branches/feature-payment", nil)
+	reqDelFeat.Header.Set("Authorization", "Bearer "+tokenStr)
+	recDelFeat := httptest.NewRecorder()
+	router.ServeHTTP(recDelFeat, reqDelFeat)
+	if recDelFeat.Code != http.StatusOK {
+		t.Fatalf("expected 200 when deleting branch, got %d: %s", recDelFeat.Code, recDelFeat.Body.String())
+	}
+
+	// 9. Verify branch count is back to 2 (main, staging)
+	recList3 := httptest.NewRecorder()
+	router.ServeHTTP(recList3, reqList)
+	var branches3 []string
+	_ = json.Unmarshal(recList3.Body.Bytes(), &branches3)
+	if len(branches3) != 2 {
+		t.Fatalf("expected 2 branches after deletion, got %v", branches3)
+	}
+
+	_ = cfg
 }
 
 

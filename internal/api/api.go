@@ -94,6 +94,7 @@ func (r *Router) registerRoutes() {
 	// Git Code & Tree
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/branches", r.handleListBranches)
 	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/branches", r.handleCreateBranch)
+	r.mux.HandleFunc("DELETE /api/v1/repos/{owner}/{repo}/branches/{branch...}", r.handleDeleteBranch)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/tags", r.handleListTags)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/commits", r.handleListCommits)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/commits/{sha}", r.handleGetCommitDiff)
@@ -888,10 +889,31 @@ func (r *Router) handleListBranches(w http.ResponseWriter, req *http.Request) {
 	repoName := req.PathValue("repo")
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
 
+	if req.URL.Query().Get("detail") == "true" {
+		repo, _ := database.GetRepositoryByName(owner, repoName)
+		defaultBranch := "main"
+		if repo != nil && repo.DefaultBranch != "" {
+			defaultBranch = repo.DefaultBranch
+		}
+		details, err := git.GetBranchDetails(repoDir, defaultBranch)
+		if err != nil {
+			jsonError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if details == nil {
+			details = []git.BranchDetail{}
+		}
+		jsonResponse(w, http.StatusOK, details)
+		return
+	}
+
 	branches, err := git.GetBranches(repoDir)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	if branches == nil {
+		branches = []string{}
 	}
 	jsonResponse(w, http.StatusOK, branches)
 }
@@ -907,6 +929,17 @@ func (r *Router) handleCreateBranch(w http.ResponseWriter, req *http.Request) {
 	repoName := req.PathValue("repo")
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
 
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required")
+		return
+	}
+
 	var body struct {
 		BranchName string `json:"branch_name"`
 		BaseRef    string `json:"base_ref"`
@@ -916,16 +949,83 @@ func (r *Router) handleCreateBranch(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if body.BaseRef == "" {
-		body.BaseRef = "main"
+	branchName := strings.TrimSpace(body.BranchName)
+	if branchName == "" {
+		jsonError(w, http.StatusBadRequest, "Branch name cannot be empty")
+		return
 	}
 
-	if err := git.CreateBranch(repoDir, body.BranchName, body.BaseRef); err != nil {
+	// Validate branch name against git ref naming rules
+	if strings.ContainsAny(branchName, " ~^:?*[\\]") || strings.Contains(branchName, "..") || strings.Contains(branchName, "@{") || strings.HasPrefix(branchName, "-") {
+		jsonError(w, http.StatusBadRequest, "Invalid branch name format")
+		return
+	}
+
+	baseRef := strings.TrimSpace(body.BaseRef)
+	if baseRef == "" {
+		baseRef = repo.DefaultBranch
+		if baseRef == "" {
+			baseRef = "main"
+		}
+	}
+
+	if err := git.CreateBranch(repoDir, branchName, baseRef); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	jsonResponse(w, http.StatusCreated, map[string]string{"message": "Branch created"})
+	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "branch", fmt.Sprintf("Created branch '%s'", branchName))
+
+	jsonResponse(w, http.StatusCreated, map[string]string{
+		"message": "Branch created successfully",
+		"branch":  branchName,
+	})
+}
+
+func (r *Router) handleDeleteBranch(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	branchName := strings.TrimSpace(req.PathValue("branch"))
+	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required")
+		return
+	}
+
+	if branchName == "" {
+		jsonError(w, http.StatusBadRequest, "Branch name is required")
+		return
+	}
+
+	if branchName == repo.DefaultBranch || branchName == "main" || branchName == "master" {
+		jsonError(w, http.StatusBadRequest, "Cannot delete the default branch")
+		return
+	}
+
+	if err := git.DeleteBranch(repoDir, branchName); err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "branch", fmt.Sprintf("Deleted branch '%s'", branchName))
+
+	jsonResponse(w, http.StatusOK, map[string]string{
+		"message": "Branch deleted successfully",
+		"branch":  branchName,
+	})
 }
 
 func (r *Router) handleListTags(w http.ResponseWriter, req *http.Request) {

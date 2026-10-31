@@ -150,6 +150,16 @@ func InitRepositoryWithReadme(repoPath, repoName, description, defaultBranch, au
 	return nil
 }
 
+// BranchDetail holds metadata for a git branch.
+type BranchDetail struct {
+	Name          string `json:"name"`
+	IsDefault     bool   `json:"is_default"`
+	CommitSHA     string `json:"commit_sha"`
+	CommitMessage string `json:"commit_message"`
+	AuthorName    string `json:"author_name"`
+	CommitTime    int64  `json:"commit_time"`
+}
+
 // GetBranches returns all branch names in the bare repository.
 func GetBranches(repoPath string) ([]string, error) {
 	out, err := RunGit(repoPath, "for-each-ref", "--format=%(refname:short)", "refs/heads/")
@@ -157,7 +167,7 @@ func GetBranches(repoPath string) ([]string, error) {
 		return nil, err
 	}
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	var branches []string
+	branches := []string{}
 	for _, l := range lines {
 		l = strings.TrimSpace(l)
 		if l != "" {
@@ -165,6 +175,40 @@ func GetBranches(repoPath string) ([]string, error) {
 		}
 	}
 	return branches, nil
+}
+
+// GetBranchDetails returns rich metadata for all branches.
+func GetBranchDetails(repoPath, defaultBranch string) ([]BranchDetail, error) {
+	format := "%(refname:short)|%(objectname)|%(subject)|%(authorname)|%(authordate:unix)"
+	out, err := RunGit(repoPath, "for-each-ref", fmt.Sprintf("--format=%s", format), "refs/heads/")
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	details := []BranchDetail{}
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if l == "" {
+			continue
+		}
+		parts := strings.Split(l, "|")
+		if len(parts) < 5 {
+			continue
+		}
+		var ts int64
+		_, _ = fmt.Sscanf(parts[4], "%d", &ts)
+		name := parts[0]
+		isDefault := (name == defaultBranch) || (defaultBranch == "" && (name == "main" || name == "master"))
+		details = append(details, BranchDetail{
+			Name:          name,
+			IsDefault:     isDefault,
+			CommitSHA:     parts[1],
+			CommitMessage: parts[2],
+			AuthorName:    parts[3],
+			CommitTime:    ts,
+		})
+	}
+	return details, nil
 }
 
 // CreateBranch creates a new branch pointing to baseRef.
