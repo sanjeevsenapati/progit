@@ -410,17 +410,39 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* Dashboard Footer Attribution */}
-        <div className="pt-8 pb-4 text-center text-xs text-gray-500 dark:text-dark-muted border-t border-gray-200 dark:border-dark-border/40 mt-8 space-y-1">
-          <p>
-            Supported by <span className="font-semibold text-emerald-600 dark:text-emerald-400">Prodevans</span> • Created by <span className="font-semibold text-gray-900 dark:text-white">Sanjeev Senapati</span>
-          </p>
-          <p className="text-[11px] text-gray-400">
-            Credit: Built on top of Gogs source code. Released under the MIT License.
-          </p>
-        </div>
       </div>
+
+      {/* Dashboard Footer */}
+      <footer className="mt-12 pt-8 pb-8 border-t border-gray-200 dark:border-dark-border/60 text-center text-xs text-gray-500 dark:text-dark-muted space-y-2">
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs">
+          <a href="/explore" className="text-gray-600 dark:text-dark-muted hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+            Explore
+          </a>
+          <a href="/settings" className="text-gray-600 dark:text-dark-muted hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+            Settings
+          </a>
+          <a href="/org/new" className="text-gray-600 dark:text-dark-muted hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+            Organizations
+          </a>
+          <a
+            href="https://github.com/sanjeevsenapati/progit"
+            target="_blank"
+            rel="noreferrer"
+            className="text-gray-600 dark:text-dark-muted hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+          >
+            GitHub
+          </a>
+        </div>
+        <p className="font-medium text-gray-700 dark:text-dark-text pt-2">
+          Supported by <span className="font-bold text-emerald-600 dark:text-emerald-400">Prodevans</span> • Created by <span className="font-bold text-gray-900 dark:text-white">Sanjeev Senapati</span>
+        </p>
+        <p className="text-gray-500 dark:text-dark-muted">
+          Credit: Built on top of Gogs source code. Released under the MIT License.
+        </p>
+        <p className="text-[11px] text-gray-400">
+          © {new Date().getFullYear()} ProGit. All rights reserved.
+        </p>
+      </footer>
     </div>
   );
 };
