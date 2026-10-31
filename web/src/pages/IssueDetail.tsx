@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api, Repository, Issue, Comment } from '../lib/api';
 import { useAuth } from '../lib/theme';
 import { RepoNav } from '../components/RepoNav';
+import { showToast } from '../components/ModalDialog';
 import { CircleDot, CheckCircle2, MessageSquare, Send } from 'lucide-react';
 
 interface IssueDetailProps {
@@ -46,8 +47,9 @@ export const IssueDetail: React.FC<IssueDetailProps> = ({ owner, repo: repoName,
       setIssue(updated);
       const cList = await api.listComments(owner, repoName, index);
       setComments(cList || []);
+      showToast(issue.is_closed ? 'Issue reopened' : 'Issue closed', 'info');
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message || 'Failed to update issue', 'error');
     }
   };
 
@@ -59,8 +61,9 @@ export const IssueDetail: React.FC<IssueDetailProps> = ({ owner, repo: repoName,
       const cmt = await api.addComment(owner, repoName, index, newComment.trim());
       setComments(prev => [...prev, cmt]);
       setNewComment('');
+      showToast('Comment posted', 'success');
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message || 'Failed to post comment', 'error');
     } finally {
       setSubmitting(false);
     }

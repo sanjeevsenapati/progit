@@ -784,6 +784,27 @@ func (r *Router) handleCreateRepo(w http.ResponseWriter, req *http.Request) {
 	jsonResponse(w, http.StatusCreated, repo)
 }
 
+func (r *Router) canAdminRepo(user *database.User, repo *database.Repository) bool {
+	if user == nil || repo == nil {
+		return false
+	}
+	if user.IsAdmin || user.ID == repo.OwnerID {
+		return true
+	}
+	if org, _ := database.GetOrgByName(repo.OwnerName); org != nil {
+		if database.IsOrgAdmin(org.ID, user.ID) {
+			return true
+		}
+	}
+	var mode string
+	if err := database.DB.QueryRow(`SELECT mode FROM collaborators WHERE repo_id = ? AND user_id = ?`, repo.ID, user.ID).Scan(&mode); err == nil {
+		if mode == "admin" {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *Router) handleGetRepo(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
@@ -806,12 +827,7 @@ func (r *Router) handleGetRepo(w http.ResponseWriter, req *http.Request) {
 	}
 
 	canWrite := database.CanUserAccessRepo(user, repo, true)
-	canAdmin := user != nil && (user.IsAdmin || user.ID == repo.OwnerID)
-	if !canAdmin && user != nil {
-		if org, _ := database.GetOrgByName(repo.OwnerName); org != nil {
-			canAdmin = database.IsOrgAdmin(org.ID, user.ID)
-		}
-	}
+	canAdmin := r.canAdminRepo(user, repo)
 
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
 	branches, _ := git.GetBranches(repoDir)
@@ -858,8 +874,8 @@ func (r *Router) handleDeleteRepo(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if !user.IsAdmin && user.ID != repo.OwnerID {
-		jsonError(w, http.StatusForbidden, "Forbidden")
+	if !r.canAdminRepo(user, repo) {
+		jsonError(w, http.StatusForbidden, "Admin privileges required to delete repository")
 		return
 	}
 
@@ -2307,8 +2323,8 @@ func (r *Router) handleUpdatePagesConfig(w http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	if !user.IsAdmin && user.ID != repo.OwnerID {
-		jsonError(w, http.StatusForbidden, "Forbidden")
+	if !r.canAdminRepo(user, repo) {
+		jsonError(w, http.StatusForbidden, "Admin privileges required to update pages configuration")
 		return
 	}
 
@@ -2366,8 +2382,8 @@ func (r *Router) handleUpdateRepoSettings(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	if !user.IsAdmin && user.ID != repo.OwnerID {
-		jsonError(w, http.StatusForbidden, "Forbidden")
+	if !r.canAdminRepo(user, repo) {
+		jsonError(w, http.StatusForbidden, "Admin privileges required to update repository settings")
 		return
 	}
 
@@ -3464,13 +3480,7 @@ func (r *Router) handleAddCollaborator(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	canAdmin := user.IsAdmin || user.ID == repo.OwnerID
-	if !canAdmin {
-		if org, _ := database.GetOrgByName(repo.OwnerName); org != nil {
-			canAdmin = database.IsOrgAdmin(org.ID, user.ID)
-		}
-	}
-	if !canAdmin {
+	if !r.canAdminRepo(user, repo) {
 		jsonError(w, http.StatusForbidden, "Admin privileges required to manage collaborators")
 		return
 	}
@@ -3518,13 +3528,7 @@ func (r *Router) handleRemoveCollaborator(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	canAdmin := user.IsAdmin || user.ID == repo.OwnerID
-	if !canAdmin {
-		if org, _ := database.GetOrgByName(repo.OwnerName); org != nil {
-			canAdmin = database.IsOrgAdmin(org.ID, user.ID)
-		}
-	}
-	if !canAdmin {
+	if !r.canAdminRepo(user, repo) {
 		jsonError(w, http.StatusForbidden, "Admin privileges required to manage collaborators")
 		return
 	}

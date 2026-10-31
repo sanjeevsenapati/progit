@@ -29,6 +29,7 @@ interface RepoNavProps {
 export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar, activeTab }) => {
   const { user } = useAuth();
   const basePath = `/${repo.owner_name}/${repo.name}`;
+  const canAdmin = !!(user && (user.is_admin || user.username === repo.owner_name || (repo as any).permissions?.admin));
 
   const [showForkModal, setShowForkModal] = useState(false);
   const [orgs, setOrgs] = useState<Organization[]>([]);
@@ -258,17 +259,19 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar,
             )}
           </a>
 
-          <a
-            href={`${basePath}/settings`}
-            className={`flex items-center space-x-2 py-3 px-3 border-b-2 font-medium transition-colors whitespace-nowrap ${
-              activeTab === 'settings'
-                ? 'border-emerald-600 text-gray-900 dark:text-white font-semibold'
-                : 'border-transparent text-gray-500 dark:text-dark-muted hover:text-gray-700 dark:hover:text-dark-text'
-            }`}
-          >
-            <SettingsIcon className="w-4 h-4" />
-            <span>Settings</span>
-          </a>
+          {(canAdmin || activeTab === 'settings') && (
+            <a
+              href={`${basePath}/settings`}
+              className={`flex items-center space-x-2 py-3 px-3 border-b-2 font-medium transition-colors whitespace-nowrap ${
+                activeTab === 'settings'
+                  ? 'border-emerald-600 text-gray-900 dark:text-white font-semibold'
+                  : 'border-transparent text-gray-500 dark:text-dark-muted hover:text-gray-700 dark:hover:text-dark-text'
+              }`}
+            >
+              <SettingsIcon className="w-4 h-4" />
+              <span>Settings</span>
+            </a>
+          )}
         </div>
       </div>
 

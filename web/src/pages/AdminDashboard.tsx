@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, User, Repository } from '../lib/api';
+import { showModalConfirm } from '../components/ModalDialog';
 import {
   Shield,
   Users,
@@ -63,9 +64,16 @@ export const AdminDashboard: React.FC = () => {
   }, []);
 
   const handleToggleAdmin = async (u: User) => {
-    if (!window.confirm(`Are you sure you want to ${u.is_admin ? 'revoke' : 'grant'} admin privileges for @${u.username}?`)) {
-      return;
-    }
+    const action = u.is_admin ? 'revoke' : 'grant';
+    const confirmed = await showModalConfirm({
+      title: `${u.is_admin ? 'Revoke' : 'Grant'} Admin Privileges`,
+      message: `Are you sure you want to ${action} admin privileges for @${u.username}?`,
+      confirmText: `${u.is_admin ? 'Revoke' : 'Grant'} privileges`,
+      cancelText: 'Cancel',
+      isDanger: u.is_admin,
+    });
+    if (!confirmed) return;
+
     try {
       await api.adminUpdateUser(u.id, { is_admin: !u.is_admin });
       setStatusMsg({ type: 'success', text: `Updated admin privileges for @${u.username}.` });
@@ -77,9 +85,15 @@ export const AdminDashboard: React.FC = () => {
 
   const handleToggleActive = async (u: User) => {
     const action = u.is_active ? 'suspend' : 'reactivate';
-    if (!window.confirm(`Are you sure you want to ${action} account @${u.username}?`)) {
-      return;
-    }
+    const confirmed = await showModalConfirm({
+      title: `${u.is_active ? 'Suspend' : 'Reactivate'} Account`,
+      message: `Are you sure you want to ${action} account @${u.username}?`,
+      confirmText: `${u.is_active ? 'Suspend' : 'Reactivate'} account`,
+      cancelText: 'Cancel',
+      isDanger: u.is_active,
+    });
+    if (!confirmed) return;
+
     try {
       await api.adminUpdateUser(u.id, { is_active: !u.is_active });
       setStatusMsg({ type: 'success', text: `Account @${u.username} has been ${u.is_active ? 'suspended' : 'activated'}.` });
@@ -90,9 +104,15 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleDeleteUser = async (u: User) => {
-    if (!window.confirm(`DANGER: Are you sure you want to permanently delete user @${u.username} and all their repositories? This action cannot be undone.`)) {
-      return;
-    }
+    const confirmed = await showModalConfirm({
+      title: 'Delete User Account',
+      message: `Are you sure you want to permanently delete user @${u.username} and all their repositories? This action cannot be undone.`,
+      confirmText: 'Delete user',
+      cancelText: 'Cancel',
+      isDanger: true,
+    });
+    if (!confirmed) return;
+
     try {
       await api.adminDeleteUser(u.id);
       setStatusMsg({ type: 'success', text: `User @${u.username} and associated repositories deleted.` });
@@ -103,9 +123,15 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleDeleteRepo = async (r: Repository) => {
-    if (!window.confirm(`DANGER: Permanently delete repository ${r.owner_name}/${r.name} from disk?`)) {
-      return;
-    }
+    const confirmed = await showModalConfirm({
+      title: 'Delete Repository Permanently',
+      message: `Are you sure you want to permanently delete repository ${r.owner_name}/${r.name} from disk? This action cannot be undone.`,
+      confirmText: 'Delete repository',
+      cancelText: 'Cancel',
+      isDanger: true,
+    });
+    if (!confirmed) return;
+
     try {
       await api.adminDeleteRepo(r.id);
       setStatusMsg({ type: 'success', text: `Repository ${r.owner_name}/${r.name} deleted successfully.` });

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, Organization, OrgMember, Team, Repository } from '../lib/api';
+import { showToast, showModalConfirm } from '../components/ModalDialog';
 import { 
   Building2, 
   BookOpen, 
@@ -81,24 +82,34 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
       setMemberMsg('');
       await api.addOrgMember(orgName, newMemberUser.trim(), newMemberRole);
       setMemberMsg(`Added @${newMemberUser} to organization`);
+      showToast(`Added @${newMemberUser} to organization`, 'success');
       setNewMemberUser('');
       const mList = await api.listOrgMembers(orgName);
       setMembers(mList || []);
       setTimeout(() => setMemberMsg(''), 4000);
     } catch (err: any) {
-      alert(err.message || 'Failed to add member');
+      showToast(err.message || 'Failed to add member', 'error');
     } finally {
       setAddingMember(false);
     }
   };
 
   const handleRemoveMember = async (username: string) => {
-    if (!confirm(`Are you sure you want to remove @${username} from ${orgName}?`)) return;
+    const confirmed = await showModalConfirm({
+      title: 'Remove Member',
+      message: `Are you sure you want to remove @${username} from ${orgName}?`,
+      confirmText: 'Remove member',
+      cancelText: 'Cancel',
+      isDanger: true,
+    });
+    if (!confirmed) return;
+
     try {
       await api.removeOrgMember(orgName, username);
       setMembers((prev) => prev.filter((m) => m.username !== username));
+      showToast(`Removed @${username} from organization`, 'info');
     } catch (err: any) {
-      alert(err.message || 'Failed to remove member');
+      showToast(err.message || 'Failed to remove member', 'error');
     }
   };
 
@@ -117,8 +128,9 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
       setShowTeamModal(false);
       setTeamName('');
       setTeamDesc('');
+      showToast(`Team "${t.name}" created successfully`, 'success');
     } catch (err: any) {
-      alert(err.message || 'Failed to create team');
+      showToast(err.message || 'Failed to create team', 'error');
     } finally {
       setCreatingTeam(false);
     }

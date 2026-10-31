@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, Repository, PagesConfig } from '../lib/api';
 import { RepoNav } from '../components/RepoNav';
+import { showToast } from '../components/ModalDialog';
 import { 
   Globe, 
   ExternalLink, 
@@ -90,9 +91,10 @@ export const PagesSettings: React.FC<PagesSettingsProps> = ({ owner, repo: repoN
         branches,
       });
       setSuccessMessage('ProGit Pages settings saved successfully!');
+      showToast('ProGit Pages settings saved successfully!', 'success');
       setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err: any) {
-      alert(err.message || 'Failed to update pages settings');
+      showToast(err.message || 'Failed to update pages settings', 'error');
     } finally {
       setSaving(false);
     }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api, Repository, WikiPage, WikiPageMeta, Commit } from '../lib/api';
 import { RepoNav } from '../components/RepoNav';
 import { MarkdownViewer } from '../components/MarkdownViewer';
+import { showToast, showModalConfirm } from '../components/ModalDialog';
 import { 
   BookOpen, 
   Plus, 
@@ -121,7 +122,7 @@ export const Wiki: React.FC<WikiProps> = ({ owner, repo: repoName, initialSlug =
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editTitle.trim()) {
-      alert('Page title is required');
+      showToast('Page title is required', 'error');
       return;
     }
 
@@ -146,8 +147,9 @@ export const Wiki: React.FC<WikiProps> = ({ owner, repo: repoName, initialSlug =
       const pagesRes = await api.listWikiPages(owner, repoName);
       setPages(pagesRes);
       setCurrentPage(saved);
+      showToast('Wiki page saved successfully', 'success');
     } catch (err: any) {
-      alert(err.message || 'Failed to save wiki page');
+      showToast(err.message || 'Failed to save wiki page', 'error');
     } finally {
       setSaving(false);
     }
@@ -155,7 +157,14 @@ export const Wiki: React.FC<WikiProps> = ({ owner, repo: repoName, initialSlug =
 
   const handleDelete = async () => {
     if (!currentPage) return;
-    if (!confirm(`Are you sure you want to delete the wiki page "${currentPage.title}"?`)) {
+    const confirmed = await showModalConfirm({
+      title: 'Delete Wiki Page',
+      message: `Are you sure you want to delete the wiki page "${currentPage.title}"? This cannot be undone.`,
+      confirmText: 'Delete page',
+      cancelText: 'Cancel',
+      isDanger: true,
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -164,8 +173,9 @@ export const Wiki: React.FC<WikiProps> = ({ owner, repo: repoName, initialSlug =
       const pagesRes = await api.listWikiPages(owner, repoName);
       setPages(pagesRes);
       setSelectedSlug(pagesRes.length > 0 ? pagesRes[0].slug : 'Home');
+      showToast(`Wiki page "${currentPage.title}" deleted`);
     } catch (err: any) {
-      alert(err.message || 'Failed to delete wiki page');
+      showToast(err.message || 'Failed to delete wiki page', 'error');
     }
   };
 

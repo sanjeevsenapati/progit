@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, User, SSHKey, AccessToken } from '../lib/api';
 import { useAuth } from '../lib/theme';
+import { showModalConfirm } from '../components/ModalDialog';
 import { 
   User as UserIcon, 
   Key, 
@@ -166,7 +167,14 @@ export const UserSettings: React.FC = () => {
   };
 
   const handleDeleteSSHKey = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this SSH key? This action cannot be undone.')) return;
+    const confirmed = await showModalConfirm({
+      title: 'Delete SSH Key',
+      message: 'Are you sure you want to delete this SSH key? This action cannot be undone.',
+      confirmText: 'Delete key',
+      cancelText: 'Cancel',
+      isDanger: true,
+    });
+    if (!confirmed) return;
     setError('');
     try {
       await api.deleteSSHKey(id);
@@ -197,7 +205,14 @@ export const UserSettings: React.FC = () => {
   };
 
   const handleDeleteToken = async (id: number) => {
-    if (!confirm('Are you sure you want to revoke this access token? Any applications using it will lose access.')) return;
+    const confirmed = await showModalConfirm({
+      title: 'Revoke Access Token',
+      message: 'Are you sure you want to revoke this access token? Any applications using it will immediately lose access.',
+      confirmText: 'Revoke token',
+      cancelText: 'Cancel',
+      isDanger: true,
+    });
+    if (!confirmed) return;
     setError('');
     try {
       await api.deleteToken(id);

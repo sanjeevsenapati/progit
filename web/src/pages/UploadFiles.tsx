@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api, Repository } from '../lib/api';
 import { RepoNav } from '../components/RepoNav';
+import { showToast } from '../components/ModalDialog';
 import { 
   UploadCloud, 
   File, 
@@ -131,7 +132,7 @@ export const UploadFiles: React.FC<UploadFilesProps> = ({
       return;
     }
     if (stagedFiles.length === 0) {
-      alert('Please choose or drop files to upload');
+      showToast('Please choose or drop files to upload', 'error');
       return;
     }
 

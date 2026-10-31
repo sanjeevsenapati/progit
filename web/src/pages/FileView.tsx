@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api, Repository } from '../lib/api';
 import { RepoNav } from '../components/RepoNav';
 import { MarkdownViewer } from '../components/MarkdownViewer';
+import { showToast } from '../components/ModalDialog';
 import { 
   detectLanguage, 
   highlightCode, 
@@ -87,7 +88,7 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
       const targetUrl = parentDir ? `/${owner}/${repoName}/tree/${branch}/${parentDir}` : `/${owner}/${repoName}/tree/${branch}`;
       window.location.href = targetUrl;
     } catch (err: any) {
-      alert(err.message || 'Failed to delete file');
+      showToast(err.message || 'Failed to delete file', 'error');
     } finally {
       setDeleting(false);
     }

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, Repository, Commit, FileDiff } from '../lib/api';
 import { RepoNav } from '../components/RepoNav';
+import { showToast } from '../components/ModalDialog';
 import { GitPullRequest, ArrowRight, GitCommit, FileText, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface CompareBranchesProps {
@@ -86,7 +87,7 @@ export const CompareBranches: React.FC<CompareBranchesProps> = ({ owner, repo: r
       });
       window.location.href = `/${owner}/${repoName}/pulls/${pr.issue?.index_number || pr.id}`;
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 

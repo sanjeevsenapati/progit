@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { api, Repository, CollaboratorUser } from '../lib/api';
+import { useAuth } from '../lib/theme';
 import { RepoNav } from '../components/RepoNav';
+import { showToast, showModalConfirm } from '../components/ModalDialog';
 import { 
   Settings, 
   Trash2, 
@@ -14,7 +16,10 @@ import {
   Unlock,
   Users,
   UserPlus,
-  Shield
+  Shield,
+  ShieldAlert,
+  AlertCircle,
+  X
 } from 'lucide-react';
 
 interface RepoSettingsProps {
@@ -23,7 +28,9 @@ interface RepoSettingsProps {
 }
 
 export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoName }) => {
+  const { user } = useAuth();
   const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [canAdmin, setCanAdmin] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -34,6 +41,7 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
   const [newCollabUser, setNewCollabUser] = useState('');
   const [newCollabMode, setNewCollabMode] = useState('write');
   const [collabMsg, setCollabMsg] = useState('');
+  const [collabError, setCollabError] = useState('');
   const [addingCollab, setAddingCollab] = useState(false);
 
   // Editable fields
@@ -49,6 +57,9 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
       try {
         const r = await api.getRepo(owner, repoName);
         setRepoData(r.repository);
+        const hasAdminAccess = !!(user && (user.is_admin || user.username === owner || (r as any).permissions?.admin));
+        setCanAdmin(hasAdminAccess);
+
         setDescription(r.repository.description || '');
         setIsPrivate(r.repository.is_private);
         setEnableWiki(r.repository.enable_wiki !== false);
@@ -56,16 +67,19 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
         setPagesBranch(r.repository.pages_branch || r.repository.default_branch || 'main');
         setPagesFolder(r.repository.pages_folder || '/');
 
-        const collabs = await api.getCollaborators(owner, repoName);
-        setCollaborators(collabs || []);
-      } catch (err) {
+        if (hasAdminAccess) {
+          const collabs = await api.getCollaborators(owner, repoName).catch(() => []);
+          setCollaborators(collabs || []);
+        }
+      } catch (err: any) {
         console.error(err);
+        setCanAdmin(false);
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [owner, repoName]);
+  }, [owner, repoName, user]);
 
   const handleAddCollaborator = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,26 +87,39 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
     try {
       setAddingCollab(true);
       setCollabMsg('');
+      setCollabError('');
       await api.addCollaborator(owner, repoName, newCollabUser.trim(), newCollabMode);
       setCollabMsg(`Collaborator @${newCollabUser} added with ${newCollabMode} permissions`);
+      showToast(`Collaborator @${newCollabUser} added successfully`);
       setNewCollabUser('');
       const collabs = await api.getCollaborators(owner, repoName);
       setCollaborators(collabs || []);
       setTimeout(() => setCollabMsg(''), 4000);
     } catch (err: any) {
-      alert(err.message || 'Failed to add collaborator');
+      const msg = err.message || 'Failed to add collaborator';
+      setCollabError(msg);
+      showToast(msg, 'error');
     } finally {
       setAddingCollab(false);
     }
   };
 
   const handleRemoveCollaborator = async (username: string) => {
-    if (!confirm(`Are you sure you want to remove collaborator @${username}?`)) return;
+    const confirmed = await showModalConfirm({
+      title: 'Remove Collaborator',
+      message: `Are you sure you want to remove collaborator @${username}? They will lose push, edit, and management permissions on this repository.`,
+      confirmText: 'Remove Collaborator',
+      cancelText: 'Cancel',
+      isDanger: true,
+    });
+    if (!confirmed) return;
+
     try {
       await api.removeCollaborator(owner, repoName, username);
       setCollaborators(prev => prev.filter(c => c.username !== username));
+      showToast(`Collaborator @${username} removed`);
     } catch (err: any) {
-      alert(err.message || 'Failed to remove collaborator');
+      showToast(err.message || 'Failed to remove collaborator', 'error');
     }
   };
 
@@ -110,9 +137,10 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
       });
       setRepoData(updated);
       setSuccessMessage('Repository settings updated successfully');
+      showToast('Repository settings updated successfully');
       setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err: any) {
-      alert(err.message || 'Failed to update settings');
+      showToast(err.message || 'Failed to update settings', 'error');
     } finally {
       setSaving(false);
     }
@@ -121,15 +149,27 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
   const handleDelete = async (e: React.FormEvent) => {
     e.preventDefault();
     if (confirmDelete !== `${owner}/${repoName}`) {
-      alert(`Please type "${owner}/${repoName}" to confirm deletion.`);
+      showToast(`Please type "${owner}/${repoName}" to confirm deletion.`, 'error');
       return;
     }
+
+    const confirmed = await showModalConfirm({
+      title: 'Delete Repository Permanently',
+      message: `Are you absolutely certain? This will permanently erase ${owner}/${repoName}, including all code, branches, tags, commit logs, issues, wiki pages, and project boards. This action cannot be reversed.`,
+      confirmText: 'Yes, delete this repository',
+      cancelText: 'Cancel',
+      isDanger: true,
+    });
+    if (!confirmed) return;
+
     try {
       await api.deleteRepo(owner, repoName);
-      alert('Repository deleted successfully');
-      window.location.href = '/dashboard';
+      showToast('Repository deleted successfully');
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 500);
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message || 'Failed to delete repository', 'error');
     }
   };
 
@@ -144,6 +184,31 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
 
   if (!repoData) {
     return <div className="py-20 text-center text-sm">Repository not found</div>;
+  }
+
+  if (!canAdmin) {
+    return (
+      <div>
+        <RepoNav repo={repoData} activeTab="settings" />
+        <div className="max-w-xl mx-auto my-16 p-8 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-center space-y-4 shadow-2xl">
+          <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto border border-red-200 dark:border-red-900/50">
+            <ShieldAlert className="w-6 h-6" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Access Restricted</h2>
+          <p className="text-xs text-gray-500 dark:text-dark-muted leading-relaxed">
+            You do not have administrator permissions to manage settings or collaborators for <strong>{owner}/{repoName}</strong>.
+          </p>
+          <div className="pt-2">
+            <a
+              href={`/${owner}/${repoName}`}
+              className="inline-flex items-center px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm transition-colors"
+            >
+              Return to repository
+            </a>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const pagesURL = `${window.location.origin}/pages/${owner}/${repoName}/`;
@@ -346,10 +411,35 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
             Grant users write or admin permissions to allow them to push commits, edit files online, upload documents, and manage project boards.
           </p>
 
+          {collabError && (
+            <div className="p-2.5 rounded-lg bg-red-100 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-xs font-semibold text-red-800 dark:text-red-300 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{collabError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCollabError('')}
+                className="p-0.5 text-red-500 hover:text-red-700 dark:hover:text-red-200"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {collabMsg && (
-            <div className="p-2.5 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-center">
-              <Check className="w-4 h-4 mr-1.5 flex-shrink-0" />
-              {collabMsg}
+            <div className="p-2.5 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Check className="w-4 h-4 flex-shrink-0" />
+                <span>{collabMsg}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCollabMsg('')}
+                className="p-0.5 text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-200"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
           )}
 

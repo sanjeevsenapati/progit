@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api, Repository, TreeEntry } from '../lib/api';
 import { RepoNav } from '../components/RepoNav';
 import { MarkdownViewer } from '../components/MarkdownViewer';
+import { showToast } from '../components/ModalDialog';
 import { 
   GitBranch, 
   Folder, 
@@ -111,9 +112,10 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
       setBranches(prev => [...prev, cleanName]);
       setShowBranchDropdown(false);
       setBranchFilter('');
+      showToast(`Branch "${cleanName}" created`, 'success');
       handleBranchChange(cleanName);
     } catch (err: any) {
-      alert(err.message || 'Failed to create branch');
+      showToast(err.message || 'Failed to create branch', 'error');
     } finally {
       setCreatingBranch(false);
     }

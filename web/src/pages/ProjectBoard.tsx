@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, Repository, Project, ProjectColumn, ProjectCard, Issue } from '../lib/api';
 import { RepoNav } from '../components/RepoNav';
+import { showToast, showModalConfirm } from '../components/ModalDialog';
 import { 
   Kanban, 
   Plus, 
@@ -75,19 +76,29 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
       });
       setNewColTitle('');
       setShowAddCol(false);
+      showToast('Column created successfully', 'success');
       await loadBoard();
     } catch (err: any) {
-      alert(err.message || 'Failed to create column');
+      showToast(err.message || 'Failed to create column', 'error');
     }
   };
 
   const handleDeleteColumn = async (columnId: number) => {
-    if (!confirm('Are you sure you want to delete this column and all its cards?')) return;
+    const confirmed = await showModalConfirm({
+      title: 'Delete Column',
+      message: 'Are you sure you want to delete this column and all its cards? This cannot be undone.',
+      confirmText: 'Delete column',
+      cancelText: 'Cancel',
+      isDanger: true,
+    });
+    if (!confirmed) return;
+
     try {
       await api.deleteProjectColumn(owner, repoName, projectId, columnId);
+      showToast('Column deleted', 'info');
       await loadBoard();
     } catch (err: any) {
-      alert(err.message || 'Failed to delete column');
+      showToast(err.message || 'Failed to delete column', 'error');
     }
   };
 
@@ -110,9 +121,10 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
       setTargetColumnId(null);
       setCardNote('');
       setSelectedIssueId(null);
+      showToast('Card added to column', 'success');
       await loadBoard();
     } catch (err: any) {
-      alert(err.message || 'Failed to add card');
+      showToast(err.message || 'Failed to add card', 'error');
     } finally {
       setAddingCard(false);
     }
@@ -126,17 +138,26 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
       });
       await loadBoard();
     } catch (err: any) {
-      alert(err.message || 'Failed to move card');
+      showToast(err.message || 'Failed to move card', 'error');
     }
   };
 
   const handleDeleteCard = async (cardId: number) => {
-    if (!confirm('Are you sure you want to delete this card?')) return;
+    const confirmed = await showModalConfirm({
+      title: 'Delete Card',
+      message: 'Are you sure you want to delete this card?',
+      confirmText: 'Delete card',
+      cancelText: 'Cancel',
+      isDanger: true,
+    });
+    if (!confirmed) return;
+
     try {
       await api.deleteProjectCard(owner, repoName, projectId, cardId);
+      showToast('Card deleted', 'info');
       await loadBoard();
     } catch (err: any) {
-      alert(err.message || 'Failed to delete card');
+      showToast(err.message || 'Failed to delete card', 'error');
     }
   };
 
@@ -148,9 +169,10 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
         description: project.description,
         is_closed: !project.is_closed,
       });
+      showToast(project.is_closed ? 'Project reopened' : 'Project closed', 'info');
       await loadBoard();
     } catch (err: any) {
-      alert(err.message || 'Failed to update project status');
+      showToast(err.message || 'Failed to update project status', 'error');
     }
   };
 

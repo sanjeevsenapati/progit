@@ -33,6 +33,7 @@ import { ProjectsList } from './pages/ProjectsList';
 import { ProjectBoard } from './pages/ProjectBoard';
 import { NewOrg } from './pages/NewOrg';
 import { OrgView } from './pages/OrgView';
+import { GlobalDialogProvider } from './components/ModalDialog';
 
 export const App: React.FC = () => {
   const { user, loading } = useAuth();
@@ -211,10 +212,12 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-dark-bg text-gray-900 dark:text-dark-text flex flex-col">
-      <Navbar />
-      <main className="flex-1">{renderRoute()}</main>
-    </div>
+    <GlobalDialogProvider>
+      <div className="min-h-screen bg-gray-50 dark:bg-dark-bg text-gray-900 dark:text-dark-text flex flex-col">
+        <Navbar />
+        <main className="flex-1">{renderRoute()}</main>
+      </div>
+    </GlobalDialogProvider>
   );
 };
 

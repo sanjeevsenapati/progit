@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { api, Repository } from '../lib/api';
 import { RepoNav } from '../components/RepoNav';
 import { MarkdownViewer } from '../components/MarkdownViewer';
+import { showToast } from '../components/ModalDialog';
 import { 
   detectLanguage, 
   highlightCode, 
@@ -140,7 +141,7 @@ export const FileEditor: React.FC<FileEditorProps> = ({
     }
     const cleanPath = pathInput.trim().replace(/^\/+/, '');
     if (!cleanPath) {
-      alert('Please provide a file name');
+      showToast('Please provide a file name', 'error');
       return;
     }
 
