@@ -149,3 +149,4 @@ Detailed architectural and deployment documentation is available in the [`docs/`
 ## License
 
 ProGit is licensed under the [MIT License](./project.md).
+

@@ -57,6 +57,15 @@ func TestGitOperations(t *testing.T) {
 		t.Errorf("unexpected blob state: %+v", blob)
 	}
 
+	// 5b. Get commit diff
+	diff, err := GetCommitDiff(repoPath, commits[0].SHA)
+	if err != nil {
+		t.Fatalf("GetCommitDiff failed: %v", err)
+	}
+	if diff == nil || len(diff.Files) == 0 {
+		t.Fatalf("expected diff files for commit, got %v", diff)
+	}
+
 	// 6. Branch creation
 	err = CreateBranch(repoPath, "feature", "main")
 	if err != nil {

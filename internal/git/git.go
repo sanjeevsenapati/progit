@@ -353,7 +353,7 @@ func GetCommitDiff(repoPath, sha string) (*CommitDiff, error) {
 		c = &commits[0]
 	}
 
-	out, err := RunGit(repoPath, "diff-tree", "-p", "--stat=false", sha)
+	out, err := RunGit(repoPath, "diff-tree", "-r", "-p", "--root", sha)
 	if err != nil {
 		return nil, err
 	}
@@ -550,8 +550,49 @@ func InitWikiRepository(wikiRepoPath, repoName, authorName, authorEmail string) 
 		return nil // already exists
 	}
 
+	tempDir, err := os.MkdirTemp("", "progit-wiki-init-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tempDir)
+
+	if _, err := RunGit("", "init", "--initial-branch=main", tempDir); err != nil {
+		return err
+	}
+
 	welcomeContent := fmt.Sprintf("# Welcome to the %s Wiki!\n\nThis is the official project documentation. Feel free to create and edit pages.\n", repoName)
-	return InitRepositoryWithReadme(wikiRepoPath, "Home", welcomeContent, "main", authorName, authorEmail)
+	if err := os.WriteFile(filepath.Join(tempDir, "Home.md"), []byte(welcomeContent), 0644); err != nil {
+		return err
+	}
+
+	if _, err := RunGit(tempDir, "add", "Home.md"); err != nil {
+		return err
+	}
+
+	if authorName == "" {
+		authorName = "ProGit"
+	}
+	if authorEmail == "" {
+		authorEmail = "wiki@progit.io"
+	}
+	commitArgs := []string{
+		"-c", "user.name=" + authorName,
+		"-c", "user.email=" + authorEmail,
+		"commit", "-m", "Initial wiki page Home.md",
+	}
+	if _, err := RunGit(tempDir, commitArgs...); err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(wikiRepoPath), 0755); err != nil {
+		return err
+	}
+
+	if _, err := RunGit("", "clone", "--bare", tempDir, wikiRepoPath); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // ListWikiPages returns all wiki pages found in the wiki repository.
@@ -601,6 +642,13 @@ func GetWikiPage(wikiRepoPath, slug string) (*WikiPage, error) {
 	fileName := cleanSlug + ".md"
 
 	blob, err := GetBlob(wikiRepoPath, "main", fileName)
+	if (err != nil || blob == nil) && (strings.EqualFold(cleanSlug, "home") || strings.EqualFold(cleanSlug, "readme")) {
+		if strings.EqualFold(cleanSlug, "home") {
+			blob, err = GetBlob(wikiRepoPath, "main", "README.md")
+		} else {
+			blob, err = GetBlob(wikiRepoPath, "main", "Home.md")
+		}
+	}
 	if err != nil || blob == nil {
 		return nil, fmt.Errorf("wiki page '%s' not found", cleanSlug)
 	}

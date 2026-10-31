@@ -1274,6 +1274,10 @@ func (r *Router) handleListWikiPages(w http.ResponseWriter, req *http.Request) {
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
 	wikiDir := git.GetWikiRepoPath(repoDir)
 
+	if _, err := os.Stat(wikiDir); os.IsNotExist(err) {
+		_ = git.InitWikiRepository(wikiDir, repo.Name, "ProGit", "wiki@progit.io")
+	}
+
 	pages, err := git.ListWikiPages(wikiDir)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
@@ -1302,6 +1306,10 @@ func (r *Router) handleGetWikiPage(w http.ResponseWriter, req *http.Request) {
 
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
 	wikiDir := git.GetWikiRepoPath(repoDir)
+
+	if _, err := os.Stat(wikiDir); os.IsNotExist(err) {
+		_ = git.InitWikiRepository(wikiDir, repo.Name, "ProGit", "wiki@progit.io")
+	}
 
 	page, err := git.GetWikiPage(wikiDir, slug)
 	if err != nil {
