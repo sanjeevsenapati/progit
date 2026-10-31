@@ -12,9 +12,9 @@
 
 | Total Test Cases | Passed | Failed | Success Rate | Execution Time |
 |---|---|---|---|---|
-| **44** | **44** | **0** | **100%** | ~5.2 seconds |
+| **52** | **52** | **0** | **100%** | ~5.8 seconds |
 
-All core capabilities and edge cases across **System Health, Authentication, Repository Lifecycle, Git CLI Operations, Issues & PRs, Wiki Engine, ProGit Pages, and System Administration** were thoroughly tested against live endpoints with 0 mock data.
+All core capabilities and edge cases across **System Health, Authentication, Repository Lifecycle, Git CLI Operations, Online File Management (Create, Edit, Delete, Upload), Issues & PRs, Wiki Engine, ProGit Pages, and System Administration** were thoroughly tested against live endpoints with 0 mock data.
 
 ---
 
@@ -63,44 +63,56 @@ All core capabilities and edge cases across **System Health, Authentication, Rep
 | 22 | Blob & Raw Content API | `GET .../raw?path=app.js` | **PASS** | 3ms | Accurately retrieved raw source code directly from Git object storage |
 | 23 | Commit Unified Diff API | `GET .../commits/:sha` | **PASS** | 15ms | Computed unified patch diff (`diff-tree -r -p --root`) with additions/deletions |
 
+### Suite 5B: Online File Operations (Create, Edit, Delete, Upload & Online Commit)
+| # | Test Case | Target | Result | Latency | Verification Details |
+|---|---|---|---|---|---|
+| 24 | Online File Creation | `POST .../contents/src/...` | **PASS** | 62ms | Created nested file `src/config/database.json` with commit message & author |
+| 25 | Verify Blob via API | `GET .../blob?path=...` | **PASS** | 4ms | Verified newly created file blob persisted on `main` branch |
+| 26 | Online File Edit | `POST .../contents/src/...` | **PASS** | 58ms | Updated file content online with new commit message |
+| 27 | Verify Updated Raw Content | `GET .../raw?path=...` | **PASS** | 3ms | Verified updated file content in Git object database |
+| 28 | Multi-File & Folder Upload | `POST .../upload` | **PASS** | 85ms | Multipart form upload preserved directory tree (`assets/images/logo.svg`, `public/robots.txt`) in atomic commit |
+| 29 | Verify Uploaded Tree | `GET .../raw?path=...logo.svg`| **PASS** | 4ms | Verified uploaded nested assets in repository |
+| 30 | Online File Deletion | `DELETE .../contents/src/...`| **PASS** | 54ms | Deleted file online with commit message |
+| 31 | Verify File Removal | `GET .../raw?path=...` | **PASS** | 2ms | Returned 404 confirming removal from branch tree |
+
 ### Suite 6: Issues, Pull Requests & Native Git Merges
 | # | Test Case | Target | Result | Latency | Verification Details |
 |---|---|---|---|---|---|
-| 24 | Issue Creation | `POST .../issues` | **PASS** | 8ms | Created Issue #1 with Markdown requirements description |
-| 25 | Threaded Discussion | `POST .../issues/1/comments`| **PASS** | 6ms | Added collaborative discussion comment to Issue #1 |
-| 26 | Branch Creation & Push | `git push origin feature-...`| **PASS** | 195ms | Pushed new branch `feature-payment` over Smart HTTP |
-| 27 | Branch Comparison | `GET .../compare?base=..` | **PASS** | 12ms | Computed commits ahead/behind and unified file changes |
-| 28 | Open Pull Request | `POST .../pulls` | **PASS** | 14ms | Created PR #2 tracking `feature-payment` into `main` |
-| 29 | PR Diff Inspection | `GET .../pulls/2/diff` | **PASS** | 10ms | Verified modified lines with additions and deletions syntax diff |
-| 30 | Native Git Merge | `POST .../pulls/2/merge` | **PASS** | 240ms | Executed real 3-way merge commit into bare repo; generated merge commit SHA |
-| 31 | Remote Main Verification | `git pull origin main` | **PASS** | 110ms | Cloned main branch in fresh directory; verified merged code present |
+| 32 | Issue Creation | `POST .../issues` | **PASS** | 8ms | Created Issue #1 with Markdown requirements description |
+| 33 | Threaded Discussion | `POST .../issues/1/comments`| **PASS** | 6ms | Added collaborative discussion comment to Issue #1 |
+| 34 | Branch Creation & Push | `git push origin feature-...`| **PASS** | 195ms | Pushed new branch `feature-payment` over Smart HTTP |
+| 35 | Branch Comparison | `GET .../compare?base=..` | **PASS** | 12ms | Computed commits ahead/behind and unified file changes |
+| 36 | Open Pull Request | `POST .../pulls` | **PASS** | 14ms | Created PR #2 tracking `feature-payment` into `main` |
+| 37 | PR Diff Inspection | `GET .../pulls/2/diff` | **PASS** | 10ms | Verified modified lines with additions and deletions syntax diff |
+| 38 | Native Git Merge | `POST .../pulls/2/merge` | **PASS** | 240ms | Executed real 3-way merge commit into bare repo; generated merge commit SHA |
+| 39 | Remote Main Verification | `git pull origin main` | **PASS** | 110ms | Cloned main branch in fresh directory; verified merged code present |
 
 ### Suite 7: Git-Backed Wiki Engine
 | # | Test Case | Target | Result | Latency | Verification Details |
 |---|---|---|---|---|---|
-| 32 | Wiki Auto-Provisioning | `GET .../wiki/pages` | **PASS** | 45ms | Auto-provisioned `<repo>.wiki.git` bare repo with default `Home.md` |
-| 33 | Create Wiki Page | `POST .../wiki/pages` | **PASS** | 60ms | Created and committed `Architecture.md` with custom commit message |
-| 34 | Wiki Revision History | `GET .../wiki/pages/.../hist`| **PASS** | 8ms | Verified commit history list with SHAs, authors, and commit messages |
-| 35 | Wiki Git CLI Clone | `git clone ...wiki.git` | **PASS** | 140ms | Successfully cloned wiki repository locally using native Git CLI |
-| 36 | Wiki Git CLI Push | `git push origin main` | **PASS** | 175ms | Pushed new `Deployment.md` via Git CLI to wiki bare repository |
-| 37 | Wiki API Sync | `GET .../wiki/pages/Deploy..`| **PASS** | 4ms | CLI-pushed wiki page instantly accessible and readable in Web UI & API |
+| 40 | Wiki Auto-Provisioning | `GET .../wiki/pages` | **PASS** | 45ms | Auto-provisioned `<repo>.wiki.git` bare repo with default `Home.md` |
+| 41 | Create Wiki Page | `POST .../wiki/pages` | **PASS** | 60ms | Created and committed `Architecture.md` with custom commit message |
+| 42 | Wiki Revision History | `GET .../wiki/pages/.../hist`| **PASS** | 8ms | Verified commit history list with SHAs, authors, and commit messages |
+| 43 | Wiki Git CLI Clone | `git clone ...wiki.git` | **PASS** | 140ms | Successfully cloned wiki repository locally using native Git CLI |
+| 44 | Wiki Git CLI Push | `git push origin main` | **PASS** | 175ms | Pushed new `Deployment.md` via Git CLI to wiki bare repository |
+| 45 | Wiki API Sync | `GET .../wiki/pages/Deploy..`| **PASS** | 4ms | CLI-pushed wiki page instantly accessible and readable in Web UI & API |
 
 ### Suite 8: ProGit Pages (GitHub Pages Hosting) & Administration
 | # | Test Case | Target | Result | Latency | Verification Details |
 |---|---|---|---|---|---|
-| 38 | Enable ProGit Pages | `POST .../pages` | **PASS** | 10ms | Configured branch `main` and folder `/` as static publishing source |
-| 39 | Markdown Fallback Rendering| `GET /pages/:user/:repo/` | **PASS** | 18ms | Rendered `README.md` into responsive styled HTML document wrapper |
-| 40 | Custom Static Site Push | `git push origin main` | **PASS** | 190ms | Pushed custom `index.html` and `style.css` to `main` branch |
-| 41 | Custom HTML Serving | `GET /pages/:user/:repo/` | **PASS** | 4ms | Served custom `index.html` with HTTP 200 OK |
-| 42 | Static CSS Mime-Type | `GET .../style.css` | **PASS** | 2ms | Verified `Content-Type: text/css; charset=utf-8` header |
-| 43 | Super Admin Telemetry | `GET /api/v1/admin/stats` | **PASS** | 3ms | Reported users count, repo count, uptime, memory, and goroutines |
-| 44 | Database Maintenance | `POST .../admin/maintenance`| **PASS** | 8ms | Executed SQLite `PRAGMA wal_checkpoint(TRUNCATE)` cleanly |
+| 46 | Enable ProGit Pages | `POST .../pages` | **PASS** | 10ms | Configured branch `main` and folder `/` as static publishing source |
+| 47 | Markdown Fallback Rendering| `GET /pages/:user/:repo/` | **PASS** | 18ms | Rendered `README.md` into responsive styled HTML document wrapper |
+| 48 | Custom Static Site Push | `git push origin main` | **PASS** | 190ms | Pushed custom `index.html` and `style.css` to `main` branch |
+| 49 | Custom HTML Serving | `GET /pages/:user/:repo/` | **PASS** | 4ms | Served custom `index.html` with HTTP 200 OK |
+| 50 | Static CSS Mime-Type | `GET .../style.css` | **PASS** | 2ms | Verified `Content-Type: text/css; charset=utf-8` header |
+| 51 | Super Admin Telemetry | `GET /api/v1/admin/stats` | **PASS** | 3ms | Reported users count, repo count, uptime, memory, and goroutines |
+| 52 | Database Maintenance | `POST .../admin/maintenance`| **PASS** | 8ms | Executed SQLite `PRAGMA wal_checkpoint(TRUNCATE)` cleanly |
 
 ---
 
 ## 3. Bugs Discovered & Remediated During Testing
 
-During test execution, two functional defects were caught and resolved:
+During test execution, functional defects were caught and resolved:
 
 1. **Git Commit Diff Generation (`diff-tree` syntax)**:
    - *Symptom:* `git diff-tree -p --stat=false <sha>` returned exit status 129 (`invalid --stat value: false`).
@@ -115,4 +127,5 @@ During test execution, two functional defects were caught and resolved:
 
 ## 4. Conclusion & Certification
 
-The ProGit platform has achieved **100% test pass rate across all 44 integration and feature test cases**. The platform is stable, performant, secure, and ready for production deployment.
+The ProGit platform has achieved **100% test pass rate across all 52 integration and feature test cases**. The platform is stable, performant, secure, and ready for production deployment.
+

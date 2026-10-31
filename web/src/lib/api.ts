@@ -278,6 +278,49 @@ export const api = {
     });
   },
 
+  // Online File Operations
+  async saveFile(
+    owner: string,
+    repo: string,
+    filePath: string,
+    data: { branch?: string; new_branch?: string; content: string; message: string }
+  ) {
+    return fetchJSON<{ message: string; commit_sha: string; branch: string; file_path: string }>(
+      `/api/v1/repos/${owner}/${repo}/contents/${filePath}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+  },
+
+  async deleteFile(
+    owner: string,
+    repo: string,
+    filePath: string,
+    data: { branch?: string; new_branch?: string; message: string }
+  ) {
+    return fetchJSON<{ message: string; commit_sha: string; branch: string; file_path: string }>(
+      `/api/v1/repos/${owner}/${repo}/contents/${filePath}`,
+      {
+        method: 'DELETE',
+        body: JSON.stringify(data),
+      }
+    );
+  },
+
+  async uploadFiles(owner: string, repo: string, formData: FormData) {
+    const res = await fetch(`/api/v1/repos/${owner}/${repo}/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    return res.json() as Promise<{ message: string; commit_sha: string; branch: string; num_files: number }>;
+  },
+
   // Issues
   async listIssues(owner: string, repo: string, state: 'open' | 'closed' = 'open') {
     return fetchJSON<Issue[]>(`/api/v1/repos/${owner}/${repo}/issues?state=${state}`);

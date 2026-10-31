@@ -3,6 +3,7 @@ package git
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -158,6 +159,82 @@ func TestMergeBranches(t *testing.T) {
 	}
 	if blob.Content != "new feature" {
 		t.Errorf("unexpected blob content on main: %s", blob.Content)
+	}
+}
+
+func TestOnlineFileOperations(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "progit-online-file-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	repoPath := filepath.Join(tempDir, "online.git")
+	if err := InitRepositoryWithReadme(repoPath, "online-repo", "Testing online operations", "main", "Tester", "tester@example.com"); err != nil {
+		t.Fatalf("init repo: %v", err)
+	}
+
+	// 1. Save new file
+	sha1, branch1, err := SaveFile(repoPath, "main", "src/main.go", "package main\n\nfunc main() {}\n", "Tester", "tester@example.com", "Add main.go", "")
+	if err != nil {
+		t.Fatalf("SaveFile create failed: %v", err)
+	}
+	if sha1 == "" || branch1 != "main" {
+		t.Errorf("unexpected SaveFile result: sha=%s, branch=%s", sha1, branch1)
+	}
+
+	blob, err := GetBlob(repoPath, "main", "src/main.go")
+	if err != nil || blob == nil {
+		t.Fatalf("GetBlob src/main.go failed: %v", err)
+	}
+	if !strings.Contains(blob.Content, "package main") {
+		t.Errorf("blob content mismatch: %s", blob.Content)
+	}
+
+	// 2. Edit existing file
+	sha2, _, err := SaveFile(repoPath, "main", "src/main.go", "package main\n\nimport \"fmt\"\n\nfunc main() { fmt.Println() }\n", "Tester", "tester@example.com", "Update main.go", "")
+	if err != nil {
+		t.Fatalf("SaveFile edit failed: %v", err)
+	}
+	if sha2 == sha1 {
+		t.Errorf("expected different commit sha after edit")
+	}
+
+	blob2, _ := GetBlob(repoPath, "main", "src/main.go")
+	if !strings.Contains(blob2.Content, "import \"fmt\"") {
+		t.Errorf("updated content mismatch: %s", blob2.Content)
+	}
+
+	// 3. Upload multiple files & directory
+	files := []UploadedFile{
+		{Path: "config/app.json", Data: []byte(`{"env":"production"}`)},
+		{Path: "assets/logo.svg", Data: []byte(`<svg></svg>`)},
+	}
+	sha3, _, err := UploadFiles(repoPath, "main", "", files, "Tester", "tester@example.com", "Upload assets & config", "")
+	if err != nil {
+		t.Fatalf("UploadFiles failed: %v", err)
+	}
+	if sha3 == "" {
+		t.Errorf("expected commit sha from upload")
+	}
+
+	blobJSON, err := GetBlob(repoPath, "main", "config/app.json")
+	if err != nil || blobJSON == nil || !strings.Contains(blobJSON.Content, "production") {
+		t.Fatalf("uploaded config/app.json not found: %v", err)
+	}
+
+	// 4. Delete file
+	sha4, _, err := DeleteFile(repoPath, "main", "config/app.json", "Tester", "tester@example.com", "Remove config", "")
+	if err != nil {
+		t.Fatalf("DeleteFile failed: %v", err)
+	}
+	if sha4 == "" {
+		t.Errorf("expected commit sha from delete")
+	}
+
+	blobDeleted, _ := GetBlob(repoPath, "main", "config/app.json")
+	if blobDeleted != nil {
+		t.Errorf("expected file to be deleted, but still found")
 	}
 }
 

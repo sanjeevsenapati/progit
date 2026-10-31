@@ -63,6 +63,21 @@ git push origin main
 - **Branch & Tag Selector**: Switch branches or tags using the dropdown at the top of the file tree.
 - **Commit History**: Click **Commits** to view the commit timeline and click any commit SHA to inspect unified diffs.
 
+### 3.1 Online File Creation and Editing
+- **Create New File**: Click **Add file > Create new file** from any directory view. You can type nested paths (e.g. `src/utils/math.js`) and ProGit will automatically create the required directories. Enter your code, provide a commit message, choose to commit directly or to a new branch, and click **Commit changes**.
+- **Edit Existing File**: In the file view (`FileView`), click the **Edit** (pencil) button. This opens the online editor with syntax highlighting, line numbers, and a **Preview** tab for Markdown files. Update your code and submit an online commit.
+
+### 3.2 Uploading Files and Directories
+- Click **Add file > Upload files** from any repository code view.
+- **Drag & Drop**: Drag one or more files directly into the upload dropzone.
+- **Choose Files**: Click **choose files** to pick multiple files.
+- **Upload Directory**: Click **upload a directory** to select an entire folder structure. ProGit preserves relative subdirectories (e.g., `assets/images/logo.svg`).
+- Review the staged file list, enter a commit message, select the target branch, and click **Commit changes**. All uploaded files are committed in a single atomic Git commit.
+
+### 3.3 Online File Deletion
+- In the file view, click the **Delete** (trash) button.
+- Enter a commit message in the confirmation modal and click **Delete file**. The file will be removed from the target branch with an online commit.
+
 ---
 
 ## 4. Collaboration: Issues & Pull Requests

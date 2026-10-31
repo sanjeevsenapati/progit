@@ -19,6 +19,10 @@
 | **Repository** | Transfer / Delete Repo | Yes | Implemented | Safety modal with confirmation |
 | **Git Engine** | Smart HTTP (Clone/Push/Pull)| Yes | Implemented | Native `git-upload-pack` & `receive-pack` |
 | **Git Engine** | SSH Protocol (Clone/Push) | OpenSSH wrapper | Implemented (Native SSH) | Built-in Go SSH server on port 2222 |
+| **Online Editor**| Online File Creation | Yes | Implemented | Create files with subpaths, commit message & branch selection |
+| **Online Editor**| Online File Editing | Yes | Implemented | In-browser editing, markdown preview & direct online commits |
+| **Online Editor**| Online File Deletion | Yes | Implemented | In-browser delete confirmation modal & direct online commit |
+| **Online Editor**| Multi-File & Folder Upload | Basic | Implemented | Drag-and-drop, multi-file & full directory uploads (`webkitdirectory`) |
 | **Code Browser**| Directory & File Tree | Basic | Implemented | Modern breadcrumbs, icons & speed |
 | **Code Browser**| File Viewer | Basic | Implemented | Syntax highlight, line nums, copy raw |
 | **Code Browser**| Markdown Rendering | Yes | Implemented | Rich markdown with GitHub flavor |

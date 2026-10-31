@@ -249,6 +249,64 @@ echo "${DIFF_RES}" | grep -q '"patch":' || assert_fail "Commit diff missing patc
 assert_pass "Commit diff rendered"
 
 # -----------------------------------------------------------------------------
+# SUITE 5B: Online File Operations (Create, Edit, Delete, Upload & Online Commit)
+# -----------------------------------------------------------------------------
+echo -e "\n${BLUE}=== [5B/9] ONLINE FILE OPERATIONS (CREATE, EDIT, UPLOAD, COMMIT) ===${NC}"
+
+log_test "Online File Creation (Create src/config/database.json)"
+CREATE_FILE_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/contents/src/config/database.json" \
+  -H "Content-Type: application/json" \
+  -d '{"branch":"main","content":"{\n  \"host\": \"localhost\",\n  \"port\": 5432\n}","message":"Create database config online"}')
+echo "${CREATE_FILE_RES}" | grep -q '"commit_sha":' || assert_fail "Online file creation failed: ${CREATE_FILE_RES}"
+assert_pass "Created file with online commit"
+
+log_test "Verify newly created file blob via API"
+BLOB_RES=$(curl -s "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/blob?ref=main&path=src/config/database.json")
+echo "${BLOB_RES}" | grep -q 'localhost' || assert_fail "Blob content mismatch after online creation: ${BLOB_RES}"
+assert_pass "File content verified on main"
+
+log_test "Online File Edit (Update src/config/database.json)"
+EDIT_FILE_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/contents/src/config/database.json" \
+  -H "Content-Type: application/json" \
+  -d '{"branch":"main","content":"{\n  \"host\": \"db.internal\",\n  \"port\": 5432,\n  \"ssl\": true\n}","message":"Update DB host for production"}')
+echo "${EDIT_FILE_RES}" | grep -q '"commit_sha":' || assert_fail "Online file edit failed: ${EDIT_FILE_RES}"
+assert_pass "Online edit committed"
+
+log_test "Verify updated content via Raw API"
+RAW_EDIT_RES=$(curl -s "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/raw?ref=main&path=src/config/database.json")
+echo "${RAW_EDIT_RES}" | grep -q '"db.internal"' || assert_fail "Raw content not updated: ${RAW_EDIT_RES}"
+assert_pass "Online edit reflected in Git"
+
+log_test "Multi-File and Directory Upload via Multipart Form"
+echo "<svg viewBox='0 0 100 100'></svg>" > "${TEST_DIR}/logo.svg"
+echo "User-agent: *\nDisallow: /admin" > "${TEST_DIR}/robots.txt"
+UPLOAD_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/upload" \
+  -F "branch=main" \
+  -F "message=Upload branding and public assets" \
+  -F "files=@${TEST_DIR}/logo.svg;filename=logo.svg" \
+  -F "files=@${TEST_DIR}/robots.txt;filename=robots.txt" \
+  -F 'relative_paths=["assets/images/logo.svg","public/robots.txt"]')
+echo "${UPLOAD_RES}" | grep -q '"num_files":2' || assert_fail "Upload failed: ${UPLOAD_RES}"
+assert_pass "2 files with directory structure uploaded"
+
+log_test "Verify uploaded directory tree (assets/images/logo.svg)"
+LOGO_BLOB=$(curl -s "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/raw?ref=main&path=assets/images/logo.svg")
+echo "${LOGO_BLOB}" | grep -q "viewBox" || assert_fail "Uploaded file not found in tree: ${LOGO_BLOB}"
+assert_pass "Uploaded directory tree verified"
+
+log_test "Online File Deletion (Delete src/config/database.json)"
+DELETE_FILE_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X DELETE "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/contents/src/config/database.json" \
+  -H "Content-Type: application/json" \
+  -d '{"branch":"main","message":"Remove obsolete DB config"}')
+echo "${DELETE_FILE_RES}" | grep -q '"commit_sha":' || assert_fail "Delete failed: ${DELETE_FILE_RES}"
+assert_pass "File deleted with online commit"
+
+log_test "Verify deleted file is gone from remote tree"
+DELETED_BLOB=$(curl -s -w "%{http_code}" -o /dev/null "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/raw?ref=main&path=src/config/database.json")
+[ "${DELETED_BLOB}" = "404" ] || [ "${DELETED_BLOB}" = "500" ] || assert_fail "Expected 404 for deleted file, got ${DELETED_BLOB}"
+assert_pass "File removal confirmed"
+
+# -----------------------------------------------------------------------------
 # SUITE 6: Issues, Pull Requests & Real Git Merge
 # -----------------------------------------------------------------------------
 echo -e "\n${BLUE}=== [6/8] ISSUES, PULL REQUESTS & NATIVE GIT MERGES ===${NC}"

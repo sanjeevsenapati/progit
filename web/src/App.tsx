@@ -10,6 +10,8 @@ import { Explore } from './pages/Explore';
 import { NewRepo } from './pages/NewRepo';
 import { RepoCode } from './pages/RepoCode';
 import { FileView } from './pages/FileView';
+import { FileEditor } from './pages/FileEditor';
+import { UploadFiles } from './pages/UploadFiles';
 import { Commits } from './pages/Commits';
 import { CommitDetail } from './pages/CommitDetail';
 import { Branches } from './pages/Branches';
@@ -96,6 +98,24 @@ export const App: React.FC = () => {
         const branch = segments[3] || 'main';
         const filePath = segments.slice(4).join('/');
         return <FileView owner={owner} repo={repo} branch={branch} filePath={filePath} />;
+      }
+
+      if (subAction === 'new') {
+        const branch = segments[3] || 'main';
+        const initialDirectory = segments.slice(4).join('/');
+        return <FileEditor owner={owner} repo={repo} branch={branch} initialDirectory={initialDirectory} mode="new" />;
+      }
+
+      if (subAction === 'edit') {
+        const branch = segments[3] || 'main';
+        const filePath = segments.slice(4).join('/');
+        return <FileEditor owner={owner} repo={repo} branch={branch} filePath={filePath} mode="edit" />;
+      }
+
+      if (subAction === 'upload') {
+        const branch = segments[3] || 'main';
+        const initialPath = segments.slice(4).join('/');
+        return <UploadFiles owner={owner} repo={repo} branch={branch} initialPath={initialPath} />;
       }
 
       if (subAction === 'commits') {

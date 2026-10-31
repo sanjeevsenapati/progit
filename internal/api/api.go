@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -96,6 +97,11 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/tree", r.handleGetTree)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/blob", r.handleGetBlob)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/raw", r.handleGetRaw)
+
+	// Online File Operations (Create, Edit, Delete, Upload)
+	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/contents/{path...}", r.handleSaveFile)
+	r.mux.HandleFunc("DELETE /api/v1/repos/{owner}/{repo}/contents/{path...}", r.handleDeleteFile)
+	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/upload", r.handleUploadFiles)
 
 	// Issues
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/issues", r.handleListIssues)
@@ -841,6 +847,214 @@ func (r *Router) handleGetRaw(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(bytes)
+}
+
+// Online File Operations Handlers
+
+func (r *Router) handleSaveFile(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	filePath := req.PathValue("path")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required")
+		return
+	}
+
+	var body struct {
+		Branch    string `json:"branch"`
+		NewBranch string `json:"new_branch"`
+		Content   string `json:"content"`
+		Message   string `json:"message"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if body.Branch == "" {
+		body.Branch = repo.DefaultBranch
+	}
+	if body.Branch == "" {
+		body.Branch = "main"
+	}
+
+	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
+	commitSHA, targetBranch, err := git.SaveFile(repoDir, body.Branch, filePath, body.Content, user.Username, user.Email, body.Message, body.NewBranch)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to save file: %v", err))
+		return
+	}
+
+	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "push", fmt.Sprintf("Committed file '%s' to branch '%s'", filePath, targetBranch))
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"message":    "File saved successfully",
+		"commit_sha": commitSHA,
+		"branch":     targetBranch,
+		"file_path":  filePath,
+	})
+}
+
+func (r *Router) handleDeleteFile(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	filePath := req.PathValue("path")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required")
+		return
+	}
+
+	var body struct {
+		Branch    string `json:"branch"`
+		NewBranch string `json:"new_branch"`
+		Message   string `json:"message"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		// Non-fatal, default to empty
+	}
+
+	if body.Branch == "" {
+		body.Branch = repo.DefaultBranch
+	}
+	if body.Branch == "" {
+		body.Branch = "main"
+	}
+
+	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
+	commitSHA, targetBranch, err := git.DeleteFile(repoDir, body.Branch, filePath, user.Username, user.Email, body.Message, body.NewBranch)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to delete file: %v", err))
+		return
+	}
+
+	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "push", fmt.Sprintf("Deleted file '%s' from branch '%s'", filePath, targetBranch))
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"message":    "File deleted successfully",
+		"commit_sha": commitSHA,
+		"branch":     targetBranch,
+		"file_path":  filePath,
+	})
+}
+
+func (r *Router) handleUploadFiles(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required")
+		return
+	}
+
+	// 32MB max in-memory for multipart
+	if err := req.ParseMultipartForm(32 << 20); err != nil {
+		jsonError(w, http.StatusBadRequest, fmt.Sprintf("Failed to parse form: %v", err))
+		return
+	}
+
+	branch := req.FormValue("branch")
+	if branch == "" {
+		branch = repo.DefaultBranch
+	}
+	if branch == "" {
+		branch = "main"
+	}
+	newBranch := req.FormValue("new_branch")
+	basePath := req.FormValue("path")
+	message := req.FormValue("message")
+
+	formFiles := req.MultipartForm.File["files"]
+	if len(formFiles) == 0 {
+		jsonError(w, http.StatusBadRequest, "No files uploaded")
+		return
+	}
+
+	var relativePaths []string
+	if relJSON := req.FormValue("relative_paths"); relJSON != "" {
+		_ = json.Unmarshal([]byte(relJSON), &relativePaths)
+	}
+
+	var files []git.UploadedFile
+	for i, fHeader := range formFiles {
+		file, err := fHeader.Open()
+		if err != nil {
+			continue
+		}
+		data, err := io.ReadAll(file)
+		_ = file.Close()
+		if err != nil {
+			continue
+		}
+
+		filePath := fHeader.Filename
+		if i < len(relativePaths) && relativePaths[i] != "" {
+			filePath = relativePaths[i]
+		}
+
+		files = append(files, git.UploadedFile{
+			Path: filePath,
+			Data: data,
+		})
+	}
+
+	if len(files) == 0 {
+		jsonError(w, http.StatusBadRequest, "No readable files found in upload")
+		return
+	}
+
+	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
+	commitSHA, targetBranch, err := git.UploadFiles(repoDir, branch, basePath, files, user.Username, user.Email, message, newBranch)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to commit uploaded files: %v", err))
+		return
+	}
+
+	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "push", fmt.Sprintf("Uploaded %d files to branch '%s'", len(files), targetBranch))
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"message":    fmt.Sprintf("Successfully uploaded %d files", len(files)),
+		"commit_sha": commitSHA,
+		"branch":     targetBranch,
+		"num_files":  len(files),
+	})
 }
 
 // Issues Handlers

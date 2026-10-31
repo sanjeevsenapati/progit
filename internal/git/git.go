@@ -787,3 +787,266 @@ func DeleteWikiPage(wikiRepoPath, slug, authorName, authorEmail string) error {
 	return nil
 }
 
+// UploadedFile represents a file payload with its target relative path and binary contents.
+type UploadedFile struct {
+	Path string
+	Data []byte
+}
+
+// SaveFile creates or updates a file directly in the repository and commits it.
+func SaveFile(repoPath, branch, filePath, content, authorName, authorEmail, message, newBranch string) (string, string, error) {
+	if abs, err := filepath.Abs(repoPath); err == nil {
+		repoPath = abs
+	}
+	if branch == "" {
+		branch = "main"
+	}
+	targetBranch := branch
+	if newBranch != "" && newBranch != branch {
+		targetBranch = newBranch
+	}
+
+	tempDir, err := os.MkdirTemp("", "progit-file-edit-*")
+	if err != nil {
+		return "", "", err
+	}
+	defer os.RemoveAll(tempDir)
+
+	branches, _ := GetBranches(repoPath)
+	hasBranches := len(branches) > 0
+
+	if hasBranches {
+		cloneArgs := []string{"clone", "--branch", branch, repoPath, tempDir}
+		if _, err := RunGit("", cloneArgs...); err != nil {
+			if _, err := RunGit("", "clone", repoPath, tempDir); err != nil {
+				return "", "", fmt.Errorf("clone failed: %w", err)
+			}
+		}
+	} else {
+		if _, err := RunGit("", "init", "--initial-branch="+branch, tempDir); err != nil {
+			return "", "", fmt.Errorf("init temp repo failed: %w", err)
+		}
+		if _, err := RunGit(tempDir, "remote", "add", "origin", repoPath); err != nil {
+			return "", "", fmt.Errorf("remote add failed: %w", err)
+		}
+	}
+
+	if newBranch != "" && newBranch != branch {
+		if _, err := RunGit(tempDir, "checkout", "-b", newBranch); err != nil {
+			return "", "", fmt.Errorf("create branch %s failed: %w", newBranch, err)
+		}
+	}
+
+	cleanFilePath := strings.TrimPrefix(filepath.Clean("/"+filePath), "/")
+	if cleanFilePath == "" || cleanFilePath == "." {
+		return "", "", fmt.Errorf("invalid file path")
+	}
+
+	destPath := filepath.Join(tempDir, filepath.FromSlash(cleanFilePath))
+	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		return "", "", fmt.Errorf("create directory failed: %w", err)
+	}
+
+	if err := os.WriteFile(destPath, []byte(content), 0644); err != nil {
+		return "", "", fmt.Errorf("write file failed: %w", err)
+	}
+
+	if _, err := RunGit(tempDir, "add", filepath.FromSlash(cleanFilePath)); err != nil {
+		return "", "", fmt.Errorf("git add failed: %w", err)
+	}
+
+	if message == "" {
+		message = fmt.Sprintf("Update %s", cleanFilePath)
+	}
+	if authorName == "" {
+		authorName = "ProGit"
+	}
+	if authorEmail == "" {
+		authorEmail = "git@progit.io"
+	}
+	authorStr := fmt.Sprintf("%s <%s>", authorName, authorEmail)
+	gitConfigArgs := []string{"-c", "user.name=" + authorName, "-c", "user.email=" + authorEmail}
+
+	commitArgs := append(gitConfigArgs, "commit", "-m", message, "--author="+authorStr)
+	if _, err := RunGit(tempDir, commitArgs...); err != nil {
+		return "", "", fmt.Errorf("git commit failed: %w", err)
+	}
+
+	if _, err := RunGit(tempDir, "push", "origin", targetBranch); err != nil {
+		return "", "", fmt.Errorf("git push failed: %w", err)
+	}
+
+	shaOut, _ := RunGit(tempDir, "rev-parse", "HEAD")
+	sha := strings.TrimSpace(string(shaOut))
+
+	return sha, targetBranch, nil
+}
+
+// DeleteFile deletes a file directly from the repository and commits the removal.
+func DeleteFile(repoPath, branch, filePath, authorName, authorEmail, message, newBranch string) (string, string, error) {
+	if abs, err := filepath.Abs(repoPath); err == nil {
+		repoPath = abs
+	}
+	if branch == "" {
+		branch = "main"
+	}
+	targetBranch := branch
+	if newBranch != "" && newBranch != branch {
+		targetBranch = newBranch
+	}
+
+	tempDir, err := os.MkdirTemp("", "progit-file-delete-*")
+	if err != nil {
+		return "", "", err
+	}
+	defer os.RemoveAll(tempDir)
+
+	cloneArgs := []string{"clone", "--branch", branch, repoPath, tempDir}
+	if _, err := RunGit("", cloneArgs...); err != nil {
+		return "", "", fmt.Errorf("clone failed: %w", err)
+	}
+
+	if newBranch != "" && newBranch != branch {
+		if _, err := RunGit(tempDir, "checkout", "-b", newBranch); err != nil {
+			return "", "", fmt.Errorf("create branch %s failed: %w", newBranch, err)
+		}
+	}
+
+	cleanFilePath := strings.TrimPrefix(filepath.Clean("/"+filePath), "/")
+	destPath := filepath.Join(tempDir, filepath.FromSlash(cleanFilePath))
+	if _, err := os.Stat(destPath); os.IsNotExist(err) {
+		return "", "", fmt.Errorf("file '%s' does not exist", cleanFilePath)
+	}
+
+	if _, err := RunGit(tempDir, "rm", filepath.FromSlash(cleanFilePath)); err != nil {
+		return "", "", fmt.Errorf("git rm failed: %w", err)
+	}
+
+	if message == "" {
+		message = fmt.Sprintf("Delete %s", cleanFilePath)
+	}
+	if authorName == "" {
+		authorName = "ProGit"
+	}
+	if authorEmail == "" {
+		authorEmail = "git@progit.io"
+	}
+	authorStr := fmt.Sprintf("%s <%s>", authorName, authorEmail)
+	gitConfigArgs := []string{"-c", "user.name=" + authorName, "-c", "user.email=" + authorEmail}
+
+	commitArgs := append(gitConfigArgs, "commit", "-m", message, "--author="+authorStr)
+	if _, err := RunGit(tempDir, commitArgs...); err != nil {
+		return "", "", fmt.Errorf("git commit failed: %w", err)
+	}
+
+	if _, err := RunGit(tempDir, "push", "origin", targetBranch); err != nil {
+		return "", "", fmt.Errorf("git push failed: %w", err)
+	}
+
+	shaOut, _ := RunGit(tempDir, "rev-parse", "HEAD")
+	sha := strings.TrimSpace(string(shaOut))
+
+	return sha, targetBranch, nil
+}
+
+// UploadFiles commits multiple files / directories into the repository in a single atomic commit.
+func UploadFiles(repoPath, branch, baseSubPath string, files []UploadedFile, authorName, authorEmail, message, newBranch string) (string, string, error) {
+	if len(files) == 0 {
+		return "", "", fmt.Errorf("no files to upload")
+	}
+	if abs, err := filepath.Abs(repoPath); err == nil {
+		repoPath = abs
+	}
+	if branch == "" {
+		branch = "main"
+	}
+	targetBranch := branch
+	if newBranch != "" && newBranch != branch {
+		targetBranch = newBranch
+	}
+
+	tempDir, err := os.MkdirTemp("", "progit-upload-*")
+	if err != nil {
+		return "", "", err
+	}
+	defer os.RemoveAll(tempDir)
+
+	branches, _ := GetBranches(repoPath)
+	hasBranches := len(branches) > 0
+
+	if hasBranches {
+		cloneArgs := []string{"clone", "--branch", branch, repoPath, tempDir}
+		if _, err := RunGit("", cloneArgs...); err != nil {
+			if _, err := RunGit("", "clone", repoPath, tempDir); err != nil {
+				return "", "", fmt.Errorf("clone failed: %w", err)
+			}
+		}
+	} else {
+		if _, err := RunGit("", "init", "--initial-branch="+branch, tempDir); err != nil {
+			return "", "", fmt.Errorf("init temp repo failed: %w", err)
+		}
+		if _, err := RunGit(tempDir, "remote", "add", "origin", repoPath); err != nil {
+			return "", "", fmt.Errorf("remote add failed: %w", err)
+		}
+	}
+
+	if newBranch != "" && newBranch != branch {
+		if _, err := RunGit(tempDir, "checkout", "-b", newBranch); err != nil {
+			return "", "", fmt.Errorf("create branch %s failed: %w", newBranch, err)
+		}
+	}
+
+	cleanBasePath := strings.TrimPrefix(filepath.Clean("/"+baseSubPath), "/")
+	if cleanBasePath == "." {
+		cleanBasePath = ""
+	}
+
+	for _, f := range files {
+		cleanRelPath := strings.TrimPrefix(filepath.Clean("/"+f.Path), "/")
+		if cleanRelPath == "" || cleanRelPath == "." {
+			continue
+		}
+		fullRel := cleanRelPath
+		if cleanBasePath != "" {
+			fullRel = filepath.Join(cleanBasePath, cleanRelPath)
+		}
+		destPath := filepath.Join(tempDir, filepath.FromSlash(fullRel))
+
+		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+			return "", "", fmt.Errorf("create directory for %s failed: %w", fullRel, err)
+		}
+		if err := os.WriteFile(destPath, f.Data, 0644); err != nil {
+			return "", "", fmt.Errorf("write file %s failed: %w", fullRel, err)
+		}
+		if _, err := RunGit(tempDir, "add", filepath.FromSlash(fullRel)); err != nil {
+			return "", "", fmt.Errorf("git add %s failed: %w", fullRel, err)
+		}
+	}
+
+	if message == "" {
+		message = fmt.Sprintf("Upload %d files", len(files))
+	}
+	if authorName == "" {
+		authorName = "ProGit"
+	}
+	if authorEmail == "" {
+		authorEmail = "git@progit.io"
+	}
+	authorStr := fmt.Sprintf("%s <%s>", authorName, authorEmail)
+	gitConfigArgs := []string{"-c", "user.name=" + authorName, "-c", "user.email=" + authorEmail}
+
+	commitArgs := append(gitConfigArgs, "commit", "-m", message, "--author="+authorStr)
+	if _, err := RunGit(tempDir, commitArgs...); err != nil {
+		return "", "", fmt.Errorf("git commit failed: %w", err)
+	}
+
+	if _, err := RunGit(tempDir, "push", "origin", targetBranch); err != nil {
+		return "", "", fmt.Errorf("git push failed: %w", err)
+	}
+
+	shaOut, _ := RunGit(tempDir, "rev-parse", "HEAD")
+	sha := strings.TrimSpace(string(shaOut))
+
+	return sha, targetBranch, nil
+}
+
