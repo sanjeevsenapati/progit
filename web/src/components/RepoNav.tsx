@@ -1,5 +1,6 @@
-import React from 'react';
-import { Repository } from '../lib/api';
+import React, { useState, useEffect } from 'react';
+import { Repository, Organization, api } from '../lib/api';
+import { useAuth } from '../lib/theme';
 import { 
   Code, 
   CircleDot, 
@@ -12,7 +13,10 @@ import {
   History,
   BookOpen,
   Globe,
-  Kanban
+  Kanban,
+  X,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 
 interface RepoNavProps {
@@ -23,31 +27,92 @@ interface RepoNavProps {
 }
 
 export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar, activeTab }) => {
+  const { user } = useAuth();
   const basePath = `/${repo.owner_name}/${repo.name}`;
+
+  const [showForkModal, setShowForkModal] = useState(false);
+  const [orgs, setOrgs] = useState<Organization[]>([]);
+  const [selectedOwner, setSelectedOwner] = useState<string>('');
+  const [forkName, setForkName] = useState<string>(repo.name);
+  const [forking, setForking] = useState(false);
+  const [forkError, setForkError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      setSelectedOwner(user.username);
+      api.listUserOrgs().then(setOrgs).catch(() => {});
+    }
+  }, [user]);
+
+  const handleForkClick = () => {
+    if (!user) {
+      window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+      return;
+    }
+    setForkError(null);
+    setForkName(repo.name);
+    setShowForkModal(true);
+  };
+
+  const handleCreateFork = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setForking(true);
+    setForkError(null);
+
+    try {
+      const isOrg = selectedOwner !== user.username;
+      const res = await api.forkRepo(repo.owner_name, repo.name, {
+        organization: isOrg ? selectedOwner : undefined,
+        name: forkName.trim() || repo.name,
+      });
+
+      // Redirect to newly forked repository
+      window.location.href = `/${res.owner_name}/${res.name}`;
+    } catch (err: any) {
+      setForkError(err.message || 'Failed to fork repository');
+      setForking(false);
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border pt-5 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Title & Action Buttons */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
-          <div className="flex items-center space-x-2 text-xl font-semibold flex-wrap">
-            <a href={`/user/${repo.owner_name}`} className="text-emerald-600 dark:text-emerald-400 hover:underline">
-              {repo.owner_name}
-            </a>
-            <span className="text-gray-400 dark:text-dark-muted">/</span>
-            <a href={basePath} className="text-gray-900 dark:text-white hover:underline font-bold">
-              {repo.name}
-            </a>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border border-gray-300 dark:border-dark-border text-gray-600 dark:text-dark-muted ml-2">
-              {repo.is_private ? (
-                <>
-                  <Lock className="w-3 h-3 mr-1" />
-                  Private
-                </>
-              ) : (
-                'Public'
-              )}
-            </span>
+          <div>
+            <div className="flex items-center space-x-2 text-xl font-semibold flex-wrap">
+              <a href={`/user/${repo.owner_name}`} className="text-emerald-600 dark:text-emerald-400 hover:underline">
+                {repo.owner_name}
+              </a>
+              <span className="text-gray-400 dark:text-dark-muted">/</span>
+              <a href={basePath} className="text-gray-900 dark:text-white hover:underline font-bold">
+                {repo.name}
+              </a>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border border-gray-300 dark:border-dark-border text-gray-600 dark:text-dark-muted ml-2">
+                {repo.is_private ? (
+                  <>
+                    <Lock className="w-3 h-3 mr-1" />
+                    Private
+                  </>
+                ) : (
+                  'Public'
+                )}
+              </span>
+            </div>
+
+            {repo.is_fork && repo.fork_parent && (
+              <div className="text-xs text-gray-500 dark:text-dark-muted flex items-center space-x-1 mt-1">
+                <span>forked from</span>
+                <a
+                  href={`/${repo.fork_parent.owner_name}/${repo.fork_parent.name}`}
+                  className="text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
+                >
+                  {repo.fork_parent.owner_name}/{repo.fork_parent.name}
+                </a>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center space-x-2">
@@ -66,13 +131,17 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar,
               </span>
             </button>
 
-            <div className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-md border border-gray-300 dark:border-dark-border bg-gray-50 dark:bg-dark-hover text-gray-700 dark:text-dark-text shadow-sm">
+            <button
+              onClick={handleForkClick}
+              title="Fork this repository"
+              className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-md border border-gray-300 dark:border-dark-border bg-gray-50 dark:bg-dark-hover hover:bg-gray-100 dark:hover:bg-dark-border/60 text-gray-700 dark:text-dark-text shadow-sm transition-colors cursor-pointer"
+            >
               <GitFork className="w-3.5 h-3.5 mr-1.5" />
               <span>Fork</span>
               <span className="ml-2 pl-2 border-l border-gray-300 dark:border-dark-border font-bold">
                 {repo.num_forks}
               </span>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -202,6 +271,107 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar,
           </a>
         </div>
       </div>
+
+      {/* Fork Modal */}
+      {showForkModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="relative bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl max-w-lg w-full shadow-2xl overflow-hidden transition-all">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-dark-border">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
+                  <GitFork className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">Create a new fork</h3>
+                  <p className="text-xs text-gray-500 dark:text-dark-muted">Fork {repo.owner_name}/{repo.name} to your account</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowForkModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateFork} className="p-6 space-y-4">
+              {forkError && (
+                <div className="flex items-center space-x-2 p-3 text-sm rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{forkError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1.5">
+                  Owner & Repository name
+                </label>
+                <div className="flex items-center space-x-2">
+                  <select
+                    value={selectedOwner}
+                    onChange={(e) => setSelectedOwner(e.target.value)}
+                    className="w-1/2 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                  >
+                    {user && <option value={user.username}>{user.username}</option>}
+                    {orgs.map((org) => (
+                      <option key={org.id} value={org.name}>
+                        {org.name} (Organization)
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-gray-400 dark:text-dark-muted font-bold text-lg">/</span>
+                  <input
+                    type="text"
+                    value={forkName}
+                    onChange={(e) => setForkName(e.target.value)}
+                    required
+                    placeholder="Repository name"
+                    className="w-1/2 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                {selectedOwner === repo.owner_name && (
+                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                    You cannot fork into the same account that currently owns the repository. Select an organization or different destination.
+                  </p>
+                )}
+              </div>
+
+              <div className="p-3 bg-gray-50 dark:bg-dark-hover rounded-lg text-xs text-gray-500 dark:text-dark-muted space-y-1">
+                <p>• A copy of <strong>{repo.owner_name}/{repo.name}</strong> will be created in <strong>{selectedOwner || 'your account'}</strong>.</p>
+                <p>• All branches, commits, tags, and commit histories will be preserved.</p>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-gray-200 dark:border-dark-border">
+                <button
+                  type="button"
+                  onClick={() => setShowForkModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover rounded-lg border border-gray-300 dark:border-dark-border"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={forking || (selectedOwner === repo.owner_name)}
+                  className="inline-flex items-center px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors"
+                >
+                  {forking ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      Forking...
+                    </>
+                  ) : (
+                    <>
+                      <GitFork className="w-3.5 h-3.5 mr-1.5" />
+                      Create fork
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

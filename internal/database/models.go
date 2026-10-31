@@ -45,9 +45,10 @@ type Repository struct {
 	Name          string    `json:"name"`
 	Description   string    `json:"description"`
 	IsPrivate     bool      `json:"is_private"`
-	IsFork        bool      `json:"is_fork"`
-	ForkParentID  *int64    `json:"fork_parent_id,omitempty"`
-	DefaultBranch string    `json:"default_branch"`
+	IsFork        bool        `json:"is_fork"`
+	ForkParentID  *int64      `json:"fork_parent_id,omitempty"`
+	ForkParent    *Repository `json:"fork_parent,omitempty"`
+	DefaultBranch string      `json:"default_branch"`
 	NumStars      int       `json:"num_stars"`
 	NumForks      int       `json:"num_forks"`
 	NumWatches    int       `json:"num_watches"`
@@ -121,10 +122,36 @@ type Comment struct {
 	PosterID     int64     `json:"poster_id"`
 	PosterName   string    `json:"poster_name"`
 	PosterAvatar string    `json:"poster_avatar"`
-	Type         string    `json:"type"` // "comment", "close", "reopen", "merge"
+	Type         string    `json:"type"` // "comment", "close", "reopen", "merge", "review"
 	Content      string    `json:"content"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type PullReview struct {
+	ID           int64               `json:"id"`
+	IssueID      int64               `json:"issue_id"`
+	PullID       int64               `json:"pull_id"`
+	ReviewerID   int64               `json:"reviewer_id"`
+	ReviewerName string              `json:"reviewer_name"`
+	State        string              `json:"state"` // "APPROVED", "CHANGES_REQUESTED", "COMMENTED"
+	Content      string              `json:"content"`
+	Comments     []PullReviewComment `json:"comments,omitempty"`
+	CreatedAt    time.Time           `json:"created_at"`
+	UpdatedAt    time.Time           `json:"updated_at"`
+}
+
+type PullReviewComment struct {
+	ID         int64     `json:"id"`
+	ReviewID   int64     `json:"review_id"`
+	IssueID    int64     `json:"issue_id"`
+	UserID     int64     `json:"user_id"`
+	UserName   string    `json:"user_name"`
+	FilePath   string    `json:"file_path"`
+	LineNumber int       `json:"line_number"`
+	DiffHunk   string    `json:"diff_hunk,omitempty"`
+	Content    string    `json:"content"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type Label struct {

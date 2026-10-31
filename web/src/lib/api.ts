@@ -20,6 +20,8 @@ export interface Repository {
   description: string;
   is_private: boolean;
   is_fork: boolean;
+  fork_parent_id?: number;
+  fork_parent?: Repository;
   default_branch: string;
   num_stars: number;
   num_forks: number;
@@ -141,6 +143,32 @@ export interface PullRequest {
   is_merged: boolean;
   merged_at?: string;
   merge_commit_sha?: string;
+}
+
+export interface PullReview {
+  id: number;
+  issue_id: number;
+  pull_id: number;
+  reviewer_id: number;
+  reviewer_name: string;
+  state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED';
+  content: string;
+  comments?: PullReviewComment[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PullReviewComment {
+  id: number;
+  review_id: number;
+  issue_id: number;
+  user_id: number;
+  user_name: string;
+  file_path: string;
+  line_number: number;
+  diff_hunk?: string;
+  content: string;
+  created_at: string;
 }
 
 export interface AccessToken {
@@ -348,6 +376,17 @@ export const api = {
     return fetchJSON<{ starred: boolean; num_stars: number }>(`/api/v1/repos/${owner}/${repo}/star`, { method: 'POST' });
   },
 
+  async forkRepo(owner: string, repo: string, data?: { organization?: string; name?: string }) {
+    return fetchJSON<Repository>(`/api/v1/repos/${owner}/${repo}/forks`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    });
+  },
+
+  async listForks(owner: string, repo: string) {
+    return fetchJSON<Repository[]>(`/api/v1/repos/${owner}/${repo}/forks`);
+  },
+
   // Git Code Browsing
   async getTree(owner: string, repo: string, ref?: string, path?: string) {
     const params = new URLSearchParams();
@@ -501,6 +540,33 @@ export const api = {
     return fetchJSON<{ message: string; merge_commit_sha: string }>(`/api/v1/repos/${owner}/${repo}/pulls/${index}/merge`, {
       method: 'POST',
       body: JSON.stringify({ merge_style: mergeStyle }),
+    });
+  },
+
+  async listPullReviews(owner: string, repo: string, index: number) {
+    return fetchJSON<PullReview[]>(`/api/v1/repos/${owner}/${repo}/pulls/${index}/reviews`);
+  },
+
+  async createPullReview(owner: string, repo: string, index: number, data: { state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED'; content?: string }) {
+    return fetchJSON<PullReview>(`/api/v1/repos/${owner}/${repo}/pulls/${index}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async listPullReviewComments(owner: string, repo: string, index: number) {
+    return fetchJSON<PullReviewComment[]>(`/api/v1/repos/${owner}/${repo}/pulls/${index}/reviews/comments`);
+  },
+
+  async addPullReviewComment(
+    owner: string,
+    repo: string,
+    index: number,
+    data: { review_id?: number; file_path: string; line_number: number; diff_hunk?: string; content: string }
+  ) {
+    return fetchJSON<PullReviewComment>(`/api/v1/repos/${owner}/${repo}/pulls/${index}/reviews/comments`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   },
 

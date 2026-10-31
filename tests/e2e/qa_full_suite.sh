@@ -539,6 +539,31 @@ PR_DIFF=$(curl -s "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/pulls/$
 echo "${PR_DIFF}" | grep -q "const stripe = require" || assert_fail "PR diff missing modified line"
 assert_pass "PR diff accurate"
 
+log_test "Submit Pull Request Review (State: APPROVED)"
+REVIEW_RES=$(curl -s -b "${TEST_DIR}/admin_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/pulls/${PR_INDEX}/reviews" \
+  -H "Content-Type: application/json" \
+  -d '{"state":"APPROVED","content":"Looks great! Verified stripe dependency and integration."}')
+echo "${REVIEW_RES}" | grep -q '"state":"APPROVED"' || assert_fail "Failed to submit review: ${REVIEW_RES}"
+REVIEW_ID=$(echo "${REVIEW_RES}" | python3 -c "import sys, json; print(json.load(sys.stdin)['id'])")
+assert_pass "Review submitted (id: ${REVIEW_ID})"
+
+log_test "Submit Line-by-Line Inline Review Comment"
+INLINE_RES=$(curl -s -b "${TEST_DIR}/admin_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/pulls/${PR_INDEX}/reviews/comments" \
+  -H "Content-Type: application/json" \
+  -d "{\"review_id\":${REVIEW_ID},\"file_path\":\"app.js\",\"line_number\":1,\"content\":\"Ensure stripe secret key is loaded from ENV.\"}")
+echo "${INLINE_RES}" | grep -q "Ensure stripe secret key" || assert_fail "Failed to submit inline comment: ${INLINE_RES}"
+assert_pass "Inline line comment recorded"
+
+log_test "List Pull Request Reviews and Verify Approval"
+LIST_REVIEWS=$(curl -s "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/pulls/${PR_INDEX}/reviews")
+echo "${LIST_REVIEWS}" | grep -q '"state":"APPROVED"' || assert_fail "Review list missing approval: ${LIST_REVIEWS}"
+assert_pass "Reviews verified on pull request"
+
+log_test "List Pull Request Review Comments"
+LIST_REV_COMMENTS=$(curl -s "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/pulls/${PR_INDEX}/reviews/comments")
+echo "${LIST_REV_COMMENTS}" | grep -q "Ensure stripe secret key" || assert_fail "Review comments list missing comment: ${LIST_REV_COMMENTS}"
+assert_pass "Review comments verified on pull request"
+
 log_test "Execute Native Git Merge on Pull Request"
 MERGE_RES=$(curl -s -b "${TEST_DIR}/admin_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/pulls/${PR_INDEX}/merge" \
   -H "Content-Type: application/json" \
@@ -551,6 +576,32 @@ cd "${TEST_DIR}"
 git clone "${HTTP_CLONE_URL}" "verify_merge_clone" >/dev/null 2>&1
 grep -q "const stripe = require" "verify_merge_clone/app.js" || assert_fail "Merged code not present on remote main branch"
 assert_pass "Merge verified on remote"
+
+log_test "Fork Repository (admin forks dev_user's repo)"
+FORK_RES=$(curl -s -b "${TEST_DIR}/admin_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/forks" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"${PUBLIC_REPO}-fork\"}")
+echo "${FORK_RES}" | grep -q '"is_fork":true' || assert_fail "Fork failed: ${FORK_RES}"
+assert_pass "Repository forked into admin account"
+
+log_test "Verify Fork Metadata and Parent Relationship"
+FORK_DETAIL=$(curl -s "${PROGIT_URL}/api/v1/repos/${ADMIN_USER}/${PUBLIC_REPO}-fork")
+echo "${FORK_DETAIL}" | grep -q '"is_fork":true' || assert_fail "Fork metadata missing is_fork: ${FORK_DETAIL}"
+echo "${FORK_DETAIL}" | grep -q "\"owner_name\":\"${DEV_USER}\"" || assert_fail "Fork parent owner missing: ${FORK_DETAIL}"
+assert_pass "Fork parent relationship verified"
+
+log_test "List Forks on Original Repository"
+FORKS_LIST=$(curl -s "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/forks")
+echo "${FORKS_LIST}" | grep -q "${ADMIN_USER}" || assert_fail "Forks list does not contain admin fork: ${FORKS_LIST}"
+assert_pass "Fork appears in original repo forks list"
+
+log_test "Clone Forked Repository via Git HTTP"
+cd "${TEST_DIR}"
+FORK_CLONE_URL="http://${ADMIN_USER}:${ADMIN_PASS}@${PROGIT_URL#http*://}/${ADMIN_USER}/${PUBLIC_REPO}-fork.git"
+git clone "${FORK_CLONE_URL}" "fork_clone" >/dev/null 2>&1 || assert_fail "Clone forked repository failed"
+test -f "fork_clone/app.js" || assert_fail "Forked clone missing app.js"
+grep -q "const stripe = require" "fork_clone/app.js" || assert_fail "Fork missing merged commit content"
+assert_pass "Forked repository cloned and all data intact"
 
 # -----------------------------------------------------------------------------
 # SUITE 7: Git-Backed Wiki Engine

@@ -202,6 +202,35 @@ func runMigrations(db *sql.DB) error {
 
 	CREATE INDEX IF NOT EXISTS idx_comments_issue ON comments(issue_id);
 
+	CREATE TABLE IF NOT EXISTS pull_reviews (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		issue_id INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+		pull_id INTEGER NOT NULL REFERENCES pull_requests(id) ON DELETE CASCADE,
+		reviewer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		state TEXT NOT NULL,
+		content TEXT NOT NULL DEFAULT '',
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_pull_reviews_issue ON pull_reviews(issue_id);
+	CREATE INDEX IF NOT EXISTS idx_pull_reviews_pull ON pull_reviews(pull_id);
+
+	CREATE TABLE IF NOT EXISTS pull_review_comments (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		review_id INTEGER REFERENCES pull_reviews(id) ON DELETE CASCADE,
+		issue_id INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		file_path TEXT NOT NULL,
+		line_number INTEGER NOT NULL DEFAULT 1,
+		diff_hunk TEXT NOT NULL DEFAULT '',
+		content TEXT NOT NULL,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_pull_review_comments_issue ON pull_review_comments(issue_id);
+
 	CREATE TABLE IF NOT EXISTS activities (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -324,6 +353,35 @@ func runMigrations(db *sql.DB) error {
 	_, _ = db.Exec(`ALTER TABLE repositories ADD COLUMN pages_branch TEXT NOT NULL DEFAULT 'main'`)
 	_, _ = db.Exec(`ALTER TABLE repositories ADD COLUMN pages_folder TEXT NOT NULL DEFAULT '/'`)
 	_, _ = db.Exec(`UPDATE repositories SET pages_branch = default_branch WHERE pages_branch = 'gh-pages' OR pages_branch = ''`)
+
+	_, _ = db.Exec(`
+		CREATE TABLE IF NOT EXISTS pull_reviews (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			issue_id INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+			pull_id INTEGER NOT NULL REFERENCES pull_requests(id) ON DELETE CASCADE,
+			reviewer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			state TEXT NOT NULL,
+			content TEXT NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);
+		CREATE INDEX IF NOT EXISTS idx_pull_reviews_issue ON pull_reviews(issue_id);
+		CREATE INDEX IF NOT EXISTS idx_pull_reviews_pull ON pull_reviews(pull_id);
+
+		CREATE TABLE IF NOT EXISTS pull_review_comments (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			review_id INTEGER REFERENCES pull_reviews(id) ON DELETE CASCADE,
+			issue_id INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			file_path TEXT NOT NULL,
+			line_number INTEGER NOT NULL DEFAULT 1,
+			diff_hunk TEXT NOT NULL DEFAULT '',
+			content TEXT NOT NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);
+		CREATE INDEX IF NOT EXISTS idx_pull_review_comments_issue ON pull_review_comments(issue_id);
+	`)
 
 	return nil
 }
@@ -637,6 +695,17 @@ func GetRepositoryByID(id int64) (*Repository, error) {
 	if err != nil {
 		return nil, err
 	}
+	if r.IsFork && r.ForkParentID != nil {
+		parent := &Repository{}
+		if err := DB.QueryRow(`
+			SELECT r.id, r.owner_id, u.username, r.name, r.description, r.is_private, r.default_branch
+			FROM repositories r
+			JOIN users u ON u.id = r.owner_id
+			WHERE r.id = ?
+		`, *r.ForkParentID).Scan(&parent.ID, &parent.OwnerID, &parent.OwnerName, &parent.Name, &parent.Description, &parent.IsPrivate, &parent.DefaultBranch); err == nil {
+			r.ForkParent = parent
+		}
+	}
 	return r, nil
 }
 
@@ -655,7 +724,72 @@ func GetRepositoryByName(ownerUsername, repoName string) (*Repository, error) {
 	if err != nil {
 		return nil, err
 	}
+	if r.IsFork && r.ForkParentID != nil {
+		parent := &Repository{}
+		if err := DB.QueryRow(`
+			SELECT r.id, r.owner_id, u.username, r.name, r.description, r.is_private, r.default_branch
+			FROM repositories r
+			JOIN users u ON u.id = r.owner_id
+			WHERE r.id = ?
+		`, *r.ForkParentID).Scan(&parent.ID, &parent.OwnerID, &parent.OwnerName, &parent.Name, &parent.Description, &parent.IsPrivate, &parent.DefaultBranch); err == nil {
+			r.ForkParent = parent
+		}
+	}
 	return r, nil
+}
+
+func ForkRepository(parentRepo *Repository, newOwnerID int64, newRepoName string) (*Repository, error) {
+	newRepoName = strings.TrimSpace(newRepoName)
+	if newRepoName == "" {
+		newRepoName = parentRepo.Name
+	}
+
+	var count int
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM repositories WHERE owner_id = ? AND name = ? COLLATE NOCASE`, newOwnerID, newRepoName).Scan(&count)
+	if count > 0 {
+		return nil, fmt.Errorf("a repository named '%s' already exists for this owner", newRepoName)
+	}
+
+	res, err := DB.Exec(`
+		INSERT INTO repositories (owner_id, name, description, is_private, is_fork, fork_parent_id, default_branch, enable_wiki, enable_pages, pages_branch, pages_folder)
+		VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
+	`, newOwnerID, newRepoName, parentRepo.Description, parentRepo.IsPrivate, parentRepo.ID, parentRepo.DefaultBranch, parentRepo.EnableWiki, parentRepo.EnablePages, parentRepo.PagesBranch, parentRepo.PagesFolder)
+	if err != nil {
+		return nil, err
+	}
+	id, _ := res.LastInsertId()
+
+	// Increment parent forks counter
+	_, _ = DB.Exec(`UPDATE repositories SET num_forks = num_forks + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, parentRepo.ID)
+
+	return GetRepositoryByID(id)
+}
+
+func GetForks(parentRepoID int64) ([]*Repository, error) {
+	rows, err := DB.Query(`
+		SELECT r.id, r.owner_id, u.username, r.name, r.description, r.is_private, r.is_fork, r.fork_parent_id,
+		       r.default_branch, r.num_stars, r.num_forks, r.num_watches, r.num_issues, r.num_pulls, r.size_bytes, r.is_archived,
+		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.created_at, r.updated_at
+		FROM repositories r
+		JOIN users u ON u.id = r.owner_id
+		WHERE r.fork_parent_id = ?
+		ORDER BY r.created_at DESC
+	`, parentRepoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var forks []*Repository
+	for rows.Next() {
+		r := &Repository{}
+		if err := rows.Scan(&r.ID, &r.OwnerID, &r.OwnerName, &r.Name, &r.Description, &r.IsPrivate, &r.IsFork, &r.ForkParentID,
+			&r.DefaultBranch, &r.NumStars, &r.NumForks, &r.NumWatches, &r.NumIssues, &r.NumPulls, &r.SizeBytes, &r.IsArchived,
+			&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.CreatedAt, &r.UpdatedAt); err == nil {
+			forks = append(forks, r)
+		}
+	}
+	return forks, nil
 }
 
 func ListRepositories(limit, offset int, publicOnly bool) ([]*Repository, error) {
@@ -1092,6 +1226,182 @@ func MarkPullRequestMerged(prID, mergedByID int64, mergeCommitSHA string) error 
 		_, _ = AddComment(issueID, mergedByID, "merge", fmt.Sprintf("Merged via commit %s", mergeCommitSHA))
 	}
 	return nil
+}
+
+// Pull Request Reviews
+
+func CreatePullReview(issueID, pullID, reviewerID int64, state, content string, comments []PullReviewComment) (*PullReview, error) {
+	state = strings.ToUpper(strings.TrimSpace(state))
+	if state != "APPROVED" && state != "CHANGES_REQUESTED" && state != "COMMENTED" {
+		state = "COMMENTED"
+	}
+	content = strings.TrimSpace(content)
+
+	res, err := DB.Exec(`
+		INSERT INTO pull_reviews (issue_id, pull_id, reviewer_id, state, content)
+		VALUES (?, ?, ?, ?, ?)
+	`, issueID, pullID, reviewerID, state, content)
+	if err != nil {
+		return nil, err
+	}
+	reviewID, _ := res.LastInsertId()
+
+	for _, c := range comments {
+		if strings.TrimSpace(c.Content) == "" {
+			continue
+		}
+		line := c.LineNumber
+		if line <= 0 {
+			line = 1
+		}
+		_, _ = DB.Exec(`
+			INSERT INTO pull_review_comments (review_id, issue_id, user_id, file_path, line_number, diff_hunk, content)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`, reviewID, issueID, reviewerID, c.FilePath, line, c.DiffHunk, c.Content)
+	}
+
+	// Add timeline comment
+	actionDesc := "approved these changes"
+	if state == "CHANGES_REQUESTED" {
+		actionDesc = "requested changes"
+	} else if state == "COMMENTED" {
+		actionDesc = "left a review"
+	}
+	timelineContent := actionDesc
+	if content != "" {
+		timelineContent = fmt.Sprintf("%s\n\n%s", actionDesc, content)
+	}
+	_, _ = AddComment(issueID, reviewerID, "review", timelineContent)
+
+	return GetPullReviewByID(reviewID)
+}
+
+func GetPullReviewByID(id int64) (*PullReview, error) {
+	rv := &PullReview{}
+	err := DB.QueryRow(`
+		SELECT pr.id, pr.issue_id, pr.pull_id, pr.reviewer_id, u.username, pr.state, pr.content, pr.created_at, pr.updated_at
+		FROM pull_reviews pr
+		JOIN users u ON u.id = pr.reviewer_id
+		WHERE pr.id = ?
+	`, id).Scan(&rv.ID, &rv.IssueID, &rv.PullID, &rv.ReviewerID, &rv.ReviewerName, &rv.State, &rv.Content, &rv.CreatedAt, &rv.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	rv.Comments, _ = GetReviewCommentsByReviewID(rv.ID)
+	return rv, nil
+}
+
+func GetPullReviews(pullID int64) ([]*PullReview, error) {
+	rows, err := DB.Query(`
+		SELECT pr.id, pr.issue_id, pr.pull_id, pr.reviewer_id, u.username, pr.state, pr.content, pr.created_at, pr.updated_at
+		FROM pull_reviews pr
+		JOIN users u ON u.id = pr.reviewer_id
+		WHERE pr.pull_id = ?
+		ORDER BY pr.created_at ASC
+	`, pullID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var reviews []*PullReview
+	for rows.Next() {
+		rv := &PullReview{}
+		if err := rows.Scan(&rv.ID, &rv.IssueID, &rv.PullID, &rv.ReviewerID, &rv.ReviewerName, &rv.State, &rv.Content, &rv.CreatedAt, &rv.UpdatedAt); err == nil {
+			rv.Comments, _ = GetReviewCommentsByReviewID(rv.ID)
+			reviews = append(reviews, rv)
+		}
+	}
+	return reviews, nil
+}
+
+func CreatePullReviewComment(issueID, pullID, reviewID, userID int64, filePath string, lineNumber int, diffHunk, content string) (*PullReviewComment, error) {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return nil, fmt.Errorf("comment content cannot be empty")
+	}
+	if lineNumber <= 0 {
+		lineNumber = 1
+	}
+
+	var revIDArg any
+	if reviewID > 0 {
+		revIDArg = reviewID
+	}
+
+	res, err := DB.Exec(`
+		INSERT INTO pull_review_comments (review_id, issue_id, user_id, file_path, line_number, diff_hunk, content)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, revIDArg, issueID, userID, filePath, lineNumber, diffHunk, content)
+	if err != nil {
+		return nil, err
+	}
+	cID, _ := res.LastInsertId()
+
+	u, _ := GetUserByID(userID)
+	userName := "User"
+	if u != nil {
+		userName = u.Username
+	}
+
+	return &PullReviewComment{
+		ID:         cID,
+		ReviewID:   reviewID,
+		IssueID:    issueID,
+		UserID:     userID,
+		UserName:   userName,
+		FilePath:   filePath,
+		LineNumber: lineNumber,
+		DiffHunk:   diffHunk,
+		Content:    content,
+		CreatedAt:  time.Now(),
+	}, nil
+}
+
+func GetPullReviewComments(issueID int64) ([]*PullReviewComment, error) {
+	rows, err := DB.Query(`
+		SELECT prc.id, COALESCE(prc.review_id, 0), prc.issue_id, prc.user_id, u.username, prc.file_path, prc.line_number, prc.diff_hunk, prc.content, prc.created_at
+		FROM pull_review_comments prc
+		JOIN users u ON u.id = prc.user_id
+		WHERE prc.issue_id = ?
+		ORDER BY prc.created_at ASC
+	`, issueID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var comments []*PullReviewComment
+	for rows.Next() {
+		c := &PullReviewComment{}
+		if err := rows.Scan(&c.ID, &c.ReviewID, &c.IssueID, &c.UserID, &c.UserName, &c.FilePath, &c.LineNumber, &c.DiffHunk, &c.Content, &c.CreatedAt); err == nil {
+			comments = append(comments, c)
+		}
+	}
+	return comments, nil
+}
+
+func GetReviewCommentsByReviewID(reviewID int64) ([]PullReviewComment, error) {
+	rows, err := DB.Query(`
+		SELECT prc.id, COALESCE(prc.review_id, 0), prc.issue_id, prc.user_id, u.username, prc.file_path, prc.line_number, prc.diff_hunk, prc.content, prc.created_at
+		FROM pull_review_comments prc
+		JOIN users u ON u.id = prc.user_id
+		WHERE prc.review_id = ?
+		ORDER BY prc.created_at ASC
+	`, reviewID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var comments []PullReviewComment
+	for rows.Next() {
+		var c PullReviewComment
+		if err := rows.Scan(&c.ID, &c.ReviewID, &c.IssueID, &c.UserID, &c.UserName, &c.FilePath, &c.LineNumber, &c.DiffHunk, &c.Content, &c.CreatedAt); err == nil {
+			comments = append(comments, c)
+		}
+	}
+	return comments, nil
 }
 
 // Activity Methods

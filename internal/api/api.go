@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -127,7 +128,15 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/pulls/{index}", r.handleGetPull)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/pulls/{index}/diff", r.handleGetPullDiff)
 	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/pulls/{index}/merge", r.handleMergePull)
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/pulls/{index}/reviews", r.handleListPullReviews)
+	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/pulls/{index}/reviews", r.handleCreatePullReview)
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/pulls/{index}/reviews/comments", r.handleListPullReviewComments)
+	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/pulls/{index}/reviews/comments", r.handleCreatePullReviewComment)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/compare", r.handleCompareBranches)
+
+	// Repository Forks
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/forks", r.handleListForks)
+	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/forks", r.handleForkRepo)
 
 	// Wiki Endpoints
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/wiki/pages", r.handleListWikiPages)
@@ -1759,6 +1768,273 @@ func (r *Router) handleMergePull(w http.ResponseWriter, req *http.Request) {
 		"message":          "Merged successfully",
 		"merge_commit_sha": mergeCommitSHA,
 	})
+}
+
+// Pull Request Reviews Handlers
+
+func (r *Router) handleListPullReviews(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	indexStr := req.PathValue("index")
+	index, _ := strconv.ParseInt(indexStr, 10, 64)
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	issue, err := database.GetIssueByIndex(repo.ID, index)
+	if err != nil || issue == nil {
+		jsonError(w, http.StatusNotFound, "Pull request issue not found")
+		return
+	}
+
+	pr, err := database.GetPullRequestByIssueID(issue.ID)
+	if err != nil || pr == nil {
+		jsonError(w, http.StatusNotFound, "Pull request not found")
+		return
+	}
+
+	reviews, err := database.GetPullReviews(pr.ID)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if reviews == nil {
+		reviews = []*database.PullReview{}
+	}
+	jsonResponse(w, http.StatusOK, reviews)
+}
+
+func (r *Router) handleCreatePullReview(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	indexStr := req.PathValue("index")
+	index, _ := strconv.ParseInt(indexStr, 10, 64)
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	issue, err := database.GetIssueByIndex(repo.ID, index)
+	if err != nil || issue == nil {
+		jsonError(w, http.StatusNotFound, "Pull request issue not found")
+		return
+	}
+
+	pr, err := database.GetPullRequestByIssueID(issue.ID)
+	if err != nil || pr == nil {
+		jsonError(w, http.StatusNotFound, "Pull request not found")
+		return
+	}
+
+	var body struct {
+		State    string                        `json:"state"`
+		Content  string                        `json:"content"`
+		Comments []database.PullReviewComment `json:"comments"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	review, err := database.CreatePullReview(issue.ID, pr.ID, user.ID, body.State, body.Content, body.Comments)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusCreated, review)
+}
+
+func (r *Router) handleListPullReviewComments(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	indexStr := req.PathValue("index")
+	index, _ := strconv.ParseInt(indexStr, 10, 64)
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	issue, err := database.GetIssueByIndex(repo.ID, index)
+	if err != nil || issue == nil {
+		jsonError(w, http.StatusNotFound, "Pull request issue not found")
+		return
+	}
+
+	comments, err := database.GetPullReviewComments(issue.ID)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if comments == nil {
+		comments = []*database.PullReviewComment{}
+	}
+	jsonResponse(w, http.StatusOK, comments)
+}
+
+func (r *Router) handleCreatePullReviewComment(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	indexStr := req.PathValue("index")
+	index, _ := strconv.ParseInt(indexStr, 10, 64)
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	issue, err := database.GetIssueByIndex(repo.ID, index)
+	if err != nil || issue == nil {
+		jsonError(w, http.StatusNotFound, "Pull request issue not found")
+		return
+	}
+
+	pr, err := database.GetPullRequestByIssueID(issue.ID)
+	if err != nil || pr == nil {
+		jsonError(w, http.StatusNotFound, "Pull request not found")
+		return
+	}
+
+	var body struct {
+		ReviewID   int64  `json:"review_id"`
+		FilePath   string `json:"file_path"`
+		LineNumber int    `json:"line_number"`
+		DiffHunk   string `json:"diff_hunk"`
+		Content    string `json:"content"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	comment, err := database.CreatePullReviewComment(issue.ID, pr.ID, body.ReviewID, user.ID, body.FilePath, body.LineNumber, body.DiffHunk, body.Content)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusCreated, comment)
+}
+
+// Repository Forks Handlers
+
+func (r *Router) handleForkRepo(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	parentRepo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || parentRepo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	// Permission to access parent repository
+	if !database.CanUserAccessRepo(user, parentRepo, false) {
+		jsonError(w, http.StatusForbidden, "Cannot fork private repository without access")
+		return
+	}
+
+	var body struct {
+		Organization string `json:"organization"`
+		Name         string `json:"name"`
+	}
+	_ = json.NewDecoder(req.Body).Decode(&body)
+
+	destOwnerID := user.ID
+	destOwnerName := user.Username
+
+	// If forking into an organization
+	if body.Organization != "" {
+		org, err := database.GetOrgByName(body.Organization)
+		if err != nil || org == nil {
+			jsonError(w, http.StatusBadRequest, "Target organization not found")
+			return
+		}
+		if !user.IsAdmin && !database.IsOrgAdmin(org.ID, user.ID) {
+			jsonError(w, http.StatusForbidden, "You do not have permission to create repositories in this organization")
+			return
+		}
+		orgUser, err := database.GetUserByUsername(org.Name)
+		if err != nil || orgUser == nil {
+			jsonError(w, http.StatusInternalServerError, "Organization account stub missing")
+			return
+		}
+		destOwnerID = orgUser.ID
+		destOwnerName = org.Name
+	} else if parentRepo.OwnerID == user.ID {
+		jsonError(w, http.StatusBadRequest, "You cannot fork your own repository to your personal account")
+		return
+	}
+
+	forkRepoName := strings.TrimSpace(body.Name)
+	if forkRepoName == "" {
+		forkRepoName = parentRepo.Name
+	}
+
+	// 1. Create database record
+	forkedRepo, err := database.ForkRepository(parentRepo, destOwnerID, forkRepoName)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// 2. Clone bare repository on disk
+	srcRepoDir := filepath.Join(r.cfg.Repository.Root, owner, parentRepo.Name+".git")
+	destRepoDir := filepath.Join(r.cfg.Repository.Root, destOwnerName, forkedRepo.Name+".git")
+	if err := git.ForkRepository(srcRepoDir, destRepoDir); err != nil {
+		log.Printf("[ProGit] Warning: git clone --bare failed during fork: %v", err)
+	}
+
+	database.CreateActivity(user.ID, user.Username, &forkedRepo.ID, forkedRepo.Name, "fork", fmt.Sprintf("Forked %s/%s to %s/%s", owner, parentRepo.Name, destOwnerName, forkedRepo.Name))
+
+	jsonResponse(w, http.StatusCreated, forkedRepo)
+}
+
+func (r *Router) handleListForks(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	forks, err := database.GetForks(repo.ID)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if forks == nil {
+		forks = []*database.Repository{}
+	}
+	jsonResponse(w, http.StatusOK, forks)
 }
 
 // Wiki Handlers

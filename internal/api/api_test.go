@@ -810,6 +810,196 @@ func TestHTTPSConfigurationAndHeaders(t *testing.T) {
 	}
 }
 
+func TestForksAPI(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	// Register User 1 (Alice)
+	user1, err := database.CreateUser("alice", "alice@example.com", "password123", "Alice", false)
+	if err != nil {
+		t.Fatalf("failed to create user1: %v", err)
+	}
+	sess1, err := auth.CreateSession(user1.ID, user1.Username)
+	if err != nil {
+		t.Fatalf("failed to create session1: %v", err)
+	}
+	token1 := sess1.Token
+
+	// Register User 2 (Bob)
+	user2, err := database.CreateUser("bob", "bob@example.com", "password123", "Bob", false)
+	if err != nil {
+		t.Fatalf("failed to create user2: %v", err)
+	}
+	sess2, err := auth.CreateSession(user2.ID, user2.Username)
+	if err != nil {
+		t.Fatalf("failed to create session2: %v", err)
+	}
+	token2 := sess2.Token
+
+	// Alice creates a repo
+	repoDir := filepath.Join(router.cfg.Repository.Root, user1.Username, "source-repo.git")
+	_ = os.MkdirAll(filepath.Dir(repoDir), 0755)
+	if err := git.InitBareRepository(repoDir, "main"); err != nil {
+		t.Fatalf("failed to init bare repo: %v", err)
+	}
+	parentRepo, err := database.CreateRepository(user1.ID, "source-repo", "Original repository", false)
+	if err != nil {
+		t.Fatalf("failed to create parent repo in DB: %v", err)
+	}
+
+	// 1. Bob forks Alice's repo
+	forkPayload := map[string]string{
+		"name": "source-repo",
+	}
+	b, _ := json.Marshal(forkPayload)
+	reqFork := httptest.NewRequest("POST", "/api/v1/repos/alice/source-repo/forks", bytes.NewReader(b))
+	reqFork.Header.Set("Authorization", "Bearer "+token2)
+	reqFork.Header.Set("Content-Type", "application/json")
+	recFork := httptest.NewRecorder()
+	router.ServeHTTP(recFork, reqFork)
+
+	if recFork.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for fork, got %d: %s", recFork.Code, recFork.Body.String())
+	}
+
+	var forked database.Repository
+	if err := json.Unmarshal(recFork.Body.Bytes(), &forked); err != nil {
+		t.Fatalf("failed to decode fork response: %v", err)
+	}
+	if !forked.IsFork || forked.ForkParentID == nil || *forked.ForkParentID != parentRepo.ID {
+		t.Errorf("fork metadata mismatch: is_fork=%v, parent_id=%v", forked.IsFork, forked.ForkParentID)
+	}
+
+	// 2. Bob lists forks on Alice's repo
+	reqList := httptest.NewRequest("GET", "/api/v1/repos/alice/source-repo/forks", nil)
+	recList := httptest.NewRecorder()
+	router.ServeHTTP(recList, reqList)
+
+	if recList.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for list forks, got %d: %s", recList.Code, recList.Body.String())
+	}
+	var forks []database.Repository
+	if err := json.Unmarshal(recList.Body.Bytes(), &forks); err != nil {
+		t.Fatalf("failed to decode forks list: %v", err)
+	}
+	if len(forks) != 1 || forks[0].ID != forked.ID {
+		t.Errorf("expected 1 fork with ID %d, got %v", forked.ID, forks)
+	}
+
+	// 3. Alice cannot fork her own repo into her personal account
+	reqSelfFork := httptest.NewRequest("POST", "/api/v1/repos/alice/source-repo/forks", bytes.NewReader(b))
+	reqSelfFork.Header.Set("Authorization", "Bearer "+token1)
+	reqSelfFork.Header.Set("Content-Type", "application/json")
+	recSelfFork := httptest.NewRecorder()
+	router.ServeHTTP(recSelfFork, reqSelfFork)
+
+	if recSelfFork.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 Bad Request for self fork, got %d", recSelfFork.Code)
+	}
+}
+
+func TestPullReviewsAPI(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	// Register Alice and Bob
+	alice, err := database.CreateUser("alice_pr", "alice_pr@example.com", "password123", "Alice PR", false)
+	if err != nil {
+		t.Fatalf("failed to create alice: %v", err)
+	}
+	bob, err := database.CreateUser("bob_pr", "bob_pr@example.com", "password123", "Bob PR", false)
+	if err != nil {
+		t.Fatalf("failed to create bob: %v", err)
+	}
+	sessBob, err := auth.CreateSession(bob.ID, bob.Username)
+	if err != nil {
+		t.Fatalf("failed to create session: %v", err)
+	}
+	tokenBob := sessBob.Token
+
+	repo, err := database.CreateRepository(alice.ID, "pr-repo", "PR repo", false)
+	if err != nil {
+		t.Fatalf("failed to create repo: %v", err)
+	}
+
+	pr, err := database.CreatePullRequest(repo.ID, repo.ID, alice.ID, "Feature X", "PR description", "feature-x", "main")
+	if err != nil {
+		t.Fatalf("failed to create PR: %v", err)
+	}
+
+	// 1. Bob creates a review with APPROVE state
+	reviewReq := map[string]string{
+		"state": "APPROVED",
+		"body":  "LGTM! Clean implementation.",
+	}
+	b, _ := json.Marshal(reviewReq)
+	reqReview := httptest.NewRequest("POST", "/api/v1/repos/alice_pr/pr-repo/pulls/1/reviews", bytes.NewReader(b))
+	reqReview.Header.Set("Authorization", "Bearer "+tokenBob)
+	reqReview.Header.Set("Content-Type", "application/json")
+	recReview := httptest.NewRecorder()
+	router.ServeHTTP(recReview, reqReview)
+
+	if recReview.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for review, got %d: %s", recReview.Code, recReview.Body.String())
+	}
+	var createdReview database.PullReview
+	if err := json.Unmarshal(recReview.Body.Bytes(), &createdReview); err != nil {
+		t.Fatalf("failed to decode created review: %v", err)
+	}
+	if createdReview.State != "APPROVED" || createdReview.ReviewerID != bob.ID {
+		t.Errorf("review state mismatch: got state %s, reviewerID %d", createdReview.State, createdReview.ReviewerID)
+	}
+
+	// 2. Bob creates an inline line comment on the review
+	commentReq := map[string]any{
+		"review_id":   createdReview.ID,
+		"file_path":   "src/main.go",
+		"line_number": 10,
+		"content":     "Consider adding a check for nil here.",
+	}
+	cb, _ := json.Marshal(commentReq)
+	reqComment := httptest.NewRequest("POST", "/api/v1/repos/alice_pr/pr-repo/pulls/1/reviews/comments", bytes.NewReader(cb))
+	reqComment.Header.Set("Authorization", "Bearer "+tokenBob)
+	reqComment.Header.Set("Content-Type", "application/json")
+	recComment := httptest.NewRecorder()
+	router.ServeHTTP(recComment, reqComment)
+
+	if recComment.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for review comment, got %d: %s", recComment.Code, recComment.Body.String())
+	}
+
+	// 3. List reviews for PR
+	reqListReviews := httptest.NewRequest("GET", "/api/v1/repos/alice_pr/pr-repo/pulls/1/reviews", nil)
+	recListReviews := httptest.NewRecorder()
+	router.ServeHTTP(recListReviews, reqListReviews)
+
+	if recListReviews.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for list reviews, got %d: %s", recListReviews.Code, recListReviews.Body.String())
+	}
+	var reviews []database.PullReview
+	_ = json.Unmarshal(recListReviews.Body.Bytes(), &reviews)
+	if len(reviews) != 1 || reviews[0].ID != createdReview.ID {
+		t.Errorf("expected 1 review, got %d", len(reviews))
+	}
+
+	// 4. List review comments for PR
+	reqListComments := httptest.NewRequest("GET", "/api/v1/repos/alice_pr/pr-repo/pulls/1/reviews/comments", nil)
+	recListComments := httptest.NewRecorder()
+	router.ServeHTTP(recListComments, reqListComments)
+
+	if recListComments.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for list review comments, got %d: %s", recListComments.Code, recListComments.Body.String())
+	}
+	var comments []database.PullReviewComment
+	_ = json.Unmarshal(recListComments.Body.Bytes(), &comments)
+	if len(comments) != 1 || comments[0].LineNumber != 10 || comments[0].FilePath != "src/main.go" {
+		t.Errorf("expected 1 comment on line 10 src/main.go, got %v", comments)
+	}
+
+	_ = pr
+}
+
+
 
 
 

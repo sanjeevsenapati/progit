@@ -252,3 +252,105 @@ func TestProjectsAndKanban(t *testing.T) {
 		t.Errorf("expected 1 total and 1 done card, got total=%d done=%d", updatedProj.TotalCards, updatedProj.DoneCards)
 	}
 }
+
+func TestForksAndPullReviews(t *testing.T) {
+	_, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	owner, err := CreateUser("alice", "alice@example.com", "hash", "Alice", false)
+	if err != nil {
+		t.Fatalf("failed to create owner: %v", err)
+	}
+	forker, err := CreateUser("bob", "bob@example.com", "hash", "Bob", false)
+	if err != nil {
+		t.Fatalf("failed to create forker: %v", err)
+	}
+
+	repo, err := CreateRepository(owner.ID, "super-project", "Original repo", false)
+	if err != nil {
+		t.Fatalf("failed to create repo: %v", err)
+	}
+
+	// 1. Fork repository
+	forked, err := ForkRepository(repo, forker.ID, "super-project")
+	if err != nil {
+		t.Fatalf("failed to fork repo: %v", err)
+	}
+	if !forked.IsFork || forked.ForkParentID == nil || *forked.ForkParentID != repo.ID {
+		t.Errorf("fork properties invalid: is_fork=%v, parent_id=%v", forked.IsFork, forked.ForkParentID)
+	}
+	if forked.ForkParent == nil || forked.ForkParent.OwnerName != "alice" {
+		t.Errorf("expected ForkParent owner to be alice, got %v", forked.ForkParent)
+	}
+
+	// Check parent's num_forks
+	parentUpdated, err := GetRepositoryByID(repo.ID)
+	if err != nil {
+		t.Fatalf("failed to get parent repo: %v", err)
+	}
+	if parentUpdated.NumForks != 1 {
+		t.Errorf("expected parent NumForks=1, got %d", parentUpdated.NumForks)
+	}
+
+	// List forks
+	forks, err := GetForks(repo.ID)
+	if err != nil {
+		t.Fatalf("failed to list forks: %v", err)
+	}
+	if len(forks) != 1 || forks[0].OwnerName != "bob" {
+		t.Fatalf("unexpected forks list: %v", forks)
+	}
+
+	// 2. Test Pull Reviews
+	pr, err := CreatePullRequest(repo.ID, repo.ID, owner.ID, "Feature PR", "Add payments", "feature", "main")
+	if err != nil {
+		t.Fatalf("failed to create pull request: %v", err)
+	}
+	issue := pr.Issue
+
+	// Create review with inline comments
+	reviewComments := []PullReviewComment{
+		{
+			FilePath:   "payment.go",
+			LineNumber: 15,
+			DiffHunk:   "@@ -10,6 +10,10 @@",
+			Content:    "Validate card length",
+		},
+	}
+	review, err := CreatePullReview(issue.ID, pr.ID, forker.ID, "APPROVED", "Looks solid!", reviewComments)
+	if err != nil {
+		t.Fatalf("failed to create review: %v", err)
+	}
+	if review.State != "APPROVED" || review.Content != "Looks solid!" {
+		t.Errorf("unexpected review data: %+v", review)
+	}
+	if len(review.Comments) != 1 || review.Comments[0].Content != "Validate card length" {
+		t.Errorf("unexpected review comments: %+v", review.Comments)
+	}
+
+	// List reviews
+	allReviews, err := GetPullReviews(pr.ID)
+	if err != nil {
+		t.Fatalf("failed to get reviews: %v", err)
+	}
+	if len(allReviews) != 1 || allReviews[0].ReviewerName != "bob" {
+		t.Fatalf("unexpected allReviews: %+v", allReviews)
+	}
+
+	// Add single inline review comment
+	inlineCmt, err := CreatePullReviewComment(issue.ID, pr.ID, review.ID, forker.ID, "payment.go", 22, "", "Handle currency enum")
+	if err != nil {
+		t.Fatalf("failed to add review comment: %v", err)
+	}
+	if inlineCmt.Content != "Handle currency enum" {
+		t.Errorf("unexpected inline comment content: %s", inlineCmt.Content)
+	}
+
+	allInline, err := GetPullReviewComments(issue.ID)
+	if err != nil {
+		t.Fatalf("failed to get inline review comments: %v", err)
+	}
+	if len(allInline) != 2 {
+		t.Errorf("expected 2 inline review comments, got %d", len(allInline))
+	}
+}

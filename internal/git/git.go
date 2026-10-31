@@ -95,6 +95,25 @@ func InitBareRepository(repoPath string, defaultBranch string) error {
 	return err
 }
 
+// ForkRepository clones a bare source repository to a new bare destination repository.
+func ForkRepository(srcRepoPath, destRepoPath string) error {
+	if abs, err := filepath.Abs(srcRepoPath); err == nil {
+		srcRepoPath = abs
+	}
+	if abs, err := filepath.Abs(destRepoPath); err == nil {
+		destRepoPath = abs
+	}
+	if err := os.MkdirAll(filepath.Dir(destRepoPath), 0755); err != nil {
+		return err
+	}
+	// If source repository doesn't exist on disk yet, initialize a bare destination repo
+	if _, err := os.Stat(srcRepoPath); err != nil {
+		return InitBareRepository(destRepoPath, "main")
+	}
+	_, err := RunGit("", "clone", "--bare", srcRepoPath, destRepoPath)
+	return err
+}
+
 // InitRepositoryWithReadme initializes a bare repository with an initial commit containing a README.md.
 func InitRepositoryWithReadme(repoPath, repoName, description, defaultBranch, authorName, authorEmail string) error {
 	if defaultBranch == "" {
