@@ -779,6 +779,7 @@
           <li><a href="#feature-webhooks" data-target="feature-webhooks">Webhooks &amp; Event Delivery</a></li>
           <li><a href="#feature-messages" data-target="feature-messages">Developer Direct Messaging</a></li>
           <li><a href="#feature-danger-zone" data-target="feature-danger-zone">Danger Zone &amp; Security Scoping</a></li>
+          <li><a href="#feature-search" data-target="feature-search">Repository Search &amp; Discovery</a></li>
         </ul>
       </div>
 
@@ -2022,6 +2023,90 @@ def verify_progit_signature(payload_bytes, secret_key, header_signature):
             <span class="dir">&larr; Previous</span>
             <span class="title">Developer Messaging</span>
           </a>
+          <a href="#feature-search" class="nav-btn" onclick="navigate('feature-search')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Repository Search</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 25B. Feature: Repository Search & Discovery -->
+      <article class="doc-page" id="page-feature-search">
+        <div class="breadcrumbs">
+          <span>Features Guide</span>
+          <span>/</span>
+          <span class="current">Repository Search &amp; Discovery</span>
+        </div>
+        <h1 class="page-title">Repository Search &amp; Discovery</h1>
+        <p class="page-subtitle">Real-time debounced autocomplete, keyboard navigation shortcuts, URL-synchronized exploration, and multi-tenant access control.</p>
+
+        <h2>Global Navbar Search</h2>
+        <p>ProGit provides a responsive, debounced search bar embedded in the global top navigation on every page:</p>
+        <ul>
+          <li><strong>Real-Time Autocomplete</strong>: Matches repositories dynamically across repository names, descriptions, and owner handles as you type.</li>
+          <li><strong>Rich Dropdown Feedback</strong>: Results display the repository owner, name, visibility badges (Private lock or Public), description snippet, and star counts.</li>
+          <li><strong>Direct Navigation</strong>: Clicking any search result or selecting it via keyboard navigates instantly to the target repository overview.</li>
+        </ul>
+
+        <h2>Keyboard Shortcuts</h2>
+        <p>Designed for power users and keyboard-first developer workflows:</p>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Key / Shortcut</th>
+                <th>Context</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>/</code></td>
+                <td>Global (outside input/textarea)</td>
+                <td>Instantly focuses the navbar search bar and selects existing text</td>
+              </tr>
+              <tr>
+                <td><code>ArrowDown</code> / <code>ArrowUp</code></td>
+                <td>Search input active</td>
+                <td>Navigates through dropdown search results</td>
+              </tr>
+              <tr>
+                <td><code>Enter</code></td>
+                <td>Search input active</td>
+                <td>Jumps directly to the selected repository; if none is highlighted, navigates to <code>/explore?q=...</code></td>
+              </tr>
+              <tr>
+                <td><code>Escape</code></td>
+                <td>Search dropdown open</td>
+                <td>Dismisses the autocomplete dropdown and blurs the search input</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2>Explore Page Search &amp; URL Synchronization</h2>
+        <p>The <strong>Explore</strong> page (<code>/explore</code>) allows comprehensive repository discovery:</p>
+        <ul>
+          <li><strong>URL Query Binding</strong>: Directly open or bookmark <code>/explore?q=keyword</code> to immediately filter repositories.</li>
+          <li><strong>Live Browser History</strong>: Searching inside the Explore view automatically updates the browser's URL using <code>window.history.replaceState</code>, enabling instant copy-paste sharing with team members.</li>
+        </ul>
+
+        <h2>Multi-Tenant Access Control &amp; Privacy</h2>
+        <div class="callout callout-warn">
+          <div class="callout-title">Zero Information Leakage Guarantee</div>
+          <p>Repository search is fully multi-tenant and access-controlled directly at the database engine layer:</p>
+        </div>
+        <ul>
+          <li><strong>Anonymous / Unauthenticated Users</strong>: Can only discover public repositories (<code>is_private = false</code>).</li>
+          <li><strong>Authenticated Developers</strong>: Can discover all public repositories, plus private repositories where they are the <strong>owner</strong>, a confirmed <strong>collaborator</strong>, or an <strong>organization member</strong>.</li>
+          <li><strong>System Administrators</strong>: Hold global visibility across all public and private repositories.</li>
+        </ul>
+
+        <div class="page-nav-buttons">
+          <a href="#feature-danger-zone" class="nav-btn" onclick="navigate('feature-danger-zone')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Danger Zone &amp; Security</span>
+          </a>
           <a href="#admin-setup" class="nav-btn" onclick="navigate('admin-setup')">
             <span class="dir">Next &rarr;</span>
             <span class="title">Super Admin Setup</span>
@@ -2048,9 +2133,9 @@ podman exec -it progit /usr/local/bin/progit admin create-user \
   --admin</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
         <div class="page-nav-buttons">
-          <a href="#feature-danger-zone" class="nav-btn" onclick="navigate('feature-danger-zone')">
+          <a href="#feature-search" class="nav-btn" onclick="navigate('feature-search')">
             <span class="dir">&larr; Previous</span>
-            <span class="title">Danger Zone &amp; Security</span>
+            <span class="title">Repository Search</span>
           </a>
           <a href="#admin-users" class="nav-btn" onclick="navigate('admin-users')">
             <span class="dir">Next &rarr;</span>
@@ -2323,7 +2408,30 @@ Content-Type: application/json
 
         <h2>List Repositories</h2>
         <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos</span></div>
-        <p>Optional query parameter <code>?owner={username}</code> filters repositories by owner handle.</p>
+        <p>Lists repositories. Optional query parameters include <code>?owner={username}</code> to filter by owner handle, or <code>?q={query}</code> to perform keyword filtering.</p>
+
+        <h2>Search Repositories</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/search?q={query}&amp;limit=20&amp;page=1</span></div>
+        <p>Global repository search supporting keyword matching against repository name, description, and owner username. Includes strict access control: unauthenticated users only discover public repositories; authenticated users discover public repositories and private repositories where they are the owner, a confirmed collaborator, or an organization member.</p>
+        <pre><code>{
+  "ok": true,
+  "repositories": [
+    {
+      "id": 14,
+      "name": "cloud-distributed-kv",
+      "owner_name": "dev_alice",
+      "description": "High performance pure-Go key-value store",
+      "is_private": false,
+      "num_stars": 12,
+      "default_branch": "main"
+    }
+  ],
+  "total": 1
+}</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h2>Explore Repositories</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/explore?q={query}</span></div>
+        <p>Retrieves public repositories and platform highlights for the Explore page, filterable by <code>?q={query}</code>.</p>
 
         <h2>Create Repository</h2>
         <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos</span></div>
@@ -3184,6 +3292,7 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
       { id: 'feature-webhooks', title: 'Webhooks & Automated Delivery', section: 'Features', desc: 'Push, issue, and PR event triggers, HMAC-SHA256 signature verification, delivery logs.' },
       { id: 'feature-messages', title: 'Developer Direct Messaging', section: 'Features', desc: 'Internal developer messaging system with real-time unread badges and replies.' },
       { id: 'feature-danger-zone', title: 'Danger Zone & Security Scoping', section: 'Features', desc: 'Visibility toggling, read-only archiving, ownership transfers, and collaborator assignee guards.' },
+      { id: 'feature-search', title: 'Repository Search & Discovery', section: 'Features', desc: 'Real-time navbar autocomplete, keyboard shortcuts (/), Explore URL sync, and access control.' },
       { id: 'admin-setup', title: 'Super Admin Setup & CLI', section: 'Administration', desc: 'CLI user creation with progit admin create-user.' },
       { id: 'admin-users', title: 'User & Key Administration', section: 'Administration', desc: 'Account suspension, role promotion, and SSH public key management.' },
       { id: 'admin-repos', title: 'Repository Oversight & Danger Zone', section: 'Administration', desc: 'Global repository oversight and permanent disk cleanup.' },
