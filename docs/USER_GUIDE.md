@@ -221,5 +221,83 @@ ProGit features interactive Kanban project boards for repositories to organize s
 - **Automated Progress Tracking**: The project board automatically tracks completed tasks (`Done` column) against total cards, displaying real-time completion percentage bars.
 - **Close & Reopen**: Mark projects as closed when completed, or reopen them anytime.
 
+---
+
+## 11. Developer Direct Messaging
+
+ProGit includes an integrated messaging portal allowing developers to communicate directly without external tooling:
+
+### 11.1 Sending and Managing Messages
+- **Accessing Messages**: Click the **Messages** envelope icon in the top navigation header or navigate directly to `/messages`.
+- **Unread Notification Badge**: The navigation envelope badge displays a live counter of unread messages.
+- **Compose**: Click **New Message**, select a recipient developer from the active developer list, enter a subject line, and draft your message in Markdown.
+- **Threaded Replies**: Open any message from your Inbox and click **Reply** to respond with automated subject quoting (`Re: ...`).
+- **Inbox & Sent Tabs**: Switch between your received **Inbox** and sent **Outbox** items.
+- **Delete / Cleanup**: Delete messages from your view with a single click.
+
+---
+
+## 12. Webhooks & Automated Integrations
+
+Webhooks allow external services (CI/CD engines, Slack, Discord, custom servers) to be notified whenever repository events occur.
+
+### 12.1 Configuring a Webhook
+1. In your repository, navigate to **Settings > Webhooks**.
+2. Click **Add Webhook**.
+3. Configure the webhook parameters:
+   - **Payload URL**: The HTTP/HTTPS target endpoint (e.g. `https://ci.example.com/hooks/progit`).
+   - **Secret Token**: Optional secret used for cryptographic HMAC-SHA256 signature generation.
+   - **Content Type**: `application/json`.
+   - **Event Triggers**: Choose all events or select specific triggers (`push`, `issues`, `pull_request`).
+4. Click **Create Webhook**.
+
+### 12.2 Signature Verification (HMAC-SHA256)
+ProGit signs every webhook request using your secret key. Verify incoming webhooks by checking the `X-Hub-Signature-256` or `X-ProGit-Signature` headers:
+```http
+X-ProGit-Event: push
+X-ProGit-Delivery: 7f83b165-2134-4b52-b8ec-f6215a782b13
+X-Hub-Signature-256: sha256=d254f3879...
+```
+
+### 12.3 Delivery History & Ping Testing
+- Click **Test Delivery** to send an instant `ping` event.
+- Inspect the **Deliveries Log** to view recent delivery status codes (e.g. `200 OK`), round-trip latency, request headers, and response payloads.
+
+---
+
+## 13. Repository Danger Zone & Protection
+
+Located in **Settings > Danger Zone**, these actions provide high-stakes repository lifecycle operations with multiple confirmation safeguards:
+
+### 13.1 Changing Repository Visibility
+- Toggle your repository between **Public** and **Private**.
+- Public repositories are visible to any user or anonymous visitor; Private repositories require explicit collaborator permissions or team membership.
+
+### 13.2 Archiving a Repository (Read-Only Lock)
+- Mark a repository as **Archived** to place it into permanent read-only mode.
+- When archived, all write operations are strictly blocked across the platform:
+  - Git CLI pushes over HTTP and SSH (`receive-pack`) are rejected.
+  - In-browser file editing, file creation, file deletion, and directory uploads are disabled.
+  - Creating issues, opening pull requests, and modifying Kanban cards are blocked with `HTTP 400 Bad Request`.
+- Owners can **Unarchive** the repository at any time to restore full write capabilities.
+
+### 13.3 Transferring Ownership
+- Transfer a repository to another developer or an organization.
+- ProGit atomically moves the underlying bare Git directory on disk and reassigns all SQLite records to the new owner namespace.
+- Clone and remote URLs update immediately to the new owner (e.g. `/<new_owner>/<repo>.git`).
+
+### 13.4 Deleting a Repository
+- Purges the repository permanently from SQLite and deletes the bare repository from disk (`/data/repositories/<owner>/<repo>.git`).
+- Requires entering the exact repository name in a confirmation dialog.
+
+---
+
+## 14. Collaborator-Scoped Issue Assignment
+
+To safeguard project privacy and prevent unauthorized user targeting, issue assignees are strictly restricted:
+- Only confirmed **repository owners and collaborators** appear in the issue assignee selector (`/api/v1/repos/{owner}/{repo}/assignees`).
+- Any attempt to assign an issue to an unauthorized external user is blocked with `HTTP 400 Bad Request`.
+
+
 
 
