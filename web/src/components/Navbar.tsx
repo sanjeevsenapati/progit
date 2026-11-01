@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth, useTheme } from '../lib/theme';
-import { api } from '../lib/api';
+import { api, Repository } from '../lib/api';
 import { 
   GitBranch, 
   Search, 
@@ -14,7 +14,10 @@ import {
   Compass, 
   LayoutDashboard,
   Building2,
-  Mail
+  Mail,
+  Lock,
+  Star,
+  Loader2
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -23,6 +26,101 @@ export const Navbar: React.FC = () => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Repository[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Focus search with '/' shortcut and close on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput = activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        (activeEl as HTMLElement).isContentEditable
+      );
+      if (e.key === '/' && !isInput) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        setSearchOpen(true);
+      }
+      if (e.key === 'Escape') {
+        setSearchOpen(false);
+        searchInputRef.current?.blur();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Debounced search queries
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      setSelectedIndex(-1);
+      return;
+    }
+
+    setSearchLoading(true);
+    setSelectedIndex(-1);
+    const timer = setTimeout(() => {
+      api.searchRepos(trimmed)
+        .then(data => {
+          setSearchResults(data.repositories || data.data || []);
+        })
+        .catch(() => {
+          setSearchResults([]);
+        })
+        .finally(() => {
+          setSearchLoading(false);
+        });
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Click outside listener
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        searchDropdownRef.current && 
+        !searchDropdownRef.current.contains(e.target as Node) &&
+        searchInputRef.current &&
+        !searchInputRef.current.contains(e.target as Node)
+      ) {
+        setSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev < searchResults.length - 1 ? prev + 1 : prev));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev > 0 ? prev - 1 : -1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selectedIndex >= 0 && selectedIndex < searchResults.length) {
+        const target = searchResults[selectedIndex];
+        window.location.href = `/${target.owner_name}/${target.name}`;
+      } else if (searchQuery.trim()) {
+        window.location.href = `/explore?q=${encodeURIComponent(searchQuery.trim())}`;
+      }
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -70,17 +168,102 @@ export const Navbar: React.FC = () => {
           </div>
 
           {/* Center: Search */}
-          <div className="hidden lg:flex flex-1 max-w-xs mx-6">
+          <div className="hidden lg:flex flex-1 max-w-sm mx-6 relative">
             <div className="relative w-full">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                <Search className="h-4 w-4" />
+                {searchLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-emerald-500" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
               </div>
               <input
+                ref={searchInputRef}
                 type="text"
+                value={searchQuery}
+                onChange={e => {
+                  setSearchQuery(e.target.value);
+                  setSearchOpen(true);
+                }}
+                onFocus={() => {
+                  if (searchQuery.trim()) setSearchOpen(true);
+                }}
+                onKeyDown={handleSearchKeyDown}
                 placeholder="Type / to search repositories..."
-                className="w-full pl-9 pr-3 py-1 text-sm rounded-md bg-gray-100 dark:bg-dark-bg border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-dark-bg focus:outline-none dark:text-white placeholder-gray-400"
+                className="w-full pl-9 pr-8 py-1.5 text-xs rounded-lg bg-gray-100 dark:bg-dark-bg border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-dark-bg focus:outline-none dark:text-white placeholder-gray-400 shadow-inner transition-all"
               />
+              <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
+                <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-gray-400 bg-gray-200 dark:bg-dark-hover rounded border border-gray-300 dark:border-dark-border">
+                  /
+                </kbd>
+              </div>
             </div>
+
+            {/* Search Dropdown */}
+            {searchOpen && searchQuery.trim() && (
+              <div
+                ref={searchDropdownRef}
+                className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl shadow-2xl z-50 text-xs overflow-hidden divide-y divide-gray-100 dark:divide-dark-border"
+              >
+                {searchLoading && searchResults.length === 0 ? (
+                  <div className="p-4 text-center text-gray-400 flex items-center justify-center space-x-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
+                    <span>Searching repositories...</span>
+                  </div>
+                ) : searchResults.length > 0 ? (
+                  <div className="max-h-80 overflow-y-auto divide-y divide-gray-50 dark:divide-dark-border/40">
+                    {searchResults.slice(0, 8).map((repo, idx) => (
+                      <a
+                        key={repo.id}
+                        href={`/${repo.owner_name}/${repo.name}`}
+                        className={`flex items-start justify-between px-3.5 py-2.5 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors ${
+                          selectedIndex === idx ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' : ''
+                        }`}
+                        onClick={() => setSearchOpen(false)}
+                      >
+                        <div className="flex items-start space-x-2.5 min-w-0 pr-2">
+                          <div className="mt-0.5 w-5 h-5 rounded-md bg-gray-100 dark:bg-dark-bg flex items-center justify-center text-gray-500 dark:text-dark-muted flex-shrink-0">
+                            {repo.is_private ? <Lock className="w-3 h-3 text-amber-500" /> : <GitBranch className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-1.5">
+                              <span className="text-gray-500 dark:text-dark-muted font-normal">{repo.owner_name} /</span>
+                              <span className="font-bold text-gray-900 dark:text-white truncate">{repo.name}</span>
+                              {repo.is_private && (
+                                <span className="text-[10px] px-1.5 py-0.2 rounded-full border border-amber-500/30 text-amber-500 bg-amber-500/10">
+                                  Private
+                                </span>
+                              )}
+                            </div>
+                            {repo.description && (
+                              <p className="text-[11px] text-gray-500 dark:text-dark-muted truncate mt-0.5 max-w-xs">
+                                {repo.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-1 text-gray-400 text-[11px] flex-shrink-0 pt-0.5">
+                          <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                          <span>{repo.num_stars}</span>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 text-center text-gray-500 dark:text-dark-muted">
+                    No repositories found matching "<span className="font-semibold text-gray-800 dark:text-white">{searchQuery}</span>"
+                  </div>
+                )}
+
+                <a
+                  href={`/explore?q=${encodeURIComponent(searchQuery.trim())}`}
+                  className="block px-3.5 py-2.5 text-center text-emerald-600 dark:text-emerald-400 hover:bg-gray-50 dark:hover:bg-dark-hover font-semibold transition-colors"
+                  onClick={() => setSearchOpen(false)}
+                >
+                  Search all repositories for "{searchQuery}" &rarr;
+                </a>
+              </div>
+            )}
           </div>
 
           {/* Right: Actions & User */}

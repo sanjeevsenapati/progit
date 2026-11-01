@@ -1651,6 +1651,130 @@ func TestDangerZoneActions(t *testing.T) {
 	}
 }
 
+func TestRepositorySearch(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	// Create test users: search_alice and search_stranger
+	alice, err := database.CreateUser("search_alice", "alice_search@progit.local", "hashedpass", "Alice Search", false)
+	if err != nil {
+		t.Fatalf("failed to create alice: %v", err)
+	}
+	aliceToken := "pgt_search_alice_tok"
+	_, _ = database.CreateAccessToken(alice.ID, "tok", aliceToken, "repo,user")
+
+	stranger, err := database.CreateUser("search_stranger", "stranger_search@progit.local", "hashedpass", "Stranger Search", false)
+	if err != nil {
+		t.Fatalf("failed to create stranger: %v", err)
+	}
+	strangerToken := "pgt_search_stranger_tok"
+	_, _ = database.CreateAccessToken(stranger.ID, "tok", strangerToken, "repo,user")
+
+	// Create public repository
+	pubRepo, err := database.CreateRepository(alice.ID, "quantum-mesh-network", "Distributed quantum ledger mesh", false)
+	if err != nil {
+		t.Fatalf("failed to create public repo: %v", err)
+	}
+
+	// Create private repository
+	privRepo, err := database.CreateRepository(alice.ID, "top-secret-crypto", "Classified cryptographic key manager", true)
+	if err != nil {
+		t.Fatalf("failed to create private repo: %v", err)
+	}
+
+	// 1. Unauthenticated search for "quantum"
+	reqPub := httptest.NewRequest("GET", "/api/v1/repos/search?q=quantum", nil)
+	recPub := httptest.NewRecorder()
+	router.ServeHTTP(recPub, reqPub)
+	if recPub.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", recPub.Code)
+	}
+	var resPub struct {
+		OK           bool                   `json:"ok"`
+		Repositories []*database.Repository `json:"repositories"`
+		Total        int                    `json:"total"`
+	}
+	if err := json.Unmarshal(recPub.Body.Bytes(), &resPub); err != nil {
+		t.Fatalf("failed to unmarshal search response: %v", err)
+	}
+	if len(resPub.Repositories) != 1 || resPub.Repositories[0].Name != pubRepo.Name {
+		t.Errorf("expected to find %s, got %+v", pubRepo.Name, resPub.Repositories)
+	}
+
+	// 2. Unauthenticated search for "secret" (should NOT find private repo)
+	reqPrivUnauth := httptest.NewRequest("GET", "/api/v1/repos/search?q=secret", nil)
+	recPrivUnauth := httptest.NewRecorder()
+	router.ServeHTTP(recPrivUnauth, reqPrivUnauth)
+	if recPrivUnauth.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", recPrivUnauth.Code)
+	}
+	var resPrivUnauth struct {
+		Repositories []*database.Repository `json:"repositories"`
+	}
+	json.Unmarshal(recPrivUnauth.Body.Bytes(), &resPrivUnauth)
+	if len(resPrivUnauth.Repositories) != 0 {
+		t.Errorf("security leak: unauthenticated search found private repo: %+v", resPrivUnauth.Repositories)
+	}
+
+	// 3. Stranger search for "secret" (should NOT find private repo)
+	reqStranger := httptest.NewRequest("GET", "/api/v1/repos/search?q=secret", nil)
+	reqStranger.Header.Set("Authorization", "Bearer "+strangerToken)
+	recStranger := httptest.NewRecorder()
+	router.ServeHTTP(recStranger, reqStranger)
+	var resStranger struct {
+		Repositories []*database.Repository `json:"repositories"`
+	}
+	json.Unmarshal(recStranger.Body.Bytes(), &resStranger)
+	if len(resStranger.Repositories) != 0 {
+		t.Errorf("security leak: stranger search found private repo: %+v", resStranger.Repositories)
+	}
+
+	// 4. Owner search for "secret" (MUST find private repo)
+	reqOwner := httptest.NewRequest("GET", "/api/v1/repos/search?q=secret", nil)
+	reqOwner.Header.Set("Authorization", "Bearer "+aliceToken)
+	recOwner := httptest.NewRecorder()
+	router.ServeHTTP(recOwner, reqOwner)
+	var resOwner struct {
+		Repositories []*database.Repository `json:"repositories"`
+	}
+	json.Unmarshal(recOwner.Body.Bytes(), &resOwner)
+	if len(resOwner.Repositories) != 1 || resOwner.Repositories[0].Name != privRepo.Name {
+		t.Errorf("expected owner to find private repo %s, got %+v", privRepo.Name, resOwner.Repositories)
+	}
+
+	// 5. Test search via /api/v1/repos?q=quantum
+	reqListQ := httptest.NewRequest("GET", "/api/v1/repos?q=quantum", nil)
+	recListQ := httptest.NewRecorder()
+	router.ServeHTTP(recListQ, reqListQ)
+	if recListQ.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from /api/v1/repos?q=quantum, got %d", recListQ.Code)
+	}
+	var listQRepos []*database.Repository
+	if err := json.Unmarshal(recListQ.Body.Bytes(), &listQRepos); err != nil {
+		t.Fatalf("failed to unmarshal /api/v1/repos?q response: %v", err)
+	}
+	if len(listQRepos) != 1 || listQRepos[0].Name != pubRepo.Name {
+		t.Errorf("expected 1 repo matching quantum, got %+v", listQRepos)
+	}
+
+	// 6. Test search via /api/v1/explore?q=quantum
+	reqExploreQ := httptest.NewRequest("GET", "/api/v1/explore?q=quantum", nil)
+	recExploreQ := httptest.NewRecorder()
+	router.ServeHTTP(recExploreQ, reqExploreQ)
+	if recExploreQ.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from /api/v1/explore?q=quantum, got %d", recExploreQ.Code)
+	}
+	var resExplore struct {
+		Repositories []*database.Repository `json:"repositories"`
+	}
+	if err := json.Unmarshal(recExploreQ.Body.Bytes(), &resExplore); err != nil {
+		t.Fatalf("failed to unmarshal explore response: %v", err)
+	}
+	if len(resExplore.Repositories) != 1 || resExplore.Repositories[0].Name != pubRepo.Name {
+		t.Errorf("expected explore to find %s, got %+v", pubRepo.Name, resExplore.Repositories)
+	}
+}
+
 
 
 

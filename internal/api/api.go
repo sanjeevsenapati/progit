@@ -158,6 +158,7 @@ func (r *Router) registerRoutes() {
 
 	// Repositories
 	r.mux.HandleFunc("GET /api/v1/repos", r.handleListRepos)
+	r.mux.HandleFunc("GET /api/v1/repos/search", r.handleSearchRepos)
 	r.mux.HandleFunc("POST /api/v1/repos", r.handleCreateRepo)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}", r.handleGetRepo)
 	r.mux.HandleFunc("DELETE /api/v1/repos/{owner}/{repo}", r.handleDeleteRepo)
@@ -537,7 +538,27 @@ func (r *Router) handleUserDashboard(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Router) handleExplore(w http.ResponseWriter, req *http.Request) {
-	repos, err := database.ListRepositories(50, 0, true)
+	user := auth.AuthenticateRequest(req)
+	q := strings.TrimSpace(req.URL.Query().Get("q"))
+	if q == "" {
+		q = strings.TrimSpace(req.URL.Query().Get("query"))
+	}
+
+	var repos []*database.Repository
+	var err error
+
+	if q != "" {
+		var userID int64
+		isAdmin := false
+		if user != nil {
+			userID = user.ID
+			isAdmin = user.IsAdmin
+		}
+		repos, err = database.SearchRepositories(q, userID, isAdmin, 50, 0)
+	} else {
+		repos, err = database.ListRepositories(50, 0, true)
+	}
+
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -784,9 +805,64 @@ func (r *Router) handleGetUserProfile(w http.ResponseWriter, req *http.Request) 
 
 // Repository Handlers
 
+func (r *Router) handleSearchRepos(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	q := strings.TrimSpace(req.URL.Query().Get("q"))
+	if q == "" {
+		q = strings.TrimSpace(req.URL.Query().Get("query"))
+	}
+	limitStr := req.URL.Query().Get("limit")
+	limit := 50
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	var userID int64
+	isAdmin := false
+	if user != nil {
+		userID = user.ID
+		isAdmin = user.IsAdmin
+	}
+
+	repos, err := database.SearchRepositories(q, userID, isAdmin, limit, 0)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"ok":           true,
+		"repositories": repos,
+		"data":         repos,
+		"total":        len(repos),
+	})
+}
+
 func (r *Router) handleListRepos(w http.ResponseWriter, req *http.Request) {
 	user := auth.AuthenticateRequest(req)
-	ownerFilter := req.URL.Query().Get("owner")
+	ownerFilter := strings.TrimSpace(req.URL.Query().Get("owner"))
+	q := strings.TrimSpace(req.URL.Query().Get("q"))
+	if q == "" {
+		q = strings.TrimSpace(req.URL.Query().Get("query"))
+	}
+
+	if q != "" {
+		var userID int64
+		isAdmin := false
+		if user != nil {
+			userID = user.ID
+			isAdmin = user.IsAdmin
+		}
+		repos, err := database.SearchRepositories(q, userID, isAdmin, 50, 0)
+		if err != nil {
+			jsonError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		jsonResponse(w, http.StatusOK, repos)
+		return
+	}
 
 	if ownerFilter != "" {
 		ownerUser, err := database.GetUserByUsername(ownerFilter)

@@ -840,6 +840,76 @@ func ListRepositories(limit, offset int, publicOnly bool) ([]*Repository, error)
 	return list, rows.Err()
 }
 
+// SearchRepositories queries repositories matching a keyword across name, description, and owner username,
+// enforcing visibility rules based on the authenticated user.
+func SearchRepositories(keyword string, userID int64, isAdmin bool, limit, offset int) ([]*Repository, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	keyword = strings.TrimSpace(keyword)
+	param := "%" + keyword + "%"
+
+	baseQuery := `
+		SELECT r.id, r.owner_id, u.username, r.name, r.description, r.is_private, r.is_fork, r.fork_parent_id,
+		       r.default_branch, r.num_stars, r.num_forks, r.num_watches, r.num_issues, r.num_pulls, r.size_bytes, r.is_archived,
+		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.created_at, r.updated_at
+		FROM repositories r
+		JOIN users u ON u.id = r.owner_id
+	`
+	var whereClauses []string
+	var args []any
+
+	if !isAdmin {
+		if userID > 0 {
+			whereClauses = append(whereClauses, `(
+				r.is_private = 0 
+				OR r.owner_id = ?
+				OR EXISTS (SELECT 1 FROM collaborators c WHERE c.repo_id = r.id AND c.user_id = ?)
+				OR EXISTS (SELECT 1 FROM org_members om WHERE om.org_id = r.owner_id AND om.user_id = ?)
+			)`)
+			args = append(args, userID, userID, userID)
+		} else {
+			whereClauses = append(whereClauses, "r.is_private = 0")
+		}
+	}
+
+	if keyword != "" {
+		whereClauses = append(whereClauses, "(r.name LIKE ? OR r.description LIKE ? OR u.username LIKE ?)")
+		args = append(args, param, param, param)
+	}
+
+	query := baseQuery
+	if len(whereClauses) > 0 {
+		query += " WHERE " + strings.Join(whereClauses, " AND ")
+	}
+	query += " ORDER BY r.num_stars DESC, r.updated_at DESC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+
+	rows, err := DB.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []*Repository
+	for rows.Next() {
+		r := &Repository{}
+		if err := rows.Scan(&r.ID, &r.OwnerID, &r.OwnerName, &r.Name, &r.Description, &r.IsPrivate, &r.IsFork, &r.ForkParentID,
+			&r.DefaultBranch, &r.NumStars, &r.NumForks, &r.NumWatches, &r.NumIssues, &r.NumPulls, &r.SizeBytes, &r.IsArchived,
+			&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, r)
+	}
+	if list == nil {
+		list = []*Repository{}
+	}
+	return list, rows.Err()
+}
+
 func ListUserRepositories(userID int64, includePrivate bool) ([]*Repository, error) {
 	query := `
 		SELECT r.id, r.owner_id, u.username, r.name, r.description, r.is_private, r.is_fork, r.fork_parent_id,

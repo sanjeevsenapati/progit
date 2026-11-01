@@ -379,13 +379,24 @@ export const api = {
     }>('/api/v1/user/dashboard');
   },
 
-  async explore() {
-    return fetchJSON<{ repositories: Repository[] }>('/api/v1/explore');
+  async explore(query?: string) {
+    const url = query ? `/api/v1/explore?q=${encodeURIComponent(query)}` : '/api/v1/explore';
+    return fetchJSON<{ repositories: Repository[] }>(url);
+  },
+
+  async searchRepos(query: string) {
+    return fetchJSON<{ ok: boolean; repositories: Repository[]; data: Repository[]; total: number }>(
+      `/api/v1/repos/search?q=${encodeURIComponent(query)}`
+    );
   },
 
   // Repositories
-  async listRepos(owner?: string) {
-    const url = owner ? `/api/v1/repos?owner=${encodeURIComponent(owner)}` : '/api/v1/repos';
+  async listRepos(owner?: string, query?: string) {
+    const params = new URLSearchParams();
+    if (owner) params.set('owner', owner);
+    if (query) params.set('q', query);
+    const qs = params.toString();
+    const url = qs ? `/api/v1/repos?${qs}` : '/api/v1/repos';
     return fetchJSON<Repository[]>(url);
   },
 

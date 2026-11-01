@@ -4,13 +4,19 @@ import { Compass, GitBranch, Star, Search, Lock, BookOpen } from 'lucide-react';
 
 export const Explore: React.FC = () => {
   const [repos, setRepos] = useState<Repository[]>([]);
-  const [filter, setFilter] = useState('');
+  const [filter, setFilter] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('q') || '';
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const data = await api.explore();
+        setLoading(true);
+        const params = new URLSearchParams(window.location.search);
+        const q = params.get('q') || '';
+        const data = await api.explore(q);
         setRepos(data.repositories || []);
       } catch (err) {
         console.error(err);
@@ -21,9 +27,20 @@ export const Explore: React.FC = () => {
     load();
   }, []);
 
+  const handleFilterChange = (val: string) => {
+    setFilter(val);
+    const url = new URL(window.location.href);
+    if (val.trim()) {
+      url.searchParams.set('q', val.trim());
+    } else {
+      url.searchParams.delete('q');
+    }
+    window.history.replaceState({}, '', url.toString());
+  };
+
   const filtered = repos.filter(r => 
     r.name.toLowerCase().includes(filter.toLowerCase()) || 
-    r.description.toLowerCase().includes(filter.toLowerCase()) ||
+    (r.description && r.description.toLowerCase().includes(filter.toLowerCase())) ||
     r.owner_name.toLowerCase().includes(filter.toLowerCase())
   );
 
@@ -46,7 +63,7 @@ export const Explore: React.FC = () => {
             type="text"
             placeholder="Search repositories..."
             value={filter}
-            onChange={e => setFilter(e.target.value)}
+            onChange={e => handleFilterChange(e.target.value)}
             className="w-full pl-9 pr-3 py-1.5 text-sm rounded-lg bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
         </div>

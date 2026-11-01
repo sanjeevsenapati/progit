@@ -1005,6 +1005,18 @@ TRANS_CHECK=$(curl -s -b "${TEST_DIR}/alice_cookies.txt" "${PROGIT_URL}/api/v1/r
 echo "${TRANS_CHECK}" | grep -q "${TRANS_REPO}" || assert_fail "Transferred repo not found under dev_alice: ${TRANS_CHECK}"
 assert_pass "Transferred repository verified under new owner dev_alice"
 
+echo ""
+echo -e "${YELLOW}--- Suite 15: Repository Search & Explore Filtering ---${NC}"
+log_test "Repository Search API (GET /api/v1/repos/search?q=qa-public-repo)"
+SEARCH_RES=$(curl -s "${PROGIT_URL}/api/v1/repos/search?q=qa-public-repo")
+echo "${SEARCH_RES}" | grep -q "qa-public-repo" || assert_fail "Search did not return expected public repository: ${SEARCH_RES}"
+assert_pass "Repository Search API returned matching repositories"
+
+log_test "Explore API with Query Filter (GET /api/v1/explore?q=qa-public-repo)"
+EXPLORE_RES=$(curl -s "${PROGIT_URL}/api/v1/explore?q=qa-public-repo")
+echo "${EXPLORE_RES}" | grep -q "qa-public-repo" || assert_fail "Explore query filtering failed: ${EXPLORE_RES}"
+assert_pass "Explore API returned query-filtered repositories"
+
 # -----------------------------------------------------------------------------
 # SUMMARY & SCORECARD
 # -----------------------------------------------------------------------------
