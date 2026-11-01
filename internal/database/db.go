@@ -1140,6 +1140,77 @@ func UpdateIssueAssignee(issueID int64, assigneeID *int64) error {
 	return err
 }
 
+// IsEligibleAssignee checks whether a user can be assigned to issues in a repository.
+// Only repository owners, direct collaborators, and organization members (if org-owned)
+// are eligible assignees.
+func IsEligibleAssignee(repo *Repository, user *User) bool {
+	if repo == nil || user == nil {
+		return false
+	}
+	// Repository owner is always eligible
+	if user.ID == repo.OwnerID {
+		return true
+	}
+	// Direct collaborator check
+	var collabsCount int
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM collaborators WHERE repo_id = ? AND user_id = ?`, repo.ID, user.ID).Scan(&collabsCount)
+	if collabsCount > 0 {
+		return true
+	}
+	// Organization member check if repository belongs to an organization
+	var orgID int64
+	if err := DB.QueryRow(`SELECT id FROM organizations WHERE name = ? COLLATE NOCASE`, repo.OwnerName).Scan(&orgID); err == nil {
+		var memberCount int
+		_ = DB.QueryRow(`SELECT COUNT(*) FROM org_members WHERE org_id = ? AND user_id = ?`, orgID, user.ID).Scan(&memberCount)
+		if memberCount > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// ListRepoAssignees returns all users eligible to be assigned to issues in a repository:
+// the repository owner, organization members (if org-owned), and all direct collaborators.
+func ListRepoAssignees(repo *Repository) ([]*User, error) {
+	if repo == nil {
+		return nil, fmt.Errorf("repository is nil")
+	}
+
+	query := `
+		SELECT DISTINCT u.id, u.username, u.email, u.full_name, u.avatar_url, u.is_admin
+		FROM users u
+		WHERE u.password_hash != 'disabled'
+		  AND (
+		    u.id = ?
+		    OR u.id IN (SELECT user_id FROM collaborators WHERE repo_id = ?)
+	`
+	args := []any{repo.OwnerID, repo.ID}
+
+	var orgID int64
+	if err := DB.QueryRow(`SELECT id FROM organizations WHERE name = ? COLLATE NOCASE`, repo.OwnerName).Scan(&orgID); err == nil {
+		query += ` OR u.id IN (SELECT user_id FROM org_members WHERE org_id = ?)`
+		args = append(args, orgID)
+	}
+
+	query += `) ORDER BY u.username ASC`
+
+	rows, err := DB.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*User
+	for rows.Next() {
+		u := &User{}
+		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.FullName, &u.AvatarURL, &u.IsAdmin); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
 func UpdateIssueStatus(issueID int64, closed bool) error {
 	var closedAt *time.Time
 	if closed {

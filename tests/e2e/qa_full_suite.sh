@@ -824,6 +824,27 @@ echo "${DEV_LIST_RES}" | grep -q "dev_alice" || assert_fail "dev_alice missing f
 echo "${DEV_LIST_RES}" | grep -q "dev_julia" || assert_fail "dev_julia missing from developers list"
 assert_pass "Developers list verified"
 
+log_test "Security Check: Block assigning non-collaborator (dev_alice)"
+BLOCKED_ASSIGN_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X PUT "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/issues/1/assignee" \
+  -H "Content-Type: application/json" \
+  -d '{"assignee":"dev_alice"}')
+echo "${BLOCKED_ASSIGN_RES}" | grep -q "collaborator or owner" || assert_fail "Security vulnerability: non-collaborator was not blocked: ${BLOCKED_ASSIGN_RES}"
+assert_pass "Non-collaborator assignment rejected (HTTP 400)"
+
+log_test "Add dev_alice as Repository Collaborator"
+ADD_COLLAB_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X PUT "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/collaborators/dev_alice" \
+  -H "Content-Type: application/json" \
+  -d '{"mode":"write"}')
+assert_pass "dev_alice added as collaborator"
+
+log_test "Verify GET /assignees only returns repo collaborators & owner"
+REPO_ASSIGNEES_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/assignees")
+echo "${REPO_ASSIGNEES_RES}" | grep -q "dev_alice" || assert_fail "dev_alice missing from assignees: ${REPO_ASSIGNEES_RES}"
+echo "${REPO_ASSIGNEES_RES}" | grep -q "${DEV_USER}" || assert_fail "${DEV_USER} missing from assignees: ${REPO_ASSIGNEES_RES}"
+# Verify stranger users (e.g. dev_fiona who is not a collaborator) are NOT in the assignees list
+echo "${REPO_ASSIGNEES_RES}" | grep -q "dev_fiona" && assert_fail "Security vulnerability: non-collaborator dev_fiona leaked in assignees: ${REPO_ASSIGNEES_RES}"
+assert_pass "Only repository collaborators and owner are returned in assignees"
+
 log_test "Assign Issue #1 to dev_alice (PUT /issues/1/assignee)"
 ASSIGN_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X PUT "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/issues/1/assignee" \
   -H "Content-Type: application/json" \

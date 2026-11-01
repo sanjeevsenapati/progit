@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository, Developer } from '../lib/api';
+import { api, Repository, User } from '../lib/api';
 import { RepoNav } from '../components/RepoNav';
 import { CircleDot, AlertCircle } from 'lucide-react';
 
@@ -10,7 +10,7 @@ interface NewIssueProps {
 
 export const NewIssue: React.FC<NewIssueProps> = ({ owner, repo: repoName }) => {
   const [repoData, setRepoData] = useState<Repository | null>(null);
-  const [developers, setDevelopers] = useState<Developer[]>([]);
+  const [assignees, setAssignees] = useState<User[]>([]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [assignee, setAssignee] = useState('');
@@ -23,8 +23,8 @@ export const NewIssue: React.FC<NewIssueProps> = ({ owner, repo: repoName }) => 
         const r = await api.getRepo(owner, repoName);
         setRepoData(r.repository);
 
-        const devs = await api.listDevelopers();
-        setDevelopers(devs || []);
+        const list = await api.listRepoAssignees(owner, repoName);
+        setAssignees(list || []);
       } catch (err) {
         console.error(err);
       }
@@ -89,7 +89,7 @@ export const NewIssue: React.FC<NewIssueProps> = ({ owner, repo: repoName }) => 
 
           <div>
             <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
-              Assignee
+              Assignee (Collaborator)
             </label>
             <select
               value={assignee}
@@ -97,12 +97,15 @@ export const NewIssue: React.FC<NewIssueProps> = ({ owner, repo: repoName }) => 
               className="w-full px-3 py-2 rounded-lg bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             >
               <option value="">No assignee (unassigned)</option>
-              {developers.map(dev => (
+              {assignees.map(dev => (
                 <option key={dev.id} value={dev.username}>
                   {dev.full_name ? `${dev.full_name} (@${dev.username})` : `@${dev.username}`}
                 </option>
               ))}
             </select>
+            <p className="text-[11px] text-gray-400 mt-1">
+              Only repository owner and authorized collaborators can be assigned.
+            </p>
           </div>
 
           <div>

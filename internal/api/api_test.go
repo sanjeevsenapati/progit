@@ -1004,7 +1004,7 @@ func TestIssueAssigneeAndFilter(t *testing.T) {
 	router, cleanup := setupTestRouter(t)
 	defer cleanup()
 
-	// Register dev_alice and dev_bob
+	// Register dev_alice, dev_bob, and dev_stranger
 	uAlice, _ := database.CreateUser("dev_alice", "dev_alice@example.com", "hash", "Alice Developer", true)
 	_, _ = database.CreateAccessToken(uAlice.ID, "tok", "pgt_alice_12345", "repo,user")
 	tokenAlice := "pgt_alice_12345"
@@ -1012,13 +1012,58 @@ func TestIssueAssigneeAndFilter(t *testing.T) {
 	uBob, _ := database.CreateUser("dev_bob", "dev_bob@example.com", "hash", "Bob Developer", false)
 	_, _ = database.CreateAccessToken(uBob.ID, "tok", "pgt_bob_12345", "repo,user")
 
+	uStranger, _ := database.CreateUser("dev_stranger", "stranger@example.com", "hash", "Stranger", false)
+	_ = uStranger
+
 	// Alice creates a repo
 	repo, err := database.CreateRepository(uAlice.ID, "assignee-repo", "Testing issue assignments", false)
 	if err != nil {
 		t.Fatalf("failed to create repo: %v", err)
 	}
 
-	// 1. Alice creates issue with assignee = dev_bob
+	// 1. Security Check: Alice tries to assign dev_stranger (NOT a collaborator) -> must be rejected (400)
+	strangerBody := map[string]any{
+		"title":    "Fix security loophole",
+		"content":  "Testing unauthorized assignment",
+		"assignee": "dev_stranger",
+	}
+	scb, _ := json.Marshal(strangerBody)
+	reqStranger := httptest.NewRequest("POST", "/api/v1/repos/dev_alice/assignee-repo/issues", bytes.NewReader(scb))
+	reqStranger.Header.Set("Authorization", "Bearer "+tokenAlice)
+	reqStranger.Header.Set("Content-Type", "application/json")
+	recStranger := httptest.NewRecorder()
+	router.ServeHTTP(recStranger, reqStranger)
+
+	if recStranger.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 Bad Request when assigning non-collaborator, got %d: %s", recStranger.Code, recStranger.Body.String())
+	}
+
+	// Add dev_bob as a repository collaborator
+	if err := database.AddCollaborator(repo.ID, uBob.ID, "write"); err != nil {
+		t.Fatalf("failed to add collaborator: %v", err)
+	}
+
+	// 2. Verify GET /api/v1/repos/:owner/:repo/assignees only returns owner (alice) and collaborator (bob), NOT stranger
+	reqAssignees := httptest.NewRequest("GET", "/api/v1/repos/dev_alice/assignee-repo/assignees", nil)
+	reqAssignees.Header.Set("Authorization", "Bearer "+tokenAlice)
+	recAssignees := httptest.NewRecorder()
+	router.ServeHTTP(recAssignees, reqAssignees)
+
+	if recAssignees.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for list assignees, got %d: %s", recAssignees.Code, recAssignees.Body.String())
+	}
+	var eligibleAssignees []*database.User
+	_ = json.Unmarshal(recAssignees.Body.Bytes(), &eligibleAssignees)
+	if len(eligibleAssignees) != 2 {
+		t.Fatalf("expected 2 eligible assignees (owner + collaborator), got %d", len(eligibleAssignees))
+	}
+	for _, u := range eligibleAssignees {
+		if u.Username != "dev_alice" && u.Username != "dev_bob" {
+			t.Errorf("unexpected user in assignees list: %s", u.Username)
+		}
+	}
+
+	// 3. Alice creates issue with assignee = dev_bob (collaborator) -> succeeds (201)
 	createBody := map[string]any{
 		"title":    "Fix database latency",
 		"content":  "Issue description",
@@ -1040,7 +1085,7 @@ func TestIssueAssigneeAndFilter(t *testing.T) {
 		t.Errorf("expected assignee_name dev_bob, got %s", createdIssue.AssigneeName)
 	}
 
-	// 2. Filter issues by assignee dev_bob
+	// 4. Filter issues by assignee dev_bob
 	reqFilter := httptest.NewRequest("GET", "/api/v1/repos/dev_alice/assignee-repo/issues?assignee=dev_bob", nil)
 	recFilter := httptest.NewRecorder()
 	router.ServeHTTP(recFilter, reqFilter)
@@ -1053,7 +1098,7 @@ func TestIssueAssigneeAndFilter(t *testing.T) {
 		t.Fatalf("expected 1 issue for dev_bob, got %d", len(bobIssues))
 	}
 
-	// 3. Filter issues by assignee dev_alice (should be 0)
+	// 5. Filter issues by assignee dev_alice (should be 0)
 	reqFilterAlice := httptest.NewRequest("GET", "/api/v1/repos/dev_alice/assignee-repo/issues?assignee=dev_alice", nil)
 	recFilterAlice := httptest.NewRecorder()
 	router.ServeHTTP(recFilterAlice, reqFilterAlice)
@@ -1063,7 +1108,7 @@ func TestIssueAssigneeAndFilter(t *testing.T) {
 		t.Fatalf("expected 0 issues for dev_alice, got %d", len(aliceIssues))
 	}
 
-	// 4. Update assignee to dev_alice via PUT /issues/{index}/assignee
+	// 6. Update assignee to dev_alice via PUT /issues/{index}/assignee
 	assignBody := map[string]any{"assignee": "dev_alice"}
 	ab, _ := json.Marshal(assignBody)
 	reqAssign := httptest.NewRequest("PUT", "/api/v1/repos/dev_alice/assignee-repo/issues/1/assignee", bytes.NewReader(ab))
@@ -1079,6 +1124,19 @@ func TestIssueAssigneeAndFilter(t *testing.T) {
 	_ = json.Unmarshal(recAssign.Body.Bytes(), &updatedIssue)
 	if updatedIssue.AssigneeName != "dev_alice" {
 		t.Errorf("expected assignee dev_alice after update, got %s", updatedIssue.AssigneeName)
+	}
+
+	// 7. Security Check: Try assigning stranger via PUT /issues/{index}/assignee -> rejected (400)
+	badAssignBody := map[string]any{"assignee": "dev_stranger"}
+	bab, _ := json.Marshal(badAssignBody)
+	reqBadAssign := httptest.NewRequest("PUT", "/api/v1/repos/dev_alice/assignee-repo/issues/1/assignee", bytes.NewReader(bab))
+	reqBadAssign.Header.Set("Authorization", "Bearer "+tokenAlice)
+	reqBadAssign.Header.Set("Content-Type", "application/json")
+	recBadAssign := httptest.NewRecorder()
+	router.ServeHTTP(recBadAssign, reqBadAssign)
+
+	if recBadAssign.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 Bad Request when assigning non-collaborator via PUT, got %d: %s", recBadAssign.Code, recBadAssign.Body.String())
 	}
 
 	// Check timeline has assign comments

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository, Issue, Developer } from '../lib/api';
+import { api, Repository, Issue, User } from '../lib/api';
 import { useAuth } from '../lib/theme';
 import { RepoNav } from '../components/RepoNav';
 import { CircleDot, CheckCircle2, MessageSquare, Plus, UserCheck, Filter } from 'lucide-react';
@@ -13,22 +13,22 @@ export const IssuesList: React.FC<IssuesListProps> = ({ owner, repo: repoName })
   const { user } = useAuth();
   const [repoData, setRepoData] = useState<Repository | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]);
-  const [developers, setDevelopers] = useState<Developer[]>([]);
+  const [assignees, setAssignees] = useState<User[]>([]);
   const [stateFilter, setStateFilter] = useState<'open' | 'closed'>('open');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadDevs() {
+    async function loadAssignees() {
       try {
-        const devs = await api.listDevelopers();
-        setDevelopers(devs || []);
+        const list = await api.listRepoAssignees(owner, repoName);
+        setAssignees(list || []);
       } catch (err) {
         console.error(err);
       }
     }
-    loadDevs();
-  }, []);
+    loadAssignees();
+  }, [owner, repoName]);
 
   useEffect(() => {
     async function load() {
@@ -99,7 +99,7 @@ export const IssuesList: React.FC<IssuesListProps> = ({ owner, repo: repoName })
               >
                 <option value="">All Assignees</option>
                 {user && <option value={user.username}>Assigned to me (@{user.username})</option>}
-                {developers
+                {assignees
                   .filter(d => !user || d.username !== user.username)
                   .map(dev => (
                     <option key={dev.id} value={dev.username}>

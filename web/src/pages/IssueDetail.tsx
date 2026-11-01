@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository, Issue, Comment, Developer } from '../lib/api';
+import { api, Repository, Issue, Comment, User } from '../lib/api';
 import { useAuth } from '../lib/theme';
 import { RepoNav } from '../components/RepoNav';
 import { showToast } from '../components/ModalDialog';
@@ -16,7 +16,7 @@ export const IssueDetail: React.FC<IssueDetailProps> = ({ owner, repo: repoName,
   const [repoData, setRepoData] = useState<Repository | null>(null);
   const [issue, setIssue] = useState<Issue | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
-  const [developers, setDevelopers] = useState<Developer[]>([]);
+  const [assignees, setAssignees] = useState<User[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -35,8 +35,8 @@ export const IssueDetail: React.FC<IssueDetailProps> = ({ owner, repo: repoName,
         const cList = await api.listComments(owner, repoName, index);
         setComments(cList || []);
 
-        const devs = await api.listDevelopers();
-        setDevelopers(devs || []);
+        const list = await api.listRepoAssignees(owner, repoName);
+        setAssignees(list || []);
       } catch (err) {
         console.error(err);
       } finally {
@@ -280,7 +280,7 @@ export const IssueDetail: React.FC<IssueDetailProps> = ({ owner, repo: repoName,
                     {assigneeMenuOpen && (
                       <div className="absolute right-0 mt-2 w-64 rounded-xl shadow-2xl py-1.5 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border text-xs z-50 divide-y divide-gray-100 dark:divide-dark-border/40">
                         <div className="px-3 py-1.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                          Assign developer
+                          Assign collaborator
                         </div>
                         <div className="py-1 max-h-56 overflow-y-auto">
                           {issue.assignee_name && (
@@ -293,28 +293,34 @@ export const IssueDetail: React.FC<IssueDetailProps> = ({ owner, repo: repoName,
                               <span>Clear assignee</span>
                             </button>
                           )}
-                          {developers.map(dev => (
-                            <button
-                              key={dev.id}
-                              onClick={() => handleAssign(dev.username)}
-                              disabled={assigning}
-                              className={`w-full text-left px-3.5 py-1.5 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-dark-hover transition-colors ${
-                                issue.assignee_name === dev.username ? 'font-bold text-emerald-600 dark:text-emerald-400' : 'text-gray-700 dark:text-dark-text'
-                              }`}
-                            >
-                              <div className="flex items-center space-x-2 truncate">
-                                <div className="w-5 h-5 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-[10px] flex-shrink-0">
-                                  {dev.username.charAt(0).toUpperCase()}
+                          {assignees.length === 0 ? (
+                            <div className="px-3.5 py-2 text-gray-400 text-[11px]">
+                              No collaborators found in this repository.
+                            </div>
+                          ) : (
+                            assignees.map(dev => (
+                              <button
+                                key={dev.id}
+                                onClick={() => handleAssign(dev.username)}
+                                disabled={assigning}
+                                className={`w-full text-left px-3.5 py-1.5 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-dark-hover transition-colors ${
+                                  issue.assignee_name === dev.username ? 'font-bold text-emerald-600 dark:text-emerald-400' : 'text-gray-700 dark:text-dark-text'
+                                }`}
+                              >
+                                <div className="flex items-center space-x-2 truncate">
+                                  <div className="w-5 h-5 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-[10px] flex-shrink-0">
+                                    {dev.username.charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="truncate">@{dev.username}</span>
                                 </div>
-                                <span className="truncate">@{dev.username}</span>
-                              </div>
-                              {issue.assignee_name === dev.username && (
-                                <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-1.5 py-0.5 rounded font-bold">
-                                  Current
-                                </span>
-                              )}
-                            </button>
-                          ))}
+                                {issue.assignee_name === dev.username && (
+                                  <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-1.5 py-0.5 rounded font-bold">
+                                    Current
+                                  </span>
+                                )}
+                              </button>
+                            ))
+                          )}
                         </div>
                       </div>
                     )}

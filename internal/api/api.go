@@ -181,6 +181,7 @@ func (r *Router) registerRoutes() {
 
 	// Issues
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/issues", r.handleListIssues)
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/assignees", r.handleListAssignees)
 	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/issues", r.handleCreateIssue)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/issues/{index}", r.handleGetIssue)
 	r.mux.HandleFunc("PATCH /api/v1/repos/{owner}/{repo}/issues/{index}", r.handleUpdateIssue)
@@ -1532,9 +1533,16 @@ func (r *Router) handleCreateIssue(w http.ResponseWriter, req *http.Request) {
 
 	var assigneeID *int64
 	if body.Assignee != nil && strings.TrimSpace(*body.Assignee) != "" {
-		if targetUser, err := database.GetUserByUsername(strings.TrimSpace(*body.Assignee)); err == nil && targetUser != nil {
-			assigneeID = &targetUser.ID
+		targetUser, err := database.GetUserByUsername(strings.TrimSpace(*body.Assignee))
+		if err != nil || targetUser == nil {
+			jsonError(w, http.StatusBadRequest, "Assignee user not found")
+			return
 		}
+		if !database.IsEligibleAssignee(repo, targetUser) {
+			jsonError(w, http.StatusBadRequest, "Assignee must be a collaborator or owner of this repository")
+			return
+		}
+		assigneeID = &targetUser.ID
 	}
 
 	issue, err := database.CreateIssue(repo.ID, user.ID, body.Title, body.Content, false, assigneeID)
@@ -1624,6 +1632,10 @@ func (r *Router) handleUpdateIssue(w http.ResponseWriter, req *http.Request) {
 				jsonError(w, http.StatusBadRequest, "Assignee user not found")
 				return
 			}
+			if !database.IsEligibleAssignee(repo, targetUser) {
+				jsonError(w, http.StatusBadRequest, "Assignee must be a collaborator or owner of this repository")
+				return
+			}
 			_ = database.UpdateIssueAssignee(issue.ID, &targetUser.ID)
 			_, _ = database.AddComment(issue.ID, user.ID, "assign", fmt.Sprintf("assigned @%s", targetUser.Username))
 		}
@@ -1674,12 +1686,43 @@ func (r *Router) handleAssignIssue(w http.ResponseWriter, req *http.Request) {
 			jsonError(w, http.StatusBadRequest, "Assignee user not found")
 			return
 		}
+		if !database.IsEligibleAssignee(repo, targetUser) {
+			jsonError(w, http.StatusBadRequest, "Assignee must be a collaborator or owner of this repository")
+			return
+		}
 		_ = database.UpdateIssueAssignee(issue.ID, &targetUser.ID)
 		_, _ = database.AddComment(issue.ID, user.ID, "assign", fmt.Sprintf("assigned @%s", targetUser.Username))
 	}
 
 	updated, _ := database.GetIssueByID(issue.ID)
 	jsonResponse(w, http.StatusOK, updated)
+}
+
+func (r *Router) handleListAssignees(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	user := auth.AuthenticateRequest(req)
+	if !database.CanUserAccessRepo(user, repo, false) {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	assignees, err := database.ListRepoAssignees(repo)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if assignees == nil {
+		assignees = []*database.User{}
+	}
+	jsonResponse(w, http.StatusOK, assignees)
 }
 
 func (r *Router) handleListComments(w http.ResponseWriter, req *http.Request) {

@@ -533,6 +533,10 @@ export const api = {
     });
   },
 
+  async listRepoAssignees(owner: string, repo: string) {
+    return fetchJSON<User[]>(`/api/v1/repos/${owner}/${repo}/assignees`);
+  },
+
   async listComments(owner: string, repo: string, index: number) {
     return fetchJSON<Comment[]>(`/api/v1/repos/${owner}/${repo}/issues/${index}/comments`);
   },
