@@ -43,7 +43,9 @@ Authentication endpoints (`/api/v1/auth/login`, `/api/v1/auth/register`) are rat
 - `DELETE /api/v1/user/keys/:id` - Remove SSH public key.
 
 ### 2.3 Repositories
-- `GET /api/v1/repos` - List repositories (filter by owner or public exploration).
+- `GET /api/v1/repos` - List repositories (filter by `?owner=username` or keyword search `?q=query`).
+- `GET /api/v1/repos/search?q={query}&limit=20&page=1` - Search repositories across name, description, and owner username with access control scoping (public repositories visible to all; private repositories visible strictly to owner, collaborators, and organization members).
+- `GET /api/v1/explore?q={query}` - Public and authorized repository exploration with keyword search.
 - `POST /api/v1/repos` - Create a new repository.
   - Body: `{"name": "my-project", "description": "Demo project", "private": false, "auto_init": true, "readme": "Default"}`
 - `GET /api/v1/repos/:owner/:repo` - Retrieve repository metadata, permissions (`can_write`, `is_admin`), and stats.

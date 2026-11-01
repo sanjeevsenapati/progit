@@ -563,8 +563,13 @@ func (r *Router) handleExplore(w http.ResponseWriter, req *http.Request) {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if repos == nil {
+		repos = []*database.Repository{}
+	}
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"repositories": repos,
+		"data":         repos,
+		"total":        len(repos),
 	})
 }
 
@@ -831,6 +836,9 @@ func (r *Router) handleSearchRepos(w http.ResponseWriter, req *http.Request) {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if repos == nil {
+		repos = []*database.Repository{}
+	}
 
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"ok":           true,
@@ -859,6 +867,9 @@ func (r *Router) handleListRepos(w http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			jsonError(w, http.StatusInternalServerError, err.Error())
 			return
+		}
+		if repos == nil {
+			repos = []*database.Repository{}
 		}
 		jsonResponse(w, http.StatusOK, repos)
 		return

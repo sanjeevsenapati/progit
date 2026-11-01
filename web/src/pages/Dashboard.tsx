@@ -105,9 +105,14 @@ export const Dashboard: React.FC = () => {
               <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Find a repository..."
+                placeholder="Find a repository (Enter to search all)..."
                 value={filter}
                 onChange={e => setFilter(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && filter.trim()) {
+                    window.location.href = `/explore?q=${encodeURIComponent(filter.trim())}`;
+                  }
+                }}
                 className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-xs"
               />
             </div>
@@ -118,10 +123,19 @@ export const Dashboard: React.FC = () => {
               ) : filteredRepos.length === 0 ? (
                 <div className="p-6 text-center text-xs text-gray-500 dark:text-dark-muted space-y-2">
                   <BookOpen className="w-6 h-6 mx-auto text-gray-400" />
-                  <p>No repositories found</p>
-                  <a href="/new" className="inline-block text-emerald-600 dark:text-emerald-400 font-semibold hover:underline">
-                    Create your first repository
-                  </a>
+                  <p>{filter.trim() ? `No local repositories matching "${filter}"` : 'No repositories found'}</p>
+                  {filter.trim() ? (
+                    <a
+                      href={`/explore?q=${encodeURIComponent(filter.trim())}`}
+                      className="inline-block text-emerald-600 dark:text-emerald-400 font-semibold hover:underline"
+                    >
+                      Search across all repositories &rarr;
+                    </a>
+                  ) : (
+                    <a href="/new" className="inline-block text-emerald-600 dark:text-emerald-400 font-semibold hover:underline">
+                      Create your first repository
+                    </a>
+                  )}
                 </div>
               ) : (
                 filteredRepos.slice(0, 10).map(repo => (

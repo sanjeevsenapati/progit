@@ -13,6 +13,7 @@
 | **Dashboard** | User Feed & Recent Repos | Partial | Implemented | GitHub-style activity stream |
 | **Dashboard** | Quick Actions / Starred | Yes | Implemented | Modern dashboard sidebar & cards |
 | **Repository** | Create Repository | Yes | Implemented | Auto-initialize with README/License |
+| **Repository** | Search & Discovery (Navbar & Explore) | Basic | Implemented | Live debounced autocomplete dropdown, keyboard shortcuts (/), /explore URL sync, strict collaborator/private access controls |
 | **Repository** | Public / Private Visibility | Yes | Implemented | Enforced in Web UI, API, and Git CLI; instant toggling in Danger Zone |
 | **Repository** | Fork Repository | Yes | Implemented | Fork relationships, upstream tracking & branch sync |
 | **Repository** | Star / Watch Repositories | Yes | Implemented | Reactive star/unstar buttons |

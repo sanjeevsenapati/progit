@@ -54,6 +54,17 @@ git commit -m "First commit"
 git push origin main
 ```
 
+### 2.4 Repository Search & Exploration
+ProGit features a global, real-time repository search engine:
+- **Navbar Instant Search**: Click the search input in the top navigation bar or press `/` on your keyboard from anywhere to immediately focus the search field.
+- **Live Autocomplete Dropdown**: As you type, matching repositories appear with owner badges, repository name, star counts, private locks, and descriptions.
+- **Keyboard Navigation**:
+  - `ArrowDown` / `ArrowUp`: Navigate through autocomplete suggestions.
+  - `Enter`: Navigate directly to the highlighted repository, or perform a full explore search for the typed query.
+  - `Escape`: Dismiss the search dropdown.
+- **Explore Page Search (`/explore?q=...`)**: Full search results page with deep URL synchronization, allowing users to bookmark or share search queries.
+- **Access Control & Privacy**: Repository search strictly adheres to security boundaries. Public repositories are discoverable by everyone. Private repositories only appear in search results for their authenticated owners, collaborators, and organization members. Stranger and unauthenticated queries never leak the existence of private repositories.
+
 ---
 
 ## 3. Code Browsing & Navigation

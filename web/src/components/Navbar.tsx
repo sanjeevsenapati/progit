@@ -17,7 +17,8 @@ import {
   Mail,
   Lock,
   Star,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -115,9 +116,15 @@ export const Navbar: React.FC = () => {
       e.preventDefault();
       if (selectedIndex >= 0 && selectedIndex < searchResults.length) {
         const target = searchResults[selectedIndex];
+        setSearchOpen(false);
         window.location.href = `/${target.owner_name}/${target.name}`;
       } else if (searchQuery.trim()) {
-        window.location.href = `/explore?q=${encodeURIComponent(searchQuery.trim())}`;
+        setSearchOpen(false);
+        if (window.location.pathname === '/explore') {
+          window.location.search = `?q=${encodeURIComponent(searchQuery.trim())}`;
+        } else {
+          window.location.href = `/explore?q=${encodeURIComponent(searchQuery.trim())}`;
+        }
       }
     }
   };
@@ -139,36 +146,36 @@ export const Navbar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
           {/* Left: Brand & Navigation */}
-          <div className="flex items-center space-x-6">
-            <a href="/" className="flex items-center space-x-2.5 font-bold text-lg text-gray-900 dark:text-white hover:opacity-90">
+          <div className="flex items-center space-x-3 sm:space-x-6 flex-shrink-0">
+            <a href="/" className="flex items-center space-x-2.5 font-bold text-lg text-gray-900 dark:text-white hover:opacity-90 flex-shrink-0">
               <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-sm">
                 <GitBranch className="w-5 h-5" />
               </div>
-              <span className="tracking-tight">ProGit</span>
+              <span className="tracking-tight hidden xs:inline">ProGit</span>
             </a>
 
-            {user && (
-              <div className="hidden md:flex items-center space-x-1 text-sm font-medium">
+            <div className="hidden md:flex items-center space-x-1 text-sm font-medium">
+              {user && (
                 <a href="/dashboard" className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover">
                   <LayoutDashboard className="w-4 h-4 text-gray-500 dark:text-dark-muted" />
                   <span>Dashboard</span>
                 </a>
-                <a href="/explore" className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover">
-                  <Compass className="w-4 h-4 text-gray-500 dark:text-dark-muted" />
-                  <span>Explore</span>
+              )}
+              <a href="/explore" className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover">
+                <Compass className="w-4 h-4 text-gray-500 dark:text-dark-muted" />
+                <span>Explore</span>
+              </a>
+              {user?.is_admin && (
+                <a href="/admin" className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-emerald-600 dark:text-emerald-400 font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors">
+                  <Shield className="w-4 h-4" />
+                  <span>Admin</span>
                 </a>
-                {user.is_admin && (
-                  <a href="/admin" className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-emerald-600 dark:text-emerald-400 font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors">
-                    <Shield className="w-4 h-4" />
-                    <span>Admin</span>
-                  </a>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Center: Search */}
-          <div className="hidden lg:flex flex-1 max-w-sm mx-6 relative">
+          <div className="flex flex-1 max-w-xs sm:max-w-sm md:max-w-md mx-2 sm:mx-6 relative">
             <div className="relative w-full">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                 {searchLoading ? (
@@ -192,11 +199,26 @@ export const Navbar: React.FC = () => {
                 placeholder="Type / to search repositories..."
                 className="w-full pl-9 pr-8 py-1.5 text-xs rounded-lg bg-gray-100 dark:bg-dark-bg border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-dark-bg focus:outline-none dark:text-white placeholder-gray-400 shadow-inner transition-all"
               />
-              <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
-                <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-gray-400 bg-gray-200 dark:bg-dark-hover rounded border border-gray-300 dark:border-dark-border">
-                  /
-                </kbd>
-              </div>
+              {searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSearchResults([]);
+                    setSearchOpen(false);
+                    searchInputRef.current?.focus();
+                  }}
+                  className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-dark-text"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
+                  <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-gray-400 bg-gray-200 dark:bg-dark-hover rounded border border-gray-300 dark:border-dark-border">
+                    /
+                  </kbd>
+                </div>
+              )}
             </div>
 
             {/* Search Dropdown */}
@@ -219,7 +241,11 @@ export const Navbar: React.FC = () => {
                         className={`flex items-start justify-between px-3.5 py-2.5 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors ${
                           selectedIndex === idx ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' : ''
                         }`}
-                        onClick={() => setSearchOpen(false)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setSearchOpen(false);
+                          window.location.href = `/${repo.owner_name}/${repo.name}`;
+                        }}
                       >
                         <div className="flex items-start space-x-2.5 min-w-0 pr-2">
                           <div className="mt-0.5 w-5 h-5 rounded-md bg-gray-100 dark:bg-dark-bg flex items-center justify-center text-gray-500 dark:text-dark-muted flex-shrink-0">
@@ -258,7 +284,15 @@ export const Navbar: React.FC = () => {
                 <a
                   href={`/explore?q=${encodeURIComponent(searchQuery.trim())}`}
                   className="block px-3.5 py-2.5 text-center text-emerald-600 dark:text-emerald-400 hover:bg-gray-50 dark:hover:bg-dark-hover font-semibold transition-colors"
-                  onClick={() => setSearchOpen(false)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setSearchOpen(false);
+                    if (window.location.pathname === '/explore') {
+                      window.location.search = `?q=${encodeURIComponent(searchQuery.trim())}`;
+                    } else {
+                      window.location.href = `/explore?q=${encodeURIComponent(searchQuery.trim())}`;
+                    }
+                  }}
                 >
                   Search all repositories for "{searchQuery}" &rarr;
                 </a>
