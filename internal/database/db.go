@@ -899,6 +899,100 @@ func DeleteRepository(repoID int64) error {
 	return err
 }
 
+// UpdateRepoVisibility toggles repository public/private visibility.
+func UpdateRepoVisibility(repoID int64, isPrivate bool) error {
+	_, err := DB.Exec(`
+		UPDATE repositories 
+		SET is_private = ?, updated_at = CURRENT_TIMESTAMP 
+		WHERE id = ?
+	`, isPrivate, repoID)
+	return err
+}
+
+// ToggleRepoArchive toggles repository archived (read-only) status.
+func ToggleRepoArchive(repoID int64, archive bool) error {
+	_, err := DB.Exec(`
+		UPDATE repositories 
+		SET is_archived = ?, updated_at = CURRENT_TIMESTAMP 
+		WHERE id = ?
+	`, archive, repoID)
+	return err
+}
+
+// TransferRepository safely moves repository files on disk and transfers ownership in the database.
+func TransferRepository(repoID int64, newOwnerID int64, newOwnerName string, repoRoot string) (*Repository, error) {
+	repo, err := GetRepositoryByID(repoID)
+	if err != nil {
+		return nil, fmt.Errorf("repository not found: %w", err)
+	}
+	oldOwnerName := repo.OwnerName
+	repoName := repo.Name
+
+	if strings.EqualFold(oldOwnerName, newOwnerName) {
+		return nil, fmt.Errorf("repository is already owned by %s", newOwnerName)
+	}
+
+	// Verify new owner does not already have a repository with this name
+	var existingID int64
+	err = DB.QueryRow(`SELECT id FROM repositories WHERE owner_id = ? AND name = ? COLLATE NOCASE`, newOwnerID, repoName).Scan(&existingID)
+	if err == nil {
+		return nil, fmt.Errorf("a repository named '%s' already exists for %s", repoName, newOwnerName)
+	}
+
+	// Paths on disk
+	oldRepoDir := filepath.Join(repoRoot, oldOwnerName, repoName+".git")
+	newRepoDir := filepath.Join(repoRoot, newOwnerName, repoName+".git")
+	oldWikiDir := filepath.Join(repoRoot, oldOwnerName, repoName+".wiki.git")
+	newWikiDir := filepath.Join(repoRoot, newOwnerName, repoName+".wiki.git")
+
+	if err := os.MkdirAll(filepath.Dir(newRepoDir), 0755); err != nil {
+		return nil, fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	if _, err := os.Stat(newRepoDir); err == nil {
+		return nil, fmt.Errorf("destination repository path '%s' already exists on disk", newRepoDir)
+	}
+
+	// Move git repository directory
+	movedRepo := false
+	if _, err := os.Stat(oldRepoDir); err == nil {
+		if err := os.Rename(oldRepoDir, newRepoDir); err != nil {
+			return nil, fmt.Errorf("failed to move repository directory: %w", err)
+		}
+		movedRepo = true
+	}
+
+	// Move wiki repo directory if exists
+	movedWiki := false
+	if _, err := os.Stat(oldWikiDir); err == nil {
+		if err := os.Rename(oldWikiDir, newWikiDir); err == nil {
+			movedWiki = true
+		}
+	}
+
+	// Update owner in database
+	_, err = DB.Exec(`
+		UPDATE repositories 
+		SET owner_id = ?, updated_at = CURRENT_TIMESTAMP 
+		WHERE id = ?
+	`, newOwnerID, repoID)
+	if err != nil {
+		// Roll back disk moves if DB update fails
+		if movedRepo {
+			_ = os.Rename(newRepoDir, oldRepoDir)
+		}
+		if movedWiki {
+			_ = os.Rename(newWikiDir, oldWikiDir)
+		}
+		return nil, fmt.Errorf("failed to update repository owner in database: %w", err)
+	}
+
+	// Clean up any collaborator records for the new owner so they become the legitimate owner
+	_, _ = DB.Exec(`DELETE FROM collaborators WHERE repo_id = ? AND user_id = ?`, repoID, newOwnerID)
+
+	return GetRepositoryByID(repoID)
+}
+
 func ToggleStar(userID, repoID int64) (bool, error) {
 	var exists int
 	err := DB.QueryRow(`SELECT COUNT(*) FROM stars WHERE user_id = ? AND repo_id = ?`, userID, repoID).Scan(&exists)

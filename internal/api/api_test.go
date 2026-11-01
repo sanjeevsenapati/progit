@@ -1410,6 +1410,247 @@ func Test10DevelopersMessagingWorkflow(t *testing.T) {
 	}
 }
 
+func TestWebhooksCRUDAndTest(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	alice, err := database.CreateUser("alice_wh", "alice_wh@example.com", "hash", "Alice WH", false)
+	if err != nil {
+		t.Fatalf("failed to create user alice: %v", err)
+	}
+	bob, err := database.CreateUser("bob_wh", "bob_wh@example.com", "hash", "Bob WH", false)
+	if err != nil {
+		t.Fatalf("failed to create user bob: %v", err)
+	}
+
+	_, err = database.CreateRepository(alice.ID, "wh-test-repo", "Webhook test repo", false)
+	if err != nil {
+		t.Fatalf("failed to create repo: %v", err)
+	}
+
+	aliceToken := "pgt_alice_wh_tok"
+	_, _ = database.CreateAccessToken(alice.ID, "tok", aliceToken, "repo,user")
+	bobToken := "pgt_bob_wh_tok"
+	_, _ = database.CreateAccessToken(bob.ID, "tok", bobToken, "repo,user")
+
+	// Spin up a mock HTTP receiver for webhook deliveries
+	var receivedHeaders http.Header
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedHeaders = r.Header.Clone()
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"received": true}`))
+	}))
+	defer testServer.Close()
+
+	// 1. Stranger (bob) attempts to create webhook -> 403 Forbidden
+	hookPayload := map[string]any{
+		"url":          testServer.URL,
+		"secret":       "my-secret-key",
+		"content_type": "json",
+		"events":       "push,issues",
+		"is_active":    true,
+	}
+	hb, _ := json.Marshal(hookPayload)
+	reqBob := httptest.NewRequest("POST", "/api/v1/repos/alice_wh/wh-test-repo/hooks", bytes.NewReader(hb))
+	reqBob.Header.Set("Authorization", "Bearer "+bobToken)
+	reqBob.Header.Set("Content-Type", "application/json")
+	recBob := httptest.NewRecorder()
+	router.ServeHTTP(recBob, reqBob)
+
+	if recBob.Code != http.StatusForbidden {
+		t.Errorf("expected 403 Forbidden for stranger webhook create, got %d", recBob.Code)
+	}
+
+	// 2. Owner (alice) creates webhook -> 201 Created
+	reqAlice := httptest.NewRequest("POST", "/api/v1/repos/alice_wh/wh-test-repo/hooks", bytes.NewReader(hb))
+	reqAlice.Header.Set("Authorization", "Bearer "+aliceToken)
+	reqAlice.Header.Set("Content-Type", "application/json")
+	recAlice := httptest.NewRecorder()
+	router.ServeHTTP(recAlice, reqAlice)
+
+	if recAlice.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for webhook create, got %d: %s", recAlice.Code, recAlice.Body.String())
+	}
+
+	var createdHook database.Webhook
+	_ = json.Unmarshal(recAlice.Body.Bytes(), &createdHook)
+	if createdHook.ID == 0 || createdHook.URL != testServer.URL {
+		t.Fatalf("expected created webhook with URL %s, got %+v", testServer.URL, createdHook)
+	}
+
+	// 3. List webhooks -> 200 OK
+	reqList := httptest.NewRequest("GET", "/api/v1/repos/alice_wh/wh-test-repo/hooks", nil)
+	reqList.Header.Set("Authorization", "Bearer "+aliceToken)
+	recList := httptest.NewRecorder()
+	router.ServeHTTP(recList, reqList)
+
+	if recList.Code != http.StatusOK {
+		t.Errorf("expected 200 OK for list hooks, got %d", recList.Code)
+	}
+	var hooks []*database.Webhook
+	_ = json.Unmarshal(recList.Body.Bytes(), &hooks)
+	if len(hooks) != 1 {
+		t.Errorf("expected 1 webhook, got %d", len(hooks))
+	}
+
+	// 4. Test Webhook (trigger ping) -> 200 OK
+	reqTest := httptest.NewRequest("POST", fmt.Sprintf("/api/v1/repos/alice_wh/wh-test-repo/hooks/%d/test", createdHook.ID), nil)
+	reqTest.Header.Set("Authorization", "Bearer "+aliceToken)
+	recTest := httptest.NewRecorder()
+	router.ServeHTTP(recTest, reqTest)
+
+	if recTest.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for test webhook, got %d: %s", recTest.Code, recTest.Body.String())
+	}
+
+	// Verify headers received by testServer
+	if receivedHeaders.Get("X-ProGit-Event") != "ping" {
+		t.Errorf("expected X-ProGit-Event: ping, got %s", receivedHeaders.Get("X-ProGit-Event"))
+	}
+	if !strings.HasPrefix(receivedHeaders.Get("X-Hub-Signature-256"), "sha256=") {
+		t.Errorf("expected X-Hub-Signature-256 header, got %s", receivedHeaders.Get("X-Hub-Signature-256"))
+	}
+
+	// 5. List deliveries -> 200 OK
+	reqDeliv := httptest.NewRequest("GET", fmt.Sprintf("/api/v1/repos/alice_wh/wh-test-repo/hooks/%d/deliveries", createdHook.ID), nil)
+	reqDeliv.Header.Set("Authorization", "Bearer "+aliceToken)
+	recDeliv := httptest.NewRecorder()
+	router.ServeHTTP(recDeliv, reqDeliv)
+
+	if recDeliv.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for deliveries, got %d", recDeliv.Code)
+	}
+	var deliveries []*database.WebhookDelivery
+	_ = json.Unmarshal(recDeliv.Body.Bytes(), &deliveries)
+	if len(deliveries) < 1 || deliveries[0].StatusCode != http.StatusOK {
+		t.Errorf("expected at least 1 successful delivery with status 200, got %d deliveries", len(deliveries))
+	}
+
+	// 6. Delete webhook -> 200 OK
+	reqDel := httptest.NewRequest("DELETE", fmt.Sprintf("/api/v1/repos/alice_wh/wh-test-repo/hooks/%d", createdHook.ID), nil)
+	reqDel.Header.Set("Authorization", "Bearer "+aliceToken)
+	recDel := httptest.NewRecorder()
+	router.ServeHTTP(recDel, reqDel)
+
+	if recDel.Code != http.StatusOK {
+		t.Errorf("expected 200 OK for delete webhook, got %d", recDel.Code)
+	}
+}
+
+func TestDangerZoneActions(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	alice, _ := database.CreateUser("alice_dz", "alice_dz@example.com", "hash", "Alice DZ", false)
+	bob, _ := database.CreateUser("bob_dz", "bob_dz@example.com", "hash", "Bob DZ", false)
+
+	repo, err := database.CreateRepository(alice.ID, "dz-repo", "Danger zone test repo", false)
+	if err != nil {
+		t.Fatalf("failed to create repo: %v", err)
+	}
+
+	aliceToken := "pgt_alice_dz_tok"
+	_, _ = database.CreateAccessToken(alice.ID, "tok", aliceToken, "repo,user")
+	bobToken := "pgt_bob_dz_tok"
+	_, _ = database.CreateAccessToken(bob.ID, "tok", bobToken, "repo,user")
+
+	// 1. Change visibility to private
+	visPayload := map[string]any{"is_private": true}
+	vb, _ := json.Marshal(visPayload)
+	reqVis := httptest.NewRequest("POST", "/api/v1/repos/alice_dz/dz-repo/visibility", bytes.NewReader(vb))
+	reqVis.Header.Set("Authorization", "Bearer "+aliceToken)
+	reqVis.Header.Set("Content-Type", "application/json")
+	recVis := httptest.NewRecorder()
+	router.ServeHTTP(recVis, reqVis)
+
+	if recVis.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for visibility change, got %d: %s", recVis.Code, recVis.Body.String())
+	}
+
+	repoCheck, _ := database.GetRepositoryByID(repo.ID)
+	if !repoCheck.IsPrivate {
+		t.Errorf("expected repository to be private after visibility update")
+	}
+
+	// 2. Archive repository
+	archPayload := map[string]any{"archive": true}
+	ab, _ := json.Marshal(archPayload)
+	reqArch := httptest.NewRequest("POST", "/api/v1/repos/alice_dz/dz-repo/archive", bytes.NewReader(ab))
+	reqArch.Header.Set("Authorization", "Bearer "+aliceToken)
+	reqArch.Header.Set("Content-Type", "application/json")
+	recArch := httptest.NewRecorder()
+	router.ServeHTTP(recArch, reqArch)
+
+	if recArch.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for archive repo, got %d: %s", recArch.Code, recArch.Body.String())
+	}
+
+	repoCheck, _ = database.GetRepositoryByID(repo.ID)
+	if !repoCheck.IsArchived {
+		t.Errorf("expected repository to be archived")
+	}
+
+	// 3. Attempting to create an issue on archived repo should fail with 400 Bad Request
+	issuePayload := map[string]any{"title": "Test Issue", "content": "Body"}
+	ib, _ := json.Marshal(issuePayload)
+	reqIssue := httptest.NewRequest("POST", "/api/v1/repos/alice_dz/dz-repo/issues", bytes.NewReader(ib))
+	reqIssue.Header.Set("Authorization", "Bearer "+aliceToken)
+	reqIssue.Header.Set("Content-Type", "application/json")
+	recIssue := httptest.NewRecorder()
+	router.ServeHTTP(recIssue, reqIssue)
+
+	if recIssue.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 Bad Request when creating issue on archived repo, got %d", recIssue.Code)
+	}
+
+	// 4. Unarchive repository
+	unarchPayload := map[string]any{"archive": false}
+	uab, _ := json.Marshal(unarchPayload)
+	reqUnarch := httptest.NewRequest("POST", "/api/v1/repos/alice_dz/dz-repo/archive", bytes.NewReader(uab))
+	reqUnarch.Header.Set("Authorization", "Bearer "+aliceToken)
+	reqUnarch.Header.Set("Content-Type", "application/json")
+	recUnarch := httptest.NewRecorder()
+	router.ServeHTTP(recUnarch, reqUnarch)
+
+	if recUnarch.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for unarchive repo, got %d", recUnarch.Code)
+	}
+
+	// 5. Transfer repository from alice to bob
+	// Unauthorized stranger attempt
+	transferPayload := map[string]any{"new_owner": "bob_dz"}
+	tb, _ := json.Marshal(transferPayload)
+	reqTransBob := httptest.NewRequest("POST", "/api/v1/repos/alice_dz/dz-repo/transfer", bytes.NewReader(tb))
+	reqTransBob.Header.Set("Authorization", "Bearer "+bobToken)
+	reqTransBob.Header.Set("Content-Type", "application/json")
+	recTransBob := httptest.NewRecorder()
+	router.ServeHTTP(recTransBob, reqTransBob)
+
+	if recTransBob.Code != http.StatusForbidden {
+		t.Errorf("expected 403 Forbidden for non-owner transfer attempt, got %d", recTransBob.Code)
+	}
+
+	// Legitimate owner transfer
+	reqTransAlice := httptest.NewRequest("POST", "/api/v1/repos/alice_dz/dz-repo/transfer", bytes.NewReader(tb))
+	reqTransAlice.Header.Set("Authorization", "Bearer "+aliceToken)
+	reqTransAlice.Header.Set("Content-Type", "application/json")
+	recTransAlice := httptest.NewRecorder()
+	router.ServeHTTP(recTransAlice, reqTransAlice)
+
+	if recTransAlice.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for transfer repo, got %d: %s", recTransAlice.Code, recTransAlice.Body.String())
+	}
+
+	// Verify owner in database
+	repoTransferred, err := database.GetRepositoryByName("bob_dz", "dz-repo")
+	if err != nil || repoTransferred == nil {
+		t.Fatalf("transferred repository bob_dz/dz-repo not found in database: %v", err)
+	}
+	if repoTransferred.OwnerName != "bob_dz" || repoTransferred.OwnerID != bob.ID {
+		t.Errorf("expected owner to be bob_dz, got %s (id: %d)", repoTransferred.OwnerName, repoTransferred.OwnerID)
+	}
+}
+
 
 
 

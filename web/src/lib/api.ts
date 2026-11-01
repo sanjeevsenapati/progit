@@ -305,6 +305,28 @@ export interface Message {
 
 export type Developer = User;
 
+export interface Webhook {
+  id: number;
+  repo_id: number;
+  url: string;
+  has_secret?: boolean;
+  content_type: string;
+  events: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface WebhookDelivery {
+  id: number;
+  webhook_id: number;
+  event: string;
+  payload: string;
+  status_code: number;
+  response_body: string;
+  duration_ms: number;
+  delivered_at: string;
+}
+
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...options,
@@ -851,6 +873,76 @@ export const api = {
     return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}/collaborators/${username}`, {
       method: 'DELETE',
     });
+  },
+
+  // Webhooks
+  async listWebhooks(owner: string, repo: string) {
+    return fetchJSON<Webhook[]>(`/api/v1/repos/${owner}/${repo}/hooks`);
+  },
+
+  async createWebhook(owner: string, repo: string, data: { url: string; secret?: string; content_type?: string; events?: string; is_active?: boolean }) {
+    return fetchJSON<Webhook>(`/api/v1/repos/${owner}/${repo}/hooks`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getWebhook(owner: string, repo: string, id: number) {
+    return fetchJSON<Webhook>(`/api/v1/repos/${owner}/${repo}/hooks/${id}`);
+  },
+
+  async updateWebhook(owner: string, repo: string, id: number, data: { url?: string; secret?: string; content_type?: string; events?: string; is_active?: boolean }) {
+    return fetchJSON<Webhook>(`/api/v1/repos/${owner}/${repo}/hooks/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteWebhook(owner: string, repo: string, id: number) {
+    return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}/hooks/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async testWebhook(owner: string, repo: string, id: number) {
+    return fetchJSON<{ message: string; delivery: WebhookDelivery }>(`/api/v1/repos/${owner}/${repo}/hooks/${id}/test`, {
+      method: 'POST',
+    });
+  },
+
+  async listWebhookDeliveries(owner: string, repo: string, id: number) {
+    return fetchJSON<WebhookDelivery[]>(`/api/v1/repos/${owner}/${repo}/hooks/${id}/deliveries`);
+  },
+
+  // Danger Zone Actions
+  async changeRepoVisibility(owner: string, repo: string, isPrivate: boolean) {
+    return fetchJSON<{ message: string; is_private: boolean; repository: Repository }>(
+      `/api/v1/repos/${owner}/${repo}/visibility`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ is_private: isPrivate }),
+      }
+    );
+  },
+
+  async toggleRepoArchive(owner: string, repo: string, archive: boolean) {
+    return fetchJSON<{ message: string; is_archived: boolean; repository: Repository }>(
+      `/api/v1/repos/${owner}/${repo}/archive`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ archive }),
+      }
+    );
+  },
+
+  async transferRepo(owner: string, repo: string, newOwner: string) {
+    return fetchJSON<{ message: string; new_owner: string; redirect_url: string; repository: Repository }>(
+      `/api/v1/repos/${owner}/${repo}/transfer`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ new_owner: newOwner }),
+      }
+    );
   },
 
   // Organizations

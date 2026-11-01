@@ -920,6 +920,92 @@ echo "${DEL_MSG_RES}" | grep -q "successfully" || assert_fail "Failed to delete 
 assert_pass "Message deleted successfully"
 
 # -----------------------------------------------------------------------------
+# 14. WEBHOOKS & DANGER ZONE MANAGEMENT
+# -----------------------------------------------------------------------------
+echo ""
+echo -e "${YELLOW}--- Suite 14: Webhooks & Danger Zone Management ---${NC}"
+
+log_test "Create Webhook for Repository (POST /hooks)"
+CREATE_HOOK_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/hooks" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://httpbin.org/post","secret":"secret-key-123","content_type":"json","events":"push,issues,pull_request","is_active":true}')
+echo "${CREATE_HOOK_RES}" | grep -q "httpbin.org" || assert_fail "Failed to create webhook: ${CREATE_HOOK_RES}"
+HOOK_ID=$(echo "${CREATE_HOOK_RES}" | python3 -c "import sys, json; print(json.load(sys.stdin)['id'])")
+assert_pass "Webhook registered (id: ${HOOK_ID})"
+
+log_test "List Webhooks for Repository (GET /hooks)"
+LIST_HOOKS_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/hooks")
+echo "${LIST_HOOKS_RES}" | grep -q "${HOOK_ID}" || assert_fail "Webhook not listed: ${LIST_HOOKS_RES}"
+assert_pass "Webhook listed in repository webhooks"
+
+log_test "Test Webhook Ping Delivery (POST /hooks/:id/test)"
+TEST_HOOK_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/hooks/${HOOK_ID}/test")
+echo "${TEST_HOOK_RES}" | grep -q "delivery" || assert_fail "Test webhook ping failed: ${TEST_HOOK_RES}"
+assert_pass "Webhook ping delivery dispatched"
+
+log_test "List Webhook Deliveries (GET /hooks/:id/deliveries)"
+LIST_DELIV_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/hooks/${HOOK_ID}/deliveries")
+echo "${LIST_DELIV_RES}" | grep -q "ping" || assert_fail "Deliveries log missing ping event: ${LIST_DELIV_RES}"
+assert_pass "Webhook deliveries log verified"
+
+log_test "Delete Webhook (DELETE /hooks/:id)"
+DEL_HOOK_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X DELETE "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/hooks/${HOOK_ID}")
+echo "${DEL_HOOK_RES}" | grep -q "successfully" || assert_fail "Failed to delete webhook: ${DEL_HOOK_RES}"
+assert_pass "Webhook deleted successfully"
+
+log_test "Danger Zone: Change Repository Visibility to Private (POST /visibility)"
+VIS_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/visibility" \
+  -H "Content-Type: application/json" \
+  -d '{"is_private":true}')
+echo "${VIS_RES}" | grep -q '"is_private":true' || assert_fail "Failed to set visibility to private: ${VIS_RES}"
+assert_pass "Repository visibility toggled to Private"
+
+log_test "Danger Zone: Change Repository Visibility back to Public (POST /visibility)"
+VIS_PUB_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/visibility" \
+  -H "Content-Type: application/json" \
+  -d '{"is_private":false}')
+echo "${VIS_PUB_RES}" | grep -q '"is_private":false' || assert_fail "Failed to set visibility to public: ${VIS_PUB_RES}"
+assert_pass "Repository visibility restored to Public"
+
+log_test "Danger Zone: Archive Repository (POST /archive)"
+ARCH_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/archive" \
+  -H "Content-Type: application/json" \
+  -d '{"archive":true}')
+echo "${ARCH_RES}" | grep -q '"is_archived":true' || assert_fail "Failed to archive repository: ${ARCH_RES}"
+assert_pass "Repository archived"
+
+log_test "Enforce Read-Only on Archived Repository (POST /issues blocked)"
+BLOCKED_ISSUE_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/issues" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Should be rejected on archived repo","content":"Testing read-only"}')
+echo "${BLOCKED_ISSUE_RES}" | grep -q "archived and read-only" || assert_fail "Archived repository allowed write: ${BLOCKED_ISSUE_RES}"
+assert_pass "Write operation rejected on archived repository"
+
+log_test "Danger Zone: Unarchive Repository (POST /archive)"
+UNARCH_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/archive" \
+  -H "Content-Type: application/json" \
+  -d '{"archive":false}')
+echo "${UNARCH_RES}" | grep -q '"is_archived":false' || assert_fail "Failed to unarchive repository: ${UNARCH_RES}"
+assert_pass "Repository unarchived and write access restored"
+
+log_test "Danger Zone: Transfer Repository Ownership to dev_alice (POST /transfer)"
+TRANS_REPO="transfer-demo-repo"
+curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"${TRANS_REPO}\",\"description\":\"Temporary repo to test transfer\",\"private\":false,\"auto_init\":true}" > /dev/null
+
+TRANS_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${TRANS_REPO}/transfer" \
+  -H "Content-Type: application/json" \
+  -d '{"new_owner":"dev_alice"}')
+echo "${TRANS_RES}" | grep -q "transferred successfully" || assert_fail "Failed to transfer repository: ${TRANS_RES}"
+assert_pass "Repository ownership transferred to dev_alice"
+
+log_test "Verify transferred repository is under dev_alice"
+TRANS_CHECK=$(curl -s -b "${TEST_DIR}/alice_cookies.txt" "${PROGIT_URL}/api/v1/repos/dev_alice/${TRANS_REPO}")
+echo "${TRANS_CHECK}" | grep -q "${TRANS_REPO}" || assert_fail "Transferred repo not found under dev_alice: ${TRANS_CHECK}"
+assert_pass "Transferred repository verified under new owner dev_alice"
+
+# -----------------------------------------------------------------------------
 # SUMMARY & SCORECARD
 # -----------------------------------------------------------------------------
 echo ""

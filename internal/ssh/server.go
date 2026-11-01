@@ -172,6 +172,11 @@ func (s *Server) executeGitCommand(channel gossh.Channel, req *gossh.Request, ra
 	}
 
 	isWrite := action == "git-receive-pack"
+	if isWrite && repo.IsArchived {
+		_, _ = channel.Stderr().Write([]byte("Repository is archived and read-only\n"))
+		_ = req.Reply(false, nil)
+		return
+	}
 	if !database.CanUserAccessRepo(authUser, repo, isWrite) {
 		_, _ = channel.Stderr().Write([]byte("Access denied to repository\n"))
 		_ = req.Reply(false, nil)
@@ -234,6 +239,18 @@ func (s *Server) executeGitCommand(channel gossh.Channel, req *gossh.Request, ra
 	status := struct{ Status uint32 }{Status: 0}
 	if cmd.ProcessState != nil && !cmd.ProcessState.Success() {
 		status.Status = 1
+	}
+	if cmd.ProcessState != nil && cmd.ProcessState.Success() && gitService == "receive-pack" && authUser != nil && repo != nil {
+		_, _ = database.DB.Exec(`UPDATE repositories SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`, repo.ID)
+		database.CreateActivity(authUser.ID, authUser.Username, &repo.ID, repo.Name, "push", fmt.Sprintf("Pushed commits to %s/%s via SSH", repo.OwnerName, repo.Name))
+		database.DispatchRepoWebhooks(repo.ID, "push", map[string]any{
+			"repository": repo,
+			"pusher": map[string]string{
+				"name":  authUser.Username,
+				"email": authUser.Email,
+			},
+			"sender": authUser,
+		})
 	}
 	_, _ = channel.SendRequest("exit-status", false, gossh.Marshal(&status))
 }

@@ -222,6 +222,20 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("PUT /api/v1/repos/{owner}/{repo}/collaborators/{collaborator}", r.handleAddCollaborator)
 	r.mux.HandleFunc("DELETE /api/v1/repos/{owner}/{repo}/collaborators/{collaborator}", r.handleRemoveCollaborator)
 
+	// Webhooks Endpoints
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/hooks", r.handleListWebhooks)
+	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/hooks", r.handleCreateWebhook)
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/hooks/{id}", r.handleGetWebhook)
+	r.mux.HandleFunc("PATCH /api/v1/repos/{owner}/{repo}/hooks/{id}", r.handleUpdateWebhook)
+	r.mux.HandleFunc("DELETE /api/v1/repos/{owner}/{repo}/hooks/{id}", r.handleDeleteWebhook)
+	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/hooks/{id}/test", r.handleTestWebhook)
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/hooks/{id}/deliveries", r.handleListWebhookDeliveries)
+
+	// Danger Zone Actions
+	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/visibility", r.handleChangeRepoVisibility)
+	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/archive", r.handleToggleRepoArchive)
+	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/transfer", r.handleTransferRepo)
+
 	// Organizations Endpoints
 	r.mux.HandleFunc("POST /api/v1/orgs", r.handleCreateOrg)
 	r.mux.HandleFunc("GET /api/v1/orgs", r.handleListOrgs)
@@ -1057,6 +1071,11 @@ func (r *Router) handleCreateBranch(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if repo.IsArchived {
+		jsonError(w, http.StatusBadRequest, "Repository is archived and read-only")
+		return
+	}
+
 	if !database.CanUserAccessRepo(user, repo, true) {
 		jsonError(w, http.StatusForbidden, "Write permission required")
 		return
@@ -1123,6 +1142,11 @@ func (r *Router) handleDeleteBranch(w http.ResponseWriter, req *http.Request) {
 	repo, err := database.GetRepositoryByName(owner, repoName)
 	if err != nil || repo == nil {
 		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if repo.IsArchived {
+		jsonError(w, http.StatusBadRequest, "Repository is archived and read-only")
 		return
 	}
 
@@ -1286,6 +1310,11 @@ func (r *Router) handleSaveFile(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if repo.IsArchived {
+		jsonError(w, http.StatusBadRequest, "Repository is archived and read-only")
+		return
+	}
+
 	if !database.CanUserAccessRepo(user, repo, true) {
 		jsonError(w, http.StatusForbidden, "Write permission required")
 		return
@@ -1317,6 +1346,16 @@ func (r *Router) handleSaveFile(w http.ResponseWriter, req *http.Request) {
 	}
 
 	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "push", fmt.Sprintf("Committed file '%s' to branch '%s'", filePath, targetBranch))
+	database.DispatchRepoWebhooks(repo.ID, "push", map[string]any{
+		"repository": repo,
+		"ref":        "refs/heads/" + targetBranch,
+		"after":      commitSHA,
+		"pusher": map[string]string{
+			"name":  user.Username,
+			"email": user.Email,
+		},
+		"sender": user,
+	})
 
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"message":    "File saved successfully",
@@ -1340,6 +1379,11 @@ func (r *Router) handleDeleteFile(w http.ResponseWriter, req *http.Request) {
 	repo, err := database.GetRepositoryByName(owner, repoName)
 	if err != nil || repo == nil {
 		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if repo.IsArchived {
+		jsonError(w, http.StatusBadRequest, "Repository is archived and read-only")
 		return
 	}
 
@@ -1394,6 +1438,11 @@ func (r *Router) handleUploadFiles(w http.ResponseWriter, req *http.Request) {
 	repo, err := database.GetRepositoryByName(owner, repoName)
 	if err != nil || repo == nil {
 		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if repo.IsArchived {
+		jsonError(w, http.StatusBadRequest, "Repository is archived and read-only")
 		return
 	}
 
@@ -1515,6 +1564,11 @@ func (r *Router) handleCreateIssue(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if repo.IsArchived {
+		jsonError(w, http.StatusBadRequest, "Repository is archived and read-only")
+		return
+	}
+
 	var body struct {
 		Title    string  `json:"title"`
 		Content  string  `json:"content"`
@@ -1556,6 +1610,12 @@ func (r *Router) handleCreateIssue(w http.ResponseWriter, req *http.Request) {
 	}
 
 	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "issue", fmt.Sprintf("Opened issue #%d in %s/%s", issue.IndexNumber, owner, repoName))
+	database.DispatchRepoWebhooks(repo.ID, "issues", map[string]any{
+		"action":     "opened",
+		"issue":      issue,
+		"repository": repo,
+		"sender":     user,
+	})
 
 	jsonResponse(w, http.StatusCreated, issue)
 }
@@ -1842,6 +1902,11 @@ func (r *Router) handleCreatePull(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if repo.IsArchived {
+		jsonError(w, http.StatusBadRequest, "Repository is archived and read-only")
+		return
+	}
+
 	var body struct {
 		Title      string `json:"title"`
 		Content    string `json:"content"`
@@ -1864,6 +1929,12 @@ func (r *Router) handleCreatePull(w http.ResponseWriter, req *http.Request) {
 	}
 
 	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "pull", fmt.Sprintf("Opened pull request #%d in %s/%s", pr.Issue.IndexNumber, owner, repoName))
+	database.DispatchRepoWebhooks(repo.ID, "pull_request", map[string]any{
+		"action":       "opened",
+		"pull_request": pr,
+		"repository":   repo,
+		"sender":       user,
+	})
 
 	jsonResponse(w, http.StatusCreated, pr)
 }
@@ -1964,6 +2035,11 @@ func (r *Router) handleMergePull(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if repo.IsArchived {
+		jsonError(w, http.StatusBadRequest, "Repository is archived and read-only")
+		return
+	}
+
 	if !database.CanUserAccessRepo(user, repo, true) {
 		jsonError(w, http.StatusForbidden, "Write permission required to merge pull requests")
 		return
@@ -2004,6 +2080,13 @@ func (r *Router) handleMergePull(w http.ResponseWriter, req *http.Request) {
 
 	_ = database.MarkPullRequestMerged(pr.ID, user.ID, mergeCommitSHA)
 	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "pull", fmt.Sprintf("Merged pull request #%d into %s", issue.IndexNumber, pr.BaseBranch))
+	database.DispatchRepoWebhooks(repo.ID, "pull_request", map[string]any{
+		"action":           "merged",
+		"pull_request":     pr,
+		"merge_commit_sha": mergeCommitSHA,
+		"repository":       repo,
+		"sender":           user,
+	})
 
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"message":          "Merged successfully",
@@ -3792,6 +3875,449 @@ func (r *Router) handleRemoveCollaborator(w http.ResponseWriter, req *http.Reque
 }
 
 // ============================================================================
+// Webhook & Danger Zone Handlers
+// ============================================================================
+
+func (r *Router) handleListWebhooks(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !r.canAdminRepo(user, repo) {
+		jsonError(w, http.StatusForbidden, "Admin privileges required to manage webhooks")
+		return
+	}
+
+	hooks, err := database.ListRepoWebhooks(repo.ID)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	jsonResponse(w, http.StatusOK, hooks)
+}
+
+func (r *Router) handleCreateWebhook(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !r.canAdminRepo(user, repo) {
+		jsonError(w, http.StatusForbidden, "Admin privileges required to manage webhooks")
+		return
+	}
+
+	var body struct {
+		URL         string `json:"url"`
+		Secret      string `json:"secret"`
+		ContentType string `json:"content_type"`
+		Events      string `json:"events"`
+		IsActive    *bool  `json:"is_active"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	isActive := true
+	if body.IsActive != nil {
+		isActive = *body.IsActive
+	}
+
+	hook, err := database.CreateWebhook(repo.ID, body.URL, body.Secret, body.ContentType, body.Events, isActive)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusCreated, hook)
+}
+
+func (r *Router) handleGetWebhook(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	hookIDStr := req.PathValue("id")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !r.canAdminRepo(user, repo) {
+		jsonError(w, http.StatusForbidden, "Admin privileges required to view webhooks")
+		return
+	}
+
+	hookID, _ := strconv.ParseInt(hookIDStr, 10, 64)
+	hook, err := database.GetWebhookByID(hookID)
+	if err != nil || hook == nil || hook.RepoID != repo.ID {
+		jsonError(w, http.StatusNotFound, "Webhook not found")
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, hook)
+}
+
+func (r *Router) handleUpdateWebhook(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	hookIDStr := req.PathValue("id")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !r.canAdminRepo(user, repo) {
+		jsonError(w, http.StatusForbidden, "Admin privileges required to update webhooks")
+		return
+	}
+
+	hookID, _ := strconv.ParseInt(hookIDStr, 10, 64)
+	hook, err := database.GetWebhookByID(hookID)
+	if err != nil || hook == nil || hook.RepoID != repo.ID {
+		jsonError(w, http.StatusNotFound, "Webhook not found")
+		return
+	}
+
+	var body struct {
+		URL         string `json:"url"`
+		Secret      string `json:"secret"`
+		ContentType string `json:"content_type"`
+		Events      string `json:"events"`
+		IsActive    *bool  `json:"is_active"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if strings.TrimSpace(body.URL) == "" {
+		body.URL = hook.URL
+	}
+	if strings.TrimSpace(body.ContentType) == "" {
+		body.ContentType = hook.ContentType
+	}
+	if strings.TrimSpace(body.Events) == "" {
+		body.Events = hook.Events
+	}
+	isActive := hook.IsActive
+	if body.IsActive != nil {
+		isActive = *body.IsActive
+	}
+
+	if err := database.UpdateWebhook(hook.ID, body.URL, body.Secret, body.ContentType, body.Events, isActive); err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	updated, _ := database.GetWebhookByID(hook.ID)
+	jsonResponse(w, http.StatusOK, updated)
+}
+
+func (r *Router) handleDeleteWebhook(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	hookIDStr := req.PathValue("id")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !r.canAdminRepo(user, repo) {
+		jsonError(w, http.StatusForbidden, "Admin privileges required to delete webhooks")
+		return
+	}
+
+	hookID, _ := strconv.ParseInt(hookIDStr, 10, 64)
+	hook, err := database.GetWebhookByID(hookID)
+	if err != nil || hook == nil || hook.RepoID != repo.ID {
+		jsonError(w, http.StatusNotFound, "Webhook not found")
+		return
+	}
+
+	if err := database.DeleteWebhook(hook.ID); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "Webhook deleted successfully"})
+}
+
+func (r *Router) handleTestWebhook(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	hookIDStr := req.PathValue("id")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !r.canAdminRepo(user, repo) {
+		jsonError(w, http.StatusForbidden, "Admin privileges required to test webhooks")
+		return
+	}
+
+	hookID, _ := strconv.ParseInt(hookIDStr, 10, 64)
+	hook, err := database.GetWebhookByID(hookID)
+	if err != nil || hook == nil || hook.RepoID != repo.ID {
+		jsonError(w, http.StatusNotFound, "Webhook not found")
+		return
+	}
+
+	pingPayload := map[string]any{
+		"zen":        "ProGit Webhooks are operational.",
+		"hook_id":    hook.ID,
+		"hook":       hook,
+		"repository": repo,
+		"sender":     user,
+	}
+
+	delivery, err := database.DeliverWebhook(hook, "ping", pingPayload)
+	if delivery == nil {
+		jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Delivery failed: %v", err))
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"message":  "Test ping delivered",
+		"delivery": delivery,
+	})
+}
+
+func (r *Router) handleListWebhookDeliveries(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	hookIDStr := req.PathValue("id")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !r.canAdminRepo(user, repo) {
+		jsonError(w, http.StatusForbidden, "Admin privileges required to view webhook deliveries")
+		return
+	}
+
+	hookID, _ := strconv.ParseInt(hookIDStr, 10, 64)
+	hook, err := database.GetWebhookByID(hookID)
+	if err != nil || hook == nil || hook.RepoID != repo.ID {
+		jsonError(w, http.StatusNotFound, "Webhook not found")
+		return
+	}
+
+	deliveries, err := database.ListWebhookDeliveries(hook.ID, 30)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	jsonResponse(w, http.StatusOK, deliveries)
+}
+
+func (r *Router) handleChangeRepoVisibility(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !r.canAdminRepo(user, repo) {
+		jsonError(w, http.StatusForbidden, "Admin privileges required to change repository visibility")
+		return
+	}
+
+	var body struct {
+		IsPrivate bool `json:"is_private"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if err := database.UpdateRepoVisibility(repo.ID, body.IsPrivate); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	repo.IsPrivate = body.IsPrivate
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"message":    "Repository visibility updated successfully",
+		"is_private": repo.IsPrivate,
+		"repository": repo,
+	})
+}
+
+func (r *Router) handleToggleRepoArchive(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !r.canAdminRepo(user, repo) {
+		jsonError(w, http.StatusForbidden, "Admin privileges required to archive or unarchive repository")
+		return
+	}
+
+	var body struct {
+		Archive bool `json:"archive"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if err := database.ToggleRepoArchive(repo.ID, body.Archive); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	repo.IsArchived = body.Archive
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"message":     "Repository archive status updated successfully",
+		"is_archived": repo.IsArchived,
+		"repository":  repo,
+	})
+}
+
+func (r *Router) handleTransferRepo(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	// Only repo owner or site administrator can transfer ownership
+	if !user.IsAdmin && user.ID != repo.OwnerID {
+		jsonError(w, http.StatusForbidden, "Only the repository owner or site administrator can transfer ownership")
+		return
+	}
+
+	var body struct {
+		NewOwner string `json:"new_owner"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil || strings.TrimSpace(body.NewOwner) == "" {
+		jsonError(w, http.StatusBadRequest, "New owner username or organization name is required")
+		return
+	}
+	newOwnerName := strings.TrimSpace(body.NewOwner)
+
+	// Check if target user exists
+	targetUser, err := database.GetUserByUsername(newOwnerName)
+	if err != nil || targetUser == nil {
+		jsonError(w, http.StatusNotFound, fmt.Sprintf("Target user or organization '%s' not found", newOwnerName))
+		return
+	}
+
+	// If destination is an organization, check user is an admin of that org
+	if org, _ := database.GetOrgByName(newOwnerName); org != nil {
+		if !user.IsAdmin && !database.IsOrgAdmin(org.ID, user.ID) {
+			jsonError(w, http.StatusForbidden, "You must be an owner or administrator of the destination organization to transfer a repository to it")
+			return
+		}
+	}
+
+	updatedRepo, err := database.TransferRepository(repo.ID, targetUser.ID, targetUser.Username, r.cfg.Repository.Root)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"message":      "Repository transferred successfully",
+		"new_owner":    targetUser.Username,
+		"redirect_url": fmt.Sprintf("/%s/%s", targetUser.Username, repo.Name),
+		"repository":   updatedRepo,
+	})
+}
+
+// ============================================================================
 // Organization Handlers
 // ============================================================================
 
@@ -4276,6 +4802,11 @@ func (r *Router) handleUpdateProject(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if repo.IsArchived {
+		jsonError(w, http.StatusBadRequest, "Repository is archived and read-only")
+		return
+	}
+
 	if !database.CanUserAccessRepo(user, repo, true) {
 		jsonError(w, http.StatusForbidden, "Write permission required")
 		return
@@ -4322,6 +4853,11 @@ func (r *Router) handleDeleteProject(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if repo.IsArchived {
+		jsonError(w, http.StatusBadRequest, "Repository is archived and read-only")
+		return
+	}
+
 	if !database.CanUserAccessRepo(user, repo, true) {
 		jsonError(w, http.StatusForbidden, "Write permission required")
 		return
@@ -4350,6 +4886,11 @@ func (r *Router) handleCreateProjectColumn(w http.ResponseWriter, req *http.Requ
 	repo, err := database.GetRepositoryByName(owner, repoName)
 	if err != nil || repo == nil {
 		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if repo.IsArchived {
+		jsonError(w, http.StatusBadRequest, "Repository is archived and read-only")
 		return
 	}
 
@@ -4394,6 +4935,11 @@ func (r *Router) handleDeleteProjectColumn(w http.ResponseWriter, req *http.Requ
 		return
 	}
 
+	if repo.IsArchived {
+		jsonError(w, http.StatusBadRequest, "Repository is archived and read-only")
+		return
+	}
+
 	if !database.CanUserAccessRepo(user, repo, true) {
 		jsonError(w, http.StatusForbidden, "Write permission required")
 		return
@@ -4422,6 +4968,11 @@ func (r *Router) handleCreateProjectCard(w http.ResponseWriter, req *http.Reques
 	repo, err := database.GetRepositoryByName(owner, repoName)
 	if err != nil || repo == nil {
 		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if repo.IsArchived {
+		jsonError(w, http.StatusBadRequest, "Repository is archived and read-only")
 		return
 	}
 
@@ -4468,6 +5019,11 @@ func (r *Router) handleUpdateProjectColumn(w http.ResponseWriter, req *http.Requ
 		return
 	}
 
+	if repo.IsArchived {
+		jsonError(w, http.StatusBadRequest, "Repository is archived and read-only")
+		return
+	}
+
 	if !database.CanUserAccessRepo(user, repo, true) {
 		jsonError(w, http.StatusForbidden, "Write permission required")
 		return
@@ -4505,6 +5061,11 @@ func (r *Router) handleMoveProjectCard(w http.ResponseWriter, req *http.Request)
 	repo, err := database.GetRepositoryByName(owner, repoName)
 	if err != nil || repo == nil {
 		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if repo.IsArchived {
+		jsonError(w, http.StatusBadRequest, "Repository is archived and read-only")
 		return
 	}
 
@@ -4550,6 +5111,11 @@ func (r *Router) handleDeleteProjectCard(w http.ResponseWriter, req *http.Reques
 	repo, err := database.GetRepositoryByName(owner, repoName)
 	if err != nil || repo == nil {
 		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if repo.IsArchived {
+		jsonError(w, http.StatusBadRequest, "Repository is archived and read-only")
 		return
 	}
 

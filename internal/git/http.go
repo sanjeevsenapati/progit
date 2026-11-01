@@ -62,6 +62,13 @@ func HandleSmartHTTP(w http.ResponseWriter, r *http.Request, cfg *config.Config)
 		isPull = false
 	}
 
+	if !isPull && repo.IsArchived {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte("Repository is archived and read-only"))
+		return true
+	}
+
 	// Authenticate user if private repository or push operation
 	var authUser *database.User
 	if repo.IsPrivate || !isPull {
@@ -213,6 +220,14 @@ func serveRPC(w http.ResponseWriter, r *http.Request, repoPath, service string, 
 		// Pushed successfully: update repo timestamp & record activity
 		_, _ = database.DB.Exec(`UPDATE repositories SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`, repo.ID)
 		database.CreateActivity(authUser.ID, authUser.Username, &repo.ID, repo.Name, "push", fmt.Sprintf("Pushed commits to %s/%s", repo.OwnerName, repo.Name))
+		database.DispatchRepoWebhooks(repo.ID, "push", map[string]any{
+			"repository": repo,
+			"pusher": map[string]string{
+				"name":  authUser.Username,
+				"email": authUser.Email,
+			},
+			"sender": authUser,
+		})
 	}
 }
 

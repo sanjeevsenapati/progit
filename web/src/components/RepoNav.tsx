@@ -16,7 +16,8 @@ import {
   Kanban,
   X,
   AlertCircle,
-  Loader2
+  Loader2,
+  Archive
 } from 'lucide-react';
 
 interface RepoNavProps {
@@ -101,6 +102,12 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar,
                   'Public'
                 )}
               </span>
+              {repo.is_archived && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-300 dark:border-amber-800 ml-2">
+                  <Archive className="w-3 h-3 mr-1" />
+                  Archived
+                </span>
+              )}
             </div>
 
             {repo.is_fork && repo.fork_parent && (
@@ -274,6 +281,13 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar,
           )}
         </div>
       </div>
+
+      {repo.is_archived && (
+        <div className="bg-amber-500/10 border-t border-amber-500/30 px-4 py-2 text-center text-xs font-semibold text-amber-700 dark:text-amber-300 flex items-center justify-center space-x-2">
+          <Archive className="w-4 h-4 flex-shrink-0" />
+          <span>This repository has been archived by the owner. It is now read-only.</span>
+        </div>
+      )}
 
       {/* Fork Modal */}
       {showForkModal && (

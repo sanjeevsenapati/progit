@@ -191,6 +191,7 @@ type Webhook struct {
 	RepoID      int64     `json:"repo_id"`
 	URL         string    `json:"url"`
 	Secret      string    `json:"-"`
+	HasSecret   bool      `json:"has_secret"`
 	ContentType string    `json:"content_type"`
 	Events      string    `json:"events"`
 	IsActive    bool      `json:"is_active"`
