@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository, Issue } from '../lib/api';
+import { api, Repository, Issue, Developer } from '../lib/api';
+import { useAuth } from '../lib/theme';
 import { RepoNav } from '../components/RepoNav';
-import { CircleDot, CheckCircle2, MessageSquare, Plus } from 'lucide-react';
+import { CircleDot, CheckCircle2, MessageSquare, Plus, UserCheck, Filter } from 'lucide-react';
 
 interface IssuesListProps {
   owner: string;
@@ -9,10 +10,25 @@ interface IssuesListProps {
 }
 
 export const IssuesList: React.FC<IssuesListProps> = ({ owner, repo: repoName }) => {
+  const { user } = useAuth();
   const [repoData, setRepoData] = useState<Repository | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [developers, setDevelopers] = useState<Developer[]>([]);
   const [stateFilter, setStateFilter] = useState<'open' | 'closed'>('open');
+  const [assigneeFilter, setAssigneeFilter] = useState<string>('');
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadDevs() {
+      try {
+        const devs = await api.listDevelopers();
+        setDevelopers(devs || []);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    loadDevs();
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -20,7 +36,7 @@ export const IssuesList: React.FC<IssuesListProps> = ({ owner, repo: repoName })
         const r = await api.getRepo(owner, repoName);
         setRepoData(r.repository);
 
-        const list = await api.listIssues(owner, repoName, stateFilter);
+        const list = await api.listIssues(owner, repoName, stateFilter, assigneeFilter || undefined);
         setIssues(list || []);
       } catch (err) {
         console.error(err);
@@ -29,7 +45,7 @@ export const IssuesList: React.FC<IssuesListProps> = ({ owner, repo: repoName })
       }
     }
     load();
-  }, [owner, repoName, stateFilter]);
+  }, [owner, repoName, stateFilter, assigneeFilter]);
 
   if (loading && !repoData) {
     return <div className="py-20 text-center text-sm text-gray-400">Loading issues...</div>;
@@ -44,31 +60,54 @@ export const IssuesList: React.FC<IssuesListProps> = ({ owner, repo: repoName })
       <RepoNav repo={repoData} activeTab="issues" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <div className="flex items-center justify-between">
-          {/* Open/Closed Filter Tabs */}
-          <div className="flex items-center space-x-4 text-sm font-semibold">
-            <button
-              onClick={() => setStateFilter('open')}
-              className={`flex items-center space-x-1.5 pb-1 border-b-2 transition-colors ${
-                stateFilter === 'open'
-                  ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <CircleDot className="w-4 h-4" />
-              <span>Open</span>
-            </button>
-            <button
-              onClick={() => setStateFilter('closed')}
-              className={`flex items-center space-x-1.5 pb-1 border-b-2 transition-colors ${
-                stateFilter === 'closed'
-                  ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Closed</span>
-            </button>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Open/Closed Filter Tabs & Assignee Filter */}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center space-x-4 text-sm font-semibold">
+              <button
+                onClick={() => setStateFilter('open')}
+                className={`flex items-center space-x-1.5 pb-1 border-b-2 transition-colors ${
+                  stateFilter === 'open'
+                    ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <CircleDot className="w-4 h-4" />
+                <span>Open</span>
+              </button>
+              <button
+                onClick={() => setStateFilter('closed')}
+                className={`flex items-center space-x-1.5 pb-1 border-b-2 transition-colors ${
+                  stateFilter === 'closed'
+                    ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Closed</span>
+              </button>
+            </div>
+
+            {/* Assignee Filter Dropdown */}
+            <div className="flex items-center space-x-1.5 text-xs text-gray-600 dark:text-dark-muted pl-2 border-l border-gray-200 dark:border-dark-border">
+              <Filter className="w-3.5 h-3.5 text-gray-400" />
+              <span>Assignee:</span>
+              <select
+                value={assigneeFilter}
+                onChange={(e) => setAssigneeFilter(e.target.value)}
+                className="px-2.5 py-1 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
+              >
+                <option value="">All Assignees</option>
+                {user && <option value={user.username}>Assigned to me (@{user.username})</option>}
+                {developers
+                  .filter(d => !user || d.username !== user.username)
+                  .map(dev => (
+                    <option key={dev.id} value={dev.username}>
+                      @{dev.username} {dev.full_name ? `(${dev.full_name})` : ''}
+                    </option>
+                  ))}
+              </select>
+            </div>
           </div>
 
           <a
@@ -85,8 +124,14 @@ export const IssuesList: React.FC<IssuesListProps> = ({ owner, repo: repoName })
           {issues.length === 0 ? (
             <div className="p-12 text-center text-gray-500 dark:text-dark-muted space-y-3">
               <CircleDot className="w-10 h-10 mx-auto text-gray-400" />
-              <h3 className="font-bold text-gray-900 dark:text-white">No {stateFilter} issues</h3>
-              <p className="text-xs">There are no {stateFilter} issues in this repository.</p>
+              <h3 className="font-bold text-gray-900 dark:text-white">
+                No {stateFilter} issues {assigneeFilter ? `assigned to @${assigneeFilter}` : ''}
+              </h3>
+              <p className="text-xs">
+                {assigneeFilter 
+                  ? `No matching issues found for assignee @${assigneeFilter}. Try changing the filter.`
+                  : `There are no ${stateFilter} issues in this repository.`}
+              </p>
             </div>
           ) : (
             issues.map(iss => (
@@ -99,28 +144,44 @@ export const IssuesList: React.FC<IssuesListProps> = ({ owner, repo: repoName })
                   )}
 
                   <div className="space-y-1">
-                    <a
-                      href={`/${owner}/${repoName}/issues/${iss.index_number}`}
-                      className="font-bold text-sm text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400"
-                    >
-                      {iss.title}
-                    </a>
-                    <p className="text-xs text-gray-500 dark:text-dark-muted">
-                      #{iss.index_number} opened by <span className="font-semibold text-gray-700 dark:text-gray-300">{iss.poster_name}</span> on{' '}
-                      {new Date(iss.created_at).toLocaleDateString()}
+                    <div className="flex items-center space-x-2">
+                      <a
+                        href={`/${owner}/${repoName}/issues/${iss.index_number}`}
+                        className="font-bold text-sm text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400"
+                      >
+                        {iss.title}
+                      </a>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-dark-muted flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span>
+                        #{iss.index_number} opened by <span className="font-semibold text-gray-700 dark:text-gray-300">{iss.poster_name}</span> on{' '}
+                        {new Date(iss.created_at).toLocaleDateString()}
+                      </span>
                     </p>
                   </div>
                 </div>
 
-                {iss.num_comments > 0 && (
-                  <a
-                    href={`/${owner}/${repoName}/issues/${iss.index_number}`}
-                    className="flex items-center space-x-1 text-xs text-gray-500 hover:text-emerald-600 dark:hover:text-emerald-400"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5" />
-                    <span>{iss.num_comments}</span>
-                  </a>
-                )}
+                <div className="flex items-center space-x-3">
+                  {iss.assignee_name && (
+                    <div 
+                      className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 text-xs font-medium"
+                      title={`Assigned to @${iss.assignee_name}`}
+                    >
+                      <UserCheck className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>@{iss.assignee_name}</span>
+                    </div>
+                  )}
+
+                  {iss.num_comments > 0 && (
+                    <a
+                      href={`/${owner}/${repoName}/issues/${iss.index_number}`}
+                      className="flex items-center space-x-1 text-xs text-gray-500 hover:text-emerald-600 dark:hover:text-emerald-400"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>{iss.num_comments}</span>
+                    </a>
+                  )}
+                </div>
               </div>
             ))
           )}
@@ -129,4 +190,3 @@ export const IssuesList: React.FC<IssuesListProps> = ({ owner, repo: repoName })
     </div>
   );
 };
-

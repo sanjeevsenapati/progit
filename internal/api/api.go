@@ -184,6 +184,7 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/issues", r.handleCreateIssue)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/issues/{index}", r.handleGetIssue)
 	r.mux.HandleFunc("PATCH /api/v1/repos/{owner}/{repo}/issues/{index}", r.handleUpdateIssue)
+	r.mux.HandleFunc("PUT /api/v1/repos/{owner}/{repo}/issues/{index}/assignee", r.handleAssignIssue)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/issues/{index}/comments", r.handleListComments)
 	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/issues/{index}/comments", r.handleAddComment)
 
@@ -241,10 +242,21 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("PUT /api/v1/repos/{owner}/{repo}/projects/{id}", r.handleUpdateProject)
 	r.mux.HandleFunc("DELETE /api/v1/repos/{owner}/{repo}/projects/{id}", r.handleDeleteProject)
 	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/projects/{id}/columns", r.handleCreateProjectColumn)
+	r.mux.HandleFunc("PUT /api/v1/repos/{owner}/{repo}/projects/{id}/columns/{column_id}", r.handleUpdateProjectColumn)
 	r.mux.HandleFunc("DELETE /api/v1/repos/{owner}/{repo}/projects/{id}/columns/{column_id}", r.handleDeleteProjectColumn)
 	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/projects/{id}/cards", r.handleCreateProjectCard)
 	r.mux.HandleFunc("PUT /api/v1/repos/{owner}/{repo}/projects/{id}/cards/{card_id}", r.handleMoveProjectCard)
 	r.mux.HandleFunc("DELETE /api/v1/repos/{owner}/{repo}/projects/{id}/cards/{card_id}", r.handleDeleteProjectCard)
+
+	// Direct Messaging Endpoints (Developer Communication)
+	r.mux.HandleFunc("POST /api/v1/messages", r.handleSendMessage)
+	r.mux.HandleFunc("GET /api/v1/messages/inbox", r.handleListInboxMessages)
+	r.mux.HandleFunc("GET /api/v1/messages/sent", r.handleListSentMessages)
+	r.mux.HandleFunc("GET /api/v1/messages/unread-count", r.handleGetUnreadMessageCount)
+	r.mux.HandleFunc("GET /api/v1/messages/{id}", r.handleGetMessage)
+	r.mux.HandleFunc("PATCH /api/v1/messages/{id}/read", r.handleMarkMessageRead)
+	r.mux.HandleFunc("DELETE /api/v1/messages/{id}", r.handleDeleteMessage)
+	r.mux.HandleFunc("GET /api/v1/developers", r.handleListDevelopers)
 
 	// Static Pages Web Hosting
 	r.mux.HandleFunc("GET /pages/{owner}/{repo}", r.handleServePagesRedirect)
@@ -1468,6 +1480,7 @@ func (r *Router) handleListIssues(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
 	state := req.URL.Query().Get("state")
+	assignee := req.URL.Query().Get("assignee")
 
 	repo, err := database.GetRepositoryByName(owner, repoName)
 	if err != nil || repo == nil {
@@ -1475,10 +1488,13 @@ func (r *Router) handleListIssues(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	issues, err := database.ListIssues(repo.ID, false, state)
+	issues, err := database.ListIssuesFiltered(repo.ID, false, state, assignee)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	if issues == nil {
+		issues = []*database.Issue{}
 	}
 	jsonResponse(w, http.StatusOK, issues)
 }
@@ -1499,8 +1515,9 @@ func (r *Router) handleCreateIssue(w http.ResponseWriter, req *http.Request) {
 	}
 
 	var body struct {
-		Title   string `json:"title"`
-		Content string `json:"content"`
+		Title    string  `json:"title"`
+		Content  string  `json:"content"`
+		Assignee *string `json:"assignee"`
 	}
 	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 		jsonError(w, http.StatusBadRequest, "Invalid request body")
@@ -1513,10 +1530,21 @@ func (r *Router) handleCreateIssue(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	issue, err := database.CreateIssue(repo.ID, user.ID, body.Title, body.Content, false)
+	var assigneeID *int64
+	if body.Assignee != nil && strings.TrimSpace(*body.Assignee) != "" {
+		if targetUser, err := database.GetUserByUsername(strings.TrimSpace(*body.Assignee)); err == nil && targetUser != nil {
+			assigneeID = &targetUser.ID
+		}
+	}
+
+	issue, err := database.CreateIssue(repo.ID, user.ID, body.Title, body.Content, false, assigneeID)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	if assigneeID != nil && issue.AssigneeName != "" {
+		_, _ = database.AddComment(issue.ID, user.ID, "assign", fmt.Sprintf("assigned @%s", issue.AssigneeName))
 	}
 
 	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "issue", fmt.Sprintf("Opened issue #%d in %s/%s", issue.IndexNumber, owner, repoName))
@@ -1568,19 +1596,87 @@ func (r *Router) handleUpdateIssue(w http.ResponseWriter, req *http.Request) {
 	}
 
 	var body struct {
-		Closed bool `json:"closed"`
+		Closed   *bool   `json:"closed"`
+		Assignee *string `json:"assignee"`
 	}
 	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 		jsonError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	_ = database.UpdateIssueStatus(issue.ID, body.Closed)
-	actionType := "close"
-	if !body.Closed {
-		actionType = "reopen"
+	if body.Closed != nil {
+		_ = database.UpdateIssueStatus(issue.ID, *body.Closed)
+		actionType := "close"
+		if !*body.Closed {
+			actionType = "reopen"
+		}
+		_, _ = database.AddComment(issue.ID, user.ID, actionType, "")
 	}
-	_, _ = database.AddComment(issue.ID, user.ID, actionType, "")
+
+	if body.Assignee != nil {
+		trimmed := strings.TrimSpace(*body.Assignee)
+		if trimmed == "" {
+			_ = database.UpdateIssueAssignee(issue.ID, nil)
+			_, _ = database.AddComment(issue.ID, user.ID, "assign", "unassigned this issue")
+		} else {
+			targetUser, err := database.GetUserByUsername(trimmed)
+			if err != nil || targetUser == nil {
+				jsonError(w, http.StatusBadRequest, "Assignee user not found")
+				return
+			}
+			_ = database.UpdateIssueAssignee(issue.ID, &targetUser.ID)
+			_, _ = database.AddComment(issue.ID, user.ID, "assign", fmt.Sprintf("assigned @%s", targetUser.Username))
+		}
+	}
+
+	updated, _ := database.GetIssueByID(issue.ID)
+	jsonResponse(w, http.StatusOK, updated)
+}
+
+func (r *Router) handleAssignIssue(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	index, _ := strconv.ParseInt(req.PathValue("index"), 10, 64)
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	issue, err := database.GetIssueByIndex(repo.ID, index)
+	if err != nil || issue == nil {
+		jsonError(w, http.StatusNotFound, "Issue not found")
+		return
+	}
+
+	var body struct {
+		Assignee string `json:"assignee"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	trimmed := strings.TrimSpace(body.Assignee)
+	if trimmed == "" {
+		_ = database.UpdateIssueAssignee(issue.ID, nil)
+		_, _ = database.AddComment(issue.ID, user.ID, "assign", "unassigned this issue")
+	} else {
+		targetUser, err := database.GetUserByUsername(trimmed)
+		if err != nil || targetUser == nil {
+			jsonError(w, http.StatusBadRequest, "Assignee user not found")
+			return
+		}
+		_ = database.UpdateIssueAssignee(issue.ID, &targetUser.ID)
+		_, _ = database.AddComment(issue.ID, user.ID, "assign", fmt.Sprintf("assigned @%s", targetUser.Username))
+	}
 
 	updated, _ := database.GetIssueByID(issue.ID)
 	jsonResponse(w, http.StatusOK, updated)
@@ -4311,6 +4407,46 @@ func (r *Router) handleCreateProjectCard(w http.ResponseWriter, req *http.Reques
 	jsonResponse(w, http.StatusCreated, card)
 }
 
+func (r *Router) handleUpdateProjectColumn(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	colIDStr := req.PathValue("column_id")
+	colID, _ := strconv.ParseInt(colIDStr, 10, 64)
+
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required")
+		return
+	}
+
+	var body struct {
+		Title    string `json:"title"`
+		OrderNum int    `json:"order_num"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if err := database.UpdateProjectColumn(colID, body.Title, body.OrderNum); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "Column updated successfully"})
+}
+
 func (r *Router) handleMoveProjectCard(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
@@ -4335,20 +4471,25 @@ func (r *Router) handleMoveProjectCard(w http.ResponseWriter, req *http.Request)
 	}
 
 	var body struct {
-		ColumnID int64 `json:"column_id"`
-		OrderNum int   `json:"order_num"`
+		ColumnID *int64  `json:"column_id"`
+		OrderNum *int    `json:"order_num"`
+		Content  *string `json:"content"`
 	}
 	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 		jsonError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	if err := database.MoveProjectCard(cardID, body.ColumnID, body.OrderNum); err != nil {
+	if err := database.UpdateProjectCard(cardID, body.ColumnID, body.OrderNum, body.Content); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	jsonResponse(w, http.StatusOK, map[string]string{"message": "Card moved successfully"})
+	msg := "Card moved successfully"
+	if body.Content != nil && body.ColumnID == nil {
+		msg = "Card updated successfully"
+	}
+	jsonResponse(w, http.StatusOK, map[string]string{"message": msg})
 }
 
 func (r *Router) handleDeleteProjectCard(w http.ResponseWriter, req *http.Request) {
@@ -4380,5 +4521,178 @@ func (r *Router) handleDeleteProjectCard(w http.ResponseWriter, req *http.Reques
 	}
 
 	jsonResponse(w, http.StatusOK, map[string]string{"message": "Card deleted successfully"})
+}
+
+// Direct Messaging Handlers (Developer Communication)
+
+func (r *Router) handleSendMessage(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	var body struct {
+		RecipientUsername string `json:"recipient_username"`
+		Subject           string `json:"subject"`
+		Content           string `json:"content"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	body.RecipientUsername = strings.TrimSpace(body.RecipientUsername)
+	if body.RecipientUsername == "" {
+		jsonError(w, http.StatusBadRequest, "Recipient username is required")
+		return
+	}
+
+	recipientUser, err := database.GetUserByUsername(body.RecipientUsername)
+	if err != nil || recipientUser == nil {
+		jsonError(w, http.StatusNotFound, "Recipient developer not found")
+		return
+	}
+
+	msg, err := database.SendMessage(user.ID, recipientUser.ID, body.Subject, body.Content)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusCreated, msg)
+}
+
+func (r *Router) handleListInboxMessages(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	messages, err := database.ListInboxMessages(user.ID)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if messages == nil {
+		messages = []database.Message{}
+	}
+	jsonResponse(w, http.StatusOK, messages)
+}
+
+func (r *Router) handleListSentMessages(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	messages, err := database.ListSentMessages(user.ID)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if messages == nil {
+		messages = []database.Message{}
+	}
+	jsonResponse(w, http.StatusOK, messages)
+}
+
+func (r *Router) handleGetUnreadMessageCount(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonResponse(w, http.StatusOK, map[string]int{"unread_count": 0})
+		return
+	}
+
+	count, _ := database.CountUnreadMessages(user.ID)
+	jsonResponse(w, http.StatusOK, map[string]int{"unread_count": count})
+}
+
+func (r *Router) handleGetMessage(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	idStr := req.PathValue("id")
+	msgID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid message ID")
+		return
+	}
+
+	msg, err := database.GetMessageByID(msgID, user.ID)
+	if err != nil || msg == nil {
+		jsonError(w, http.StatusNotFound, "Message not found")
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, msg)
+}
+
+func (r *Router) handleMarkMessageRead(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	idStr := req.PathValue("id")
+	msgID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid message ID")
+		return
+	}
+
+	if err := database.MarkMessageRead(msgID, user.ID); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "Message marked as read"})
+}
+
+func (r *Router) handleDeleteMessage(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	idStr := req.PathValue("id")
+	msgID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid message ID")
+		return
+	}
+
+	if err := database.DeleteMessage(msgID, user.ID); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "Message deleted successfully"})
+}
+
+func (r *Router) handleListDevelopers(w http.ResponseWriter, req *http.Request) {
+	limitStr := req.URL.Query().Get("limit")
+	limit := 100
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+		limit = l
+	}
+
+	developers, err := database.ListActiveDevelopers(limit)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if developers == nil {
+		developers = []database.User{}
+	}
+
+	jsonResponse(w, http.StatusOK, developers)
 }
 

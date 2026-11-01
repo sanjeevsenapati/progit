@@ -10,12 +10,13 @@ import {
   ChevronLeft, 
   ChevronRight, 
   CircleDot, 
-  CheckCircle2, 
   Lock, 
   Unlock, 
-  FileText, 
+  Edit3, 
+  Settings, 
   Check, 
-  MoveRight 
+  GripVertical,
+  MoveHorizontal
 } from 'lucide-react';
 
 interface ProjectBoardProps {
@@ -31,16 +32,34 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
   const [loading, setLoading] = useState(true);
   const [canWrite, setCanWrite] = useState(false);
 
-  // New column state
+  // Drag and drop state
+  const [dragOverColId, setDragOverColId] = useState<number | null>(null);
+
+  // Add column state
   const [newColTitle, setNewColTitle] = useState('');
   const [showAddCol, setShowAddCol] = useState(false);
 
-  // New card modal
+  // Rename column modal state
+  const [renameCol, setRenameCol] = useState<ProjectColumn | null>(null);
+  const [renameColTitle, setRenameColTitle] = useState('');
+
+  // Add card modal
   const [targetColumnId, setTargetColumnId] = useState<number | null>(null);
   const [cardType, setCardType] = useState<'note' | 'issue'>('note');
   const [cardNote, setCardNote] = useState('');
   const [selectedIssueId, setSelectedIssueId] = useState<number | null>(null);
   const [addingCard, setAddingCard] = useState(false);
+
+  // Edit card modal state
+  const [editingCard, setEditingCard] = useState<ProjectCard | null>(null);
+  const [editingCardContent, setEditingCardContent] = useState('');
+  const [savingCard, setSavingCard] = useState(false);
+
+  // Edit project modal state
+  const [showEditProject, setShowEditProject] = useState(false);
+  const [editProjTitle, setEditProjTitle] = useState('');
+  const [editProjDesc, setEditProjDesc] = useState('');
+  const [savingProject, setSavingProject] = useState(false);
 
   useEffect(() => {
     loadBoard();
@@ -55,6 +74,8 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
 
       const p = await api.getProject(owner, repoName, projectId);
       setProject(p);
+      setEditProjTitle(p.title);
+      setEditProjDesc(p.description || '');
 
       const iss = await api.listIssues(owner, repoName, 'open');
       setIssues(iss || []);
@@ -80,6 +101,23 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
       await loadBoard();
     } catch (err: any) {
       showToast(err.message || 'Failed to create column', 'error');
+    }
+  };
+
+  const handleRenameColumn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!renameCol || !renameColTitle.trim()) return;
+    try {
+      await api.updateProjectColumn(owner, repoName, projectId, renameCol.id, {
+        title: renameColTitle.trim(),
+        order_num: renameCol.order_num,
+      });
+      setRenameCol(null);
+      setRenameColTitle('');
+      showToast('Column renamed', 'success');
+      await loadBoard();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to rename column', 'error');
     }
   };
 
@@ -130,6 +168,28 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
     }
   };
 
+  const handleEditCard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCard) return;
+
+    try {
+      setSavingCard(true);
+      await api.updateProjectCard(owner, repoName, projectId, editingCard.id, {
+        column_id: editingCard.column_id,
+        order_num: editingCard.order_num,
+        content: editingCardContent.trim(),
+      });
+      setEditingCard(null);
+      setEditingCardContent('');
+      showToast('Card note updated', 'success');
+      await loadBoard();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update card', 'error');
+    } finally {
+      setSavingCard(false);
+    }
+  };
+
   const handleMoveCard = async (cardId: number, targetColId: number) => {
     try {
       await api.moveProjectCard(owner, repoName, projectId, cardId, {
@@ -173,6 +233,46 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
       await loadBoard();
     } catch (err: any) {
       showToast(err.message || 'Failed to update project status', 'error');
+    }
+  };
+
+  const handleSaveProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!project || !editProjTitle.trim()) return;
+
+    try {
+      setSavingProject(true);
+      await api.updateProject(owner, repoName, projectId, {
+        title: editProjTitle.trim(),
+        description: editProjDesc.trim(),
+        is_closed: project.is_closed,
+      });
+      setShowEditProject(false);
+      showToast('Project updated successfully', 'success');
+      await loadBoard();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update project', 'error');
+    } finally {
+      setSavingProject(false);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    const confirmed = await showModalConfirm({
+      title: 'Delete Project Board',
+      message: `Are you sure you want to delete "${project?.title}"? This will permanently delete the project board and all associated column data.`,
+      confirmText: 'Delete Project',
+      cancelText: 'Cancel',
+      isDanger: true,
+    });
+    if (!confirmed) return;
+
+    try {
+      await api.deleteProject(owner, repoName, projectId);
+      showToast('Project deleted', 'info');
+      window.location.href = `/${owner}/${repoName}/projects`;
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete project', 'error');
     }
   };
 
@@ -228,20 +328,37 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
           {canWrite && (
             <div className="flex items-center space-x-2">
               <button
+                onClick={() => setShowEditProject(true)}
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text text-xs font-semibold shadow-sm transition-colors"
+                title="Edit project title and description"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-gray-500" />
+                <span>Edit Project</span>
+              </button>
+
+              <button
                 onClick={handleToggleClose}
                 className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text text-xs font-semibold shadow-sm transition-colors"
               >
                 {project.is_closed ? (
                   <>
                     <Unlock className="w-3.5 h-3.5" />
-                    <span>Reopen Project</span>
+                    <span>Reopen</span>
                   </>
                 ) : (
                   <>
                     <Lock className="w-3.5 h-3.5" />
-                    <span>Close Project</span>
+                    <span>Close</span>
                   </>
                 )}
+              </button>
+
+              <button
+                onClick={handleDeleteProject}
+                className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 text-xs font-semibold transition-colors"
+                title="Delete project"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
@@ -253,15 +370,49 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
         <div className="inline-flex items-start space-x-4 min-h-[500px]">
           {columns.map((col, colIdx) => {
             const cards = col.cards || [];
+            const isHoveredDrop = dragOverColId === col.id;
+
             return (
               <div
                 key={col.id}
-                className="w-72 flex-shrink-0 bg-gray-100 dark:bg-dark-surface/90 rounded-xl border border-gray-200 dark:border-dark-border flex flex-col max-h-[calc(100vh-220px)] shadow-sm"
+                onDragOver={(e) => {
+                  if (!canWrite) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  if (dragOverColId !== col.id) {
+                    setDragOverColId(col.id);
+                  }
+                }}
+                onDragLeave={() => {
+                  if (dragOverColId === col.id) {
+                    setDragOverColId(null);
+                  }
+                }}
+                onDrop={async (e) => {
+                  if (!canWrite) return;
+                  e.preventDefault();
+                  setDragOverColId(null);
+                  const raw = e.dataTransfer.getData('application/json');
+                  if (!raw) return;
+                  try {
+                    const data = JSON.parse(raw);
+                    if (data.cardId && data.sourceColId !== col.id) {
+                      await handleMoveCard(data.cardId, col.id);
+                    }
+                  } catch (err) {
+                    console.error('Drop error:', err);
+                  }
+                }}
+                className={`w-72 flex-shrink-0 bg-gray-100 dark:bg-dark-surface/90 rounded-xl border transition-all flex flex-col max-h-[calc(100vh-220px)] shadow-sm ${
+                  isHoveredDrop
+                    ? 'border-emerald-500 ring-2 ring-emerald-500/30 bg-emerald-50/20 dark:bg-emerald-950/20'
+                    : 'border-gray-200 dark:border-dark-border'
+                }`}
               >
                 {/* Column Header */}
                 <div className="p-3 border-b border-gray-200 dark:border-dark-border/60 flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold text-xs text-gray-800 dark:text-white">
+                  <div className="flex items-center space-x-2 truncate">
+                    <span className="font-bold text-xs text-gray-800 dark:text-white truncate">
                       {col.title}
                     </span>
                     <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-gray-200 dark:bg-dark-hover text-gray-700 dark:text-dark-muted">
@@ -270,7 +421,17 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
                   </div>
 
                   {canWrite && (
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center space-x-1 flex-shrink-0">
+                      <button
+                        onClick={() => {
+                          setRenameCol(col);
+                          setRenameColTitle(col.title);
+                        }}
+                        className="p-1 rounded hover:bg-gray-200 dark:hover:bg-dark-hover text-gray-500 dark:text-dark-muted"
+                        title="Rename column"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={() => setTargetColumnId(col.id)}
                         className="p-1 rounded hover:bg-gray-200 dark:hover:bg-dark-hover text-gray-500 dark:text-dark-muted"
@@ -280,7 +441,7 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
                       </button>
                       <button
                         onClick={() => handleDeleteColumn(col.id)}
-                        className="p-1 rounded hover:bg-red-100 text-gray-400 hover:text-red-500"
+                        className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-950/40 text-gray-400 hover:text-red-500"
                         title="Delete column"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -293,13 +454,22 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
                 <div className="p-2 space-y-2.5 overflow-y-auto flex-1">
                   {cards.length === 0 ? (
                     <div className="py-6 text-center text-[11px] text-gray-400">
-                      No cards in this column
+                      Drag cards here or click +
                     </div>
                   ) : (
                     cards.map((card) => (
                       <div
                         key={card.id}
-                        className="p-3 bg-white dark:bg-dark-surface rounded-lg border border-gray-200 dark:border-dark-border shadow-xs hover:shadow-sm transition-shadow space-y-2 group"
+                        draggable={canWrite}
+                        onDragStart={(e) => {
+                          if (!canWrite) return;
+                          e.dataTransfer.setData('application/json', JSON.stringify({
+                            cardId: card.id,
+                            sourceColId: col.id,
+                          }));
+                          e.dataTransfer.effectAllowed = 'move';
+                        }}
+                        className="p-3 bg-white dark:bg-dark-surface rounded-lg border border-gray-200 dark:border-dark-border shadow-xs hover:shadow-md transition-shadow space-y-2 group cursor-grab active:cursor-grabbing"
                       >
                         {card.issue ? (
                           <div className="space-y-1">
@@ -317,8 +487,22 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
                             </span>
                           </div>
                         ) : (
-                          <div className="text-xs text-gray-800 dark:text-white whitespace-pre-wrap font-sans">
-                            {card.content}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="text-xs text-gray-800 dark:text-white whitespace-pre-wrap font-sans flex-1">
+                              {card.content}
+                            </div>
+                            {canWrite && (
+                              <button
+                                onClick={() => {
+                                  setEditingCard(card);
+                                  setEditingCardContent(card.content || '');
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-emerald-600 rounded transition-opacity"
+                                title="Edit note"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                              </button>
+                            )}
                           </div>
                         )}
 
@@ -335,6 +519,23 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
                                   <ChevronLeft className="w-3 h-3" />
                                 </button>
                               )}
+
+                              {/* Quick Move Dropdown */}
+                              {columns.length > 2 && (
+                                <select
+                                  value={col.id}
+                                  onChange={(e) => handleMoveCard(card.id, Number(e.target.value))}
+                                  className="text-[10px] px-1 py-0.5 bg-gray-50 dark:bg-dark-hover border border-gray-200 dark:border-dark-border rounded text-gray-600 dark:text-dark-text focus:outline-none"
+                                  title="Quick jump column"
+                                >
+                                  {columns.map(c => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.title}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+
                               {colIdx < columns.length - 1 && (
                                 <button
                                   onClick={() => handleMoveCard(card.id, columns[colIdx + 1].id)}
@@ -365,7 +566,7 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
                   <div className="p-2 border-t border-gray-200 dark:border-dark-border/60">
                     <button
                       onClick={() => setTargetColumnId(col.id)}
-                      className="w-full flex items-center justify-center space-x-1 py-1.5 rounded-lg text-xs font-semibold text-gray-600 dark:text-dark-muted hover:bg-gray-200 dark:hover:bg-dark-hover transition-colors"
+                      className="w-full flex items-center justify-center space-x-1 py-1.5 rounded-lg text-xs font-semibold text-gray-600 dark:text-dark-muted hover:bg-gray-200 dark:hover:bg-dark-hover transition-colors cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add card</span>
@@ -521,6 +722,172 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
                   className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {addingCard ? 'Adding...' : 'Add Card'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Card Note Modal */}
+      {editingCard && (
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-dark-surface rounded-xl max-w-md w-full border border-gray-200 dark:border-dark-border p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-dark-border pb-3">
+              <h3 className="font-bold text-base text-gray-900 dark:text-white">
+                Edit Card Note
+              </h3>
+              <button
+                onClick={() => setEditingCard(null)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditCard} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                  Content
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={editingCardContent}
+                  onChange={(e) => setEditingCardContent(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none font-sans"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-gray-200 dark:border-dark-border">
+                <button
+                  type="button"
+                  onClick={() => setEditingCard(null)}
+                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingCard}
+                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  {savingCard ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Rename Column Modal */}
+      {renameCol && (
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-dark-surface rounded-xl max-w-sm w-full border border-gray-200 dark:border-dark-border p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-dark-border pb-3">
+              <h3 className="font-bold text-base text-gray-900 dark:text-white">
+                Rename Column
+              </h3>
+              <button
+                onClick={() => setRenameCol(null)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRenameColumn} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                  Column Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={renameColTitle}
+                  onChange={(e) => setRenameColTitle(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-gray-200 dark:border-dark-border">
+                <button
+                  type="button"
+                  onClick={() => setRenameCol(null)}
+                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm transition-colors cursor-pointer"
+                >
+                  Save Title
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Project Details Modal */}
+      {showEditProject && (
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-dark-surface rounded-xl max-w-md w-full border border-gray-200 dark:border-dark-border p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-dark-border pb-3">
+              <h3 className="font-bold text-base text-gray-900 dark:text-white">
+                Edit Project
+              </h3>
+              <button
+                onClick={() => setShowEditProject(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProject} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                  Project Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editProjTitle}
+                  onChange={(e) => setEditProjTitle(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  value={editProjDesc}
+                  onChange={(e) => setEditProjDesc(e.target.value)}
+                  placeholder="Goals or roadmap details..."
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none font-sans"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-gray-200 dark:border-dark-border">
+                <button
+                  type="button"
+                  onClick={() => setShowEditProject(false)}
+                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingProject}
+                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  {savingProject ? 'Saving...' : 'Save Project'}
                 </button>
               </div>
             </form>

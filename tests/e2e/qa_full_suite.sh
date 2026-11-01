@@ -805,6 +805,100 @@ echo "${PROJ_UPDATED}" | grep -q '"done_cards":1' || assert_fail "done_cards met
 assert_pass "Progress metrics 100% accurate"
 
 # -----------------------------------------------------------------------------
+# 11. 10 DEVELOPERS, ISSUE ASSIGNMENT & DIRECT MESSAGING SYSTEM
+# -----------------------------------------------------------------------------
+echo -e "\n${BLUE}=== [11/11] 10 DEVELOPERS, ISSUE ASSIGNMENT & MESSAGING SYSTEM ===${NC}"
+
+log_test "Provision 10 Developers (dev_alice to dev_julia)"
+DEV_NAMES=("dev_alice" "dev_bob" "dev_charlie" "dev_diana" "dev_evan" "dev_fiona" "dev_george" "dev_hannah" "dev_ian" "dev_julia")
+for dname in "${DEV_NAMES[@]}"; do
+  curl -s -X POST "${PROGIT_URL}/api/v1/auth/register" \
+    -H "Content-Type: application/json" \
+    -d "{\"username\":\"${dname}\",\"email\":\"${dname}@progit.local\",\"password\":\"DevSecret123!\",\"full_name\":\"Developer ${dname}\"}" > /dev/null || true
+done
+assert_pass "10 developer accounts provisioned"
+
+log_test "List Active Developers via /api/v1/developers"
+DEV_LIST_RES=$(curl -s "${PROGIT_URL}/api/v1/developers")
+echo "${DEV_LIST_RES}" | grep -q "dev_alice" || assert_fail "dev_alice missing from developers list"
+echo "${DEV_LIST_RES}" | grep -q "dev_julia" || assert_fail "dev_julia missing from developers list"
+assert_pass "Developers list verified"
+
+log_test "Assign Issue #1 to dev_alice (PUT /issues/1/assignee)"
+ASSIGN_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X PUT "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/issues/1/assignee" \
+  -H "Content-Type: application/json" \
+  -d '{"assignee":"dev_alice"}')
+echo "${ASSIGN_RES}" | grep -q '"assignee_name":"dev_alice"' || assert_fail "Issue assignment failed: ${ASSIGN_RES}"
+assert_pass "Issue #1 assigned to dev_alice"
+
+log_test "Filter Issues by Assignee (GET /issues?assignee=dev_alice)"
+FILTER_RES=$(curl -s "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/issues?assignee=dev_alice")
+echo "${FILTER_RES}" | grep -q '"assignee_name":"dev_alice"' || assert_fail "Assignee filter failed: ${FILTER_RES}"
+assert_pass "Filtered issues matching assignee dev_alice"
+
+log_test "Rename Kanban Column (PUT /columns/:id)"
+RENAME_COL_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X PUT "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/projects/${PROJECT_ID}/columns/${TODO_COL_ID}" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Backlog"}')
+echo "${RENAME_COL_RES}" | grep -q "successfully" || assert_fail "Failed to rename column: ${RENAME_COL_RES}"
+assert_pass "Kanban column renamed"
+
+log_test "Edit Kanban Card Content (PUT /cards/:id with content)"
+EDIT_CARD_RES=$(curl -s -b "${TEST_DIR}/dev_cookies.txt" -X PUT "${PROGIT_URL}/api/v1/repos/${DEV_USER}/${PUBLIC_REPO}/projects/${PROJECT_ID}/cards/${CARD_ID}" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"Refactored OAuth2 Provider with PKCE"}')
+echo "${EDIT_CARD_RES}" | grep -q "successfully" || assert_fail "Failed to edit card note: ${EDIT_CARD_RES}"
+assert_pass "Kanban card note updated"
+
+log_test "Login as dev_alice and dev_bob"
+curl -s -c "${TEST_DIR}/alice_cookies.txt" -X POST "${PROGIT_URL}/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"dev_alice","password":"DevSecret123!"}' > /dev/null
+curl -s -c "${TEST_DIR}/bob_cookies.txt" -X POST "${PROGIT_URL}/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"dev_bob","password":"DevSecret123!"}' > /dev/null
+assert_pass "Developer sessions authenticated"
+
+log_test "dev_alice sends message to dev_bob (POST /api/v1/messages)"
+SEND_MSG_RES=$(curl -s -b "${TEST_DIR}/alice_cookies.txt" -X POST "${PROGIT_URL}/api/v1/messages" \
+  -H "Content-Type: application/json" \
+  -d '{"recipient_username":"dev_bob","subject":"Sprint Planning Discussion","content":"Hi Bob, let us sync on sprint targets today."}')
+echo "${SEND_MSG_RES}" | grep -q "Sprint Planning Discussion" || assert_fail "Failed to send message: ${SEND_MSG_RES}"
+MSG_ID=$(echo "${SEND_MSG_RES}" | python3 -c "import sys, json; print(json.load(sys.stdin)['id'])")
+assert_pass "Message sent from dev_alice to dev_bob (id: ${MSG_ID})"
+
+log_test "dev_bob unread message count is 1"
+BOB_UNREAD=$(curl -s -b "${TEST_DIR}/bob_cookies.txt" "${PROGIT_URL}/api/v1/messages/unread-count")
+echo "${BOB_UNREAD}" | grep -q '"unread_count":1' || assert_fail "Unread count incorrect: ${BOB_UNREAD}"
+assert_pass "dev_bob unread count verified"
+
+log_test "dev_bob reads inbox and marks message read"
+BOB_INBOX=$(curl -s -b "${TEST_DIR}/bob_cookies.txt" "${PROGIT_URL}/api/v1/messages/inbox")
+echo "${BOB_INBOX}" | grep -q "Sprint Planning Discussion" || assert_fail "Message not found in dev_bob inbox: ${BOB_INBOX}"
+curl -s -b "${TEST_DIR}/bob_cookies.txt" -X PATCH "${PROGIT_URL}/api/v1/messages/${MSG_ID}/read" > /dev/null
+BOB_UNREAD_AFTER=$(curl -s -b "${TEST_DIR}/bob_cookies.txt" "${PROGIT_URL}/api/v1/messages/unread-count")
+echo "${BOB_UNREAD_AFTER}" | grep -q '"unread_count":0' || assert_fail "Unread count should be 0 after reading: ${BOB_UNREAD_AFTER}"
+assert_pass "Message read and unread count decremented to 0"
+
+log_test "dev_bob replies to dev_alice"
+REPLY_RES=$(curl -s -b "${TEST_DIR}/bob_cookies.txt" -X POST "${PROGIT_URL}/api/v1/messages" \
+  -H "Content-Type: application/json" \
+  -d "{\"recipient_username\":\"dev_alice\",\"subject\":\"Re: Sprint Planning Discussion\",\"content\":\"Sounds great, see you at 2 PM!\"}")
+echo "${REPLY_RES}" | grep -q "Sounds great" || assert_fail "Failed to send reply: ${REPLY_RES}"
+REPLY_ID=$(echo "${REPLY_RES}" | python3 -c "import sys, json; print(json.load(sys.stdin)['id'])")
+assert_pass "Reply sent to dev_alice (id: ${REPLY_ID})"
+
+log_test "dev_alice lists sent messages"
+ALICE_SENT=$(curl -s -b "${TEST_DIR}/alice_cookies.txt" "${PROGIT_URL}/api/v1/messages/sent")
+echo "${ALICE_SENT}" | grep -q "Sprint Planning Discussion" || assert_fail "Sent message not found in dev_alice outbox: ${ALICE_SENT}"
+assert_pass "dev_alice sent messages verified"
+
+log_test "Delete developer message (DELETE /api/v1/messages/:id)"
+DEL_MSG_RES=$(curl -s -b "${TEST_DIR}/bob_cookies.txt" -X DELETE "${PROGIT_URL}/api/v1/messages/${MSG_ID}")
+echo "${DEL_MSG_RES}" | grep -q "successfully" || assert_fail "Failed to delete message: ${DEL_MSG_RES}"
+assert_pass "Message deleted successfully"
+
+# -----------------------------------------------------------------------------
 # SUMMARY & SCORECARD
 # -----------------------------------------------------------------------------
 echo ""

@@ -164,6 +164,7 @@ func runMigrations(db *sql.DB) error {
 		repo_id INTEGER NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
 		index_number INTEGER NOT NULL,
 		poster_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
 		title TEXT NOT NULL,
 		content TEXT NOT NULL DEFAULT '',
 		is_pull BOOLEAN NOT NULL DEFAULT 0,
@@ -341,6 +342,19 @@ func runMigrations(db *sql.DB) error {
 		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE INDEX IF NOT EXISTS idx_project_cards ON project_cards(column_id, order_num);
+
+	CREATE TABLE IF NOT EXISTS messages (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		subject TEXT NOT NULL DEFAULT '',
+		content TEXT NOT NULL,
+		is_read BOOLEAN NOT NULL DEFAULT 0,
+		read_at DATETIME,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient_id, is_read, created_at DESC);
+	CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id, created_at DESC);
 	`
 
 	if _, err := db.Exec(schema); err != nil {
@@ -348,6 +362,8 @@ func runMigrations(db *sql.DB) error {
 	}
 
 	// Migration columns for existing databases
+	_, _ = db.Exec(`ALTER TABLE issues ADD COLUMN assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL`)
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_issues_assignee ON issues(assignee_id)`)
 	_, _ = db.Exec(`ALTER TABLE repositories ADD COLUMN enable_wiki BOOLEAN NOT NULL DEFAULT 1`)
 	_, _ = db.Exec(`ALTER TABLE repositories ADD COLUMN enable_pages BOOLEAN NOT NULL DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE repositories ADD COLUMN pages_branch TEXT NOT NULL DEFAULT 'main'`)
@@ -993,7 +1009,7 @@ func CanUserAccessRepo(user *User, repo *Repository, writeRequired bool) bool {
 
 // Issue Methods
 
-func CreateIssue(repoID, posterID int64, title, content string, isPull bool) (*Issue, error) {
+func CreateIssue(repoID, posterID int64, title, content string, isPull bool, assigneeID *int64) (*Issue, error) {
 	tx, err := DB.Begin()
 	if err != nil {
 		return nil, err
@@ -1007,9 +1023,9 @@ func CreateIssue(repoID, posterID int64, title, content string, isPull bool) (*I
 	}
 
 	res, err := tx.Exec(`
-		INSERT INTO issues (repo_id, index_number, poster_id, title, content, is_pull)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, repoID, nextIndex, posterID, title, content, isPull)
+		INSERT INTO issues (repo_id, index_number, poster_id, assignee_id, title, content, is_pull)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, repoID, nextIndex, posterID, assigneeID, title, content, isPull)
 	if err != nil {
 		return nil, err
 	}
@@ -1030,21 +1046,29 @@ func CreateIssue(repoID, posterID int64, title, content string, isPull bool) (*I
 
 func GetIssueByID(id int64) (*Issue, error) {
 	iss := &Issue{}
+	var assigneeID *int64
+	var assigneeName, assigneeAvatar string
 	err := DB.QueryRow(`
 		SELECT i.id, i.repo_id, u.username, r.name, i.index_number, i.poster_id, pu.username, pu.avatar_url,
 		       i.title, i.content, i.is_pull, i.is_closed, i.closed_at,
 		       (SELECT COUNT(*) FROM comments c WHERE c.issue_id = i.id),
-		       i.created_at, i.updated_at
+		       i.created_at, i.updated_at,
+		       i.assignee_id, COALESCE(au.username, ''), COALESCE(au.avatar_url, '')
 		FROM issues i
 		JOIN repositories r ON r.id = i.repo_id
 		JOIN users u ON u.id = r.owner_id
 		JOIN users pu ON pu.id = i.poster_id
+		LEFT JOIN users au ON au.id = i.assignee_id
 		WHERE i.id = ?
 	`, id).Scan(&iss.ID, &iss.RepoID, &iss.RepoOwner, &iss.RepoName, &iss.IndexNumber, &iss.PosterID, &iss.PosterName, &iss.PosterAvatar,
-		&iss.Title, &iss.Content, &iss.IsPull, &iss.IsClosed, &iss.ClosedAt, &iss.NumComments, &iss.CreatedAt, &iss.UpdatedAt)
+		&iss.Title, &iss.Content, &iss.IsPull, &iss.IsClosed, &iss.ClosedAt, &iss.NumComments, &iss.CreatedAt, &iss.UpdatedAt,
+		&assigneeID, &assigneeName, &assigneeAvatar)
 	if err != nil {
 		return nil, err
 	}
+	iss.AssigneeID = assigneeID
+	iss.AssigneeName = assigneeName
+	iss.AssigneeAvatar = assigneeAvatar
 	return iss, nil
 }
 
@@ -1058,25 +1082,36 @@ func GetIssueByIndex(repoID, indexNumber int64) (*Issue, error) {
 }
 
 func ListIssues(repoID int64, isPull bool, state string) ([]*Issue, error) {
+	return ListIssuesFiltered(repoID, isPull, state, "")
+}
+
+func ListIssuesFiltered(repoID int64, isPull bool, state string, assigneeUsername string) ([]*Issue, error) {
 	query := `
 		SELECT i.id, i.repo_id, u.username, r.name, i.index_number, i.poster_id, pu.username, pu.avatar_url,
 		       i.title, i.content, i.is_pull, i.is_closed, i.closed_at,
 		       (SELECT COUNT(*) FROM comments c WHERE c.issue_id = i.id),
-		       i.created_at, i.updated_at
+		       i.created_at, i.updated_at,
+		       i.assignee_id, COALESCE(au.username, ''), COALESCE(au.avatar_url, '')
 		FROM issues i
 		JOIN repositories r ON r.id = i.repo_id
 		JOIN users u ON u.id = r.owner_id
 		JOIN users pu ON pu.id = i.poster_id
+		LEFT JOIN users au ON au.id = i.assignee_id
 		WHERE i.repo_id = ? AND i.is_pull = ?
 	`
+	args := []any{repoID, isPull}
 	if state == "closed" {
 		query += ` AND i.is_closed = 1 `
 	} else if state == "open" {
 		query += ` AND i.is_closed = 0 `
 	}
+	if strings.TrimSpace(assigneeUsername) != "" {
+		query += ` AND au.username = ? `
+		args = append(args, strings.TrimSpace(assigneeUsername))
+	}
 	query += ` ORDER BY i.index_number DESC `
 
-	rows, err := DB.Query(query, repoID, isPull)
+	rows, err := DB.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -1085,13 +1120,24 @@ func ListIssues(repoID int64, isPull bool, state string) ([]*Issue, error) {
 	var list []*Issue
 	for rows.Next() {
 		iss := &Issue{}
+		var assigneeID *int64
+		var assigneeName, assigneeAvatar string
 		if err := rows.Scan(&iss.ID, &iss.RepoID, &iss.RepoOwner, &iss.RepoName, &iss.IndexNumber, &iss.PosterID, &iss.PosterName, &iss.PosterAvatar,
-			&iss.Title, &iss.Content, &iss.IsPull, &iss.IsClosed, &iss.ClosedAt, &iss.NumComments, &iss.CreatedAt, &iss.UpdatedAt); err != nil {
+			&iss.Title, &iss.Content, &iss.IsPull, &iss.IsClosed, &iss.ClosedAt, &iss.NumComments, &iss.CreatedAt, &iss.UpdatedAt,
+			&assigneeID, &assigneeName, &assigneeAvatar); err != nil {
 			return nil, err
 		}
+		iss.AssigneeID = assigneeID
+		iss.AssigneeName = assigneeName
+		iss.AssigneeAvatar = assigneeAvatar
 		list = append(list, iss)
 	}
 	return list, rows.Err()
+}
+
+func UpdateIssueAssignee(issueID int64, assigneeID *int64) error {
+	_, err := DB.Exec(`UPDATE issues SET assignee_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, assigneeID, issueID)
+	return err
 }
 
 func UpdateIssueStatus(issueID int64, closed bool) error {
@@ -1166,7 +1212,7 @@ func ListComments(issueID int64) ([]*Comment, error) {
 // Pull Requests
 
 func CreatePullRequest(headRepoID, baseRepoID, posterID int64, title, content, headBranch, baseBranch string) (*PullRequest, error) {
-	issue, err := CreateIssue(baseRepoID, posterID, title, content, true)
+	issue, err := CreateIssue(baseRepoID, posterID, title, content, true, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1824,7 +1870,10 @@ func GetProjectByID(id int64) (*Project, error) {
 	_ = DB.QueryRow(`
 		SELECT COUNT(*) FROM project_cards pc
 		JOIN project_columns col ON pc.column_id = col.id
-		WHERE pc.project_id = ? AND col.title = 'Done'
+		WHERE pc.project_id = ? AND (
+			LOWER(TRIM(col.title)) IN ('done', 'completed', 'finished', 'closed')
+			OR col.order_num = (SELECT MAX(order_num) FROM project_columns WHERE project_id = pc.project_id)
+		)
 	`, p.ID).Scan(&p.DoneCards)
 
 	return p, nil
@@ -1853,7 +1902,10 @@ func ListRepoProjects(repoID int64) ([]Project, error) {
 		_ = DB.QueryRow(`
 			SELECT COUNT(*) FROM project_cards pc
 			JOIN project_columns col ON pc.column_id = col.id
-			WHERE pc.project_id = ? AND col.title = 'Done'
+			WHERE pc.project_id = ? AND (
+				LOWER(TRIM(col.title)) IN ('done', 'completed', 'finished', 'closed')
+				OR col.order_num = (SELECT MAX(order_num) FROM project_columns WHERE project_id = pc.project_id)
+			)
 		`, p.ID).Scan(&p.DoneCards)
 		projects = append(projects, p)
 	}
@@ -1918,6 +1970,15 @@ func CreateProjectColumn(projectID int64, title string, orderNum int) (*ProjectC
 		OrderNum:  orderNum,
 		CreatedAt: time.Now(),
 	}, nil
+}
+
+func UpdateProjectColumn(columnID int64, title string, orderNum int) error {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return fmt.Errorf("column title is required")
+	}
+	_, err := DB.Exec(`UPDATE project_columns SET title = ?, order_num = ? WHERE id = ?`, title, orderNum, columnID)
+	return err
 }
 
 func DeleteProjectColumn(columnID int64) error {
@@ -1988,8 +2049,184 @@ func MoveProjectCard(cardID, targetColumnID int64, orderNum int) error {
 	return err
 }
 
+func UpdateProjectCard(cardID int64, columnID *int64, orderNum *int, content *string) error {
+	query := `UPDATE project_cards SET updated_at = CURRENT_TIMESTAMP`
+	var args []any
+	if columnID != nil {
+		query += `, column_id = ?`
+		args = append(args, *columnID)
+	}
+	if orderNum != nil {
+		query += `, order_num = ?`
+		args = append(args, *orderNum)
+	}
+	if content != nil {
+		query += `, content = ?`
+		args = append(args, *content)
+	}
+	query += ` WHERE id = ?`
+	args = append(args, cardID)
+	_, err := DB.Exec(query, args...)
+	return err
+}
+
 func DeleteProjectCard(cardID int64) error {
 	_, err := DB.Exec(`DELETE FROM project_cards WHERE id = ?`, cardID)
 	return err
+}
+
+// Message Methods (Send Messages to Developers)
+
+func SendMessage(senderID, recipientID int64, subject, content string) (*Message, error) {
+	subject = strings.TrimSpace(subject)
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return nil, fmt.Errorf("message content cannot be empty")
+	}
+
+	res, err := DB.Exec(`
+		INSERT INTO messages (sender_id, recipient_id, subject, content)
+		VALUES (?, ?, ?, ?)
+	`, senderID, recipientID, subject, content)
+	if err != nil {
+		return nil, err
+	}
+	msgID, _ := res.LastInsertId()
+	return GetMessageByID(msgID, senderID)
+}
+
+func ListInboxMessages(userID int64) ([]Message, error) {
+	rows, err := DB.Query(`
+		SELECT m.id, m.sender_id, su.username, su.full_name, su.avatar_url,
+		       m.recipient_id, ru.username, ru.full_name, ru.avatar_url,
+		       m.subject, m.content, m.is_read, m.read_at, m.created_at
+		FROM messages m
+		JOIN users su ON su.id = m.sender_id
+		JOIN users ru ON ru.id = m.recipient_id
+		WHERE m.recipient_id = ?
+		ORDER BY m.created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []Message
+	for rows.Next() {
+		var m Message
+		if err := rows.Scan(&m.ID, &m.SenderID, &m.SenderUsername, &m.SenderFullName, &m.SenderAvatarURL,
+			&m.RecipientID, &m.RecipientUsername, &m.RecipientFullName, &m.RecipientAvatarURL,
+			&m.Subject, &m.Content, &m.IsRead, &m.ReadAt, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, m)
+	}
+	return list, nil
+}
+
+func ListSentMessages(userID int64) ([]Message, error) {
+	rows, err := DB.Query(`
+		SELECT m.id, m.sender_id, su.username, su.full_name, su.avatar_url,
+		       m.recipient_id, ru.username, ru.full_name, ru.avatar_url,
+		       m.subject, m.content, m.is_read, m.read_at, m.created_at
+		FROM messages m
+		JOIN users su ON su.id = m.sender_id
+		JOIN users ru ON ru.id = m.recipient_id
+		WHERE m.sender_id = ?
+		ORDER BY m.created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []Message
+	for rows.Next() {
+		var m Message
+		if err := rows.Scan(&m.ID, &m.SenderID, &m.SenderUsername, &m.SenderFullName, &m.SenderAvatarURL,
+			&m.RecipientID, &m.RecipientUsername, &m.RecipientFullName, &m.RecipientAvatarURL,
+			&m.Subject, &m.Content, &m.IsRead, &m.ReadAt, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, m)
+	}
+	return list, nil
+}
+
+func GetMessageByID(messageID, userID int64) (*Message, error) {
+	var m Message
+	err := DB.QueryRow(`
+		SELECT m.id, m.sender_id, su.username, su.full_name, su.avatar_url,
+		       m.recipient_id, ru.username, ru.full_name, ru.avatar_url,
+		       m.subject, m.content, m.is_read, m.read_at, m.created_at
+		FROM messages m
+		JOIN users su ON su.id = m.sender_id
+		JOIN users ru ON ru.id = m.recipient_id
+		WHERE m.id = ? AND (m.sender_id = ? OR m.recipient_id = ?)
+	`, messageID, userID, userID).Scan(&m.ID, &m.SenderID, &m.SenderUsername, &m.SenderFullName, &m.SenderAvatarURL,
+		&m.RecipientID, &m.RecipientUsername, &m.RecipientFullName, &m.RecipientAvatarURL,
+		&m.Subject, &m.Content, &m.IsRead, &m.ReadAt, &m.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	// Auto mark as read if recipient is accessing
+	if m.RecipientID == userID && !m.IsRead {
+		_ = MarkMessageRead(messageID, userID)
+		m.IsRead = true
+		now := time.Now()
+		m.ReadAt = &now
+	}
+
+	return &m, nil
+}
+
+func MarkMessageRead(messageID, recipientID int64) error {
+	_, err := DB.Exec(`
+		UPDATE messages SET is_read = 1, read_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND recipient_id = ?
+	`, messageID, recipientID)
+	return err
+}
+
+func DeleteMessage(messageID, userID int64) error {
+	_, err := DB.Exec(`
+		DELETE FROM messages
+		WHERE id = ? AND (sender_id = ? OR recipient_id = ?)
+	`, messageID, userID, userID)
+	return err
+}
+
+func CountUnreadMessages(userID int64) (int, error) {
+	var count int
+	err := DB.QueryRow(`SELECT COUNT(*) FROM messages WHERE recipient_id = ? AND is_read = 0`, userID).Scan(&count)
+	return count, err
+}
+
+func ListActiveDevelopers(limit int) ([]User, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := DB.Query(`
+		SELECT id, username, email, full_name, avatar_url, is_active, is_admin, created_at
+		FROM users
+		WHERE is_active = 1
+		ORDER BY username ASC
+		LIMIT ?
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.FullName, &u.AvatarURL, &u.IsActive, &u.IsAdmin, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, nil
 }
 

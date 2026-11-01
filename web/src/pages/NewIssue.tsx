@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository } from '../lib/api';
+import { api, Repository, Developer } from '../lib/api';
 import { RepoNav } from '../components/RepoNav';
 import { CircleDot, AlertCircle } from 'lucide-react';
 
@@ -10,8 +10,10 @@ interface NewIssueProps {
 
 export const NewIssue: React.FC<NewIssueProps> = ({ owner, repo: repoName }) => {
   const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [developers, setDevelopers] = useState<Developer[]>([]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [assignee, setAssignee] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -20,6 +22,9 @@ export const NewIssue: React.FC<NewIssueProps> = ({ owner, repo: repoName }) => 
       try {
         const r = await api.getRepo(owner, repoName);
         setRepoData(r.repository);
+
+        const devs = await api.listDevelopers();
+        setDevelopers(devs || []);
       } catch (err) {
         console.error(err);
       }
@@ -33,7 +38,11 @@ export const NewIssue: React.FC<NewIssueProps> = ({ owner, repo: repoName }) => 
     setLoading(true);
 
     try {
-      const issue = await api.createIssue(owner, repoName, { title, content });
+      const issue = await api.createIssue(owner, repoName, { 
+        title, 
+        content,
+        assignee: assignee.trim() || undefined
+      });
       window.location.href = `/${owner}/${repoName}/issues/${issue.index_number}`;
     } catch (err: any) {
       setError(err.message || 'Failed to create issue');
@@ -80,6 +89,24 @@ export const NewIssue: React.FC<NewIssueProps> = ({ owner, repo: repoName }) => 
 
           <div>
             <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+              Assignee
+            </label>
+            <select
+              value={assignee}
+              onChange={e => setAssignee(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            >
+              <option value="">No assignee (unassigned)</option>
+              {developers.map(dev => (
+                <option key={dev.id} value={dev.username}>
+                  {dev.full_name ? `${dev.full_name} (@${dev.username})` : `@${dev.username}`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
               Description (Markdown supported)
             </label>
             <textarea
@@ -101,7 +128,7 @@ export const NewIssue: React.FC<NewIssueProps> = ({ owner, repo: repoName }) => 
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold text-sm shadow-sm transition-colors"
+              className="px-6 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold text-sm shadow-sm transition-colors cursor-pointer"
             >
               {loading ? 'Submitting...' : 'Submit new issue'}
             </button>
@@ -111,4 +138,3 @@ export const NewIssue: React.FC<NewIssueProps> = ({ owner, repo: repoName }) => 
     </div>
   );
 };
-

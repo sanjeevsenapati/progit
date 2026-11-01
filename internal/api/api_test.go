@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -998,6 +999,359 @@ func TestPullReviewsAPI(t *testing.T) {
 
 	_ = pr
 }
+
+func TestIssueAssigneeAndFilter(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	// Register dev_alice and dev_bob
+	uAlice, _ := database.CreateUser("dev_alice", "dev_alice@example.com", "hash", "Alice Developer", true)
+	_, _ = database.CreateAccessToken(uAlice.ID, "tok", "pgt_alice_12345", "repo,user")
+	tokenAlice := "pgt_alice_12345"
+
+	uBob, _ := database.CreateUser("dev_bob", "dev_bob@example.com", "hash", "Bob Developer", false)
+	_, _ = database.CreateAccessToken(uBob.ID, "tok", "pgt_bob_12345", "repo,user")
+
+	// Alice creates a repo
+	repo, err := database.CreateRepository(uAlice.ID, "assignee-repo", "Testing issue assignments", false)
+	if err != nil {
+		t.Fatalf("failed to create repo: %v", err)
+	}
+
+	// 1. Alice creates issue with assignee = dev_bob
+	createBody := map[string]any{
+		"title":    "Fix database latency",
+		"content":  "Issue description",
+		"assignee": "dev_bob",
+	}
+	cb, _ := json.Marshal(createBody)
+	req := httptest.NewRequest("POST", "/api/v1/repos/dev_alice/assignee-repo/issues", bytes.NewReader(cb))
+	req.Header.Set("Authorization", "Bearer "+tokenAlice)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for issue, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var createdIssue database.Issue
+	_ = json.Unmarshal(rec.Body.Bytes(), &createdIssue)
+	if createdIssue.AssigneeName != "dev_bob" {
+		t.Errorf("expected assignee_name dev_bob, got %s", createdIssue.AssigneeName)
+	}
+
+	// 2. Filter issues by assignee dev_bob
+	reqFilter := httptest.NewRequest("GET", "/api/v1/repos/dev_alice/assignee-repo/issues?assignee=dev_bob", nil)
+	recFilter := httptest.NewRecorder()
+	router.ServeHTTP(recFilter, reqFilter)
+	if recFilter.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for list issues, got %d", recFilter.Code)
+	}
+	var bobIssues []database.Issue
+	_ = json.Unmarshal(recFilter.Body.Bytes(), &bobIssues)
+	if len(bobIssues) != 1 || bobIssues[0].AssigneeName != "dev_bob" {
+		t.Fatalf("expected 1 issue for dev_bob, got %d", len(bobIssues))
+	}
+
+	// 3. Filter issues by assignee dev_alice (should be 0)
+	reqFilterAlice := httptest.NewRequest("GET", "/api/v1/repos/dev_alice/assignee-repo/issues?assignee=dev_alice", nil)
+	recFilterAlice := httptest.NewRecorder()
+	router.ServeHTTP(recFilterAlice, reqFilterAlice)
+	var aliceIssues []database.Issue
+	_ = json.Unmarshal(recFilterAlice.Body.Bytes(), &aliceIssues)
+	if len(aliceIssues) != 0 {
+		t.Fatalf("expected 0 issues for dev_alice, got %d", len(aliceIssues))
+	}
+
+	// 4. Update assignee to dev_alice via PUT /issues/{index}/assignee
+	assignBody := map[string]any{"assignee": "dev_alice"}
+	ab, _ := json.Marshal(assignBody)
+	reqAssign := httptest.NewRequest("PUT", "/api/v1/repos/dev_alice/assignee-repo/issues/1/assignee", bytes.NewReader(ab))
+	reqAssign.Header.Set("Authorization", "Bearer "+tokenAlice)
+	reqAssign.Header.Set("Content-Type", "application/json")
+	recAssign := httptest.NewRecorder()
+	router.ServeHTTP(recAssign, reqAssign)
+
+	if recAssign.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for assign, got %d: %s", recAssign.Code, recAssign.Body.String())
+	}
+	var updatedIssue database.Issue
+	_ = json.Unmarshal(recAssign.Body.Bytes(), &updatedIssue)
+	if updatedIssue.AssigneeName != "dev_alice" {
+		t.Errorf("expected assignee dev_alice after update, got %s", updatedIssue.AssigneeName)
+	}
+
+	// Check timeline has assign comments
+	comments, _ := database.ListComments(createdIssue.ID)
+	hasAssignComment := false
+	for _, c := range comments {
+		if c.Type == "assign" {
+			hasAssignComment = true
+			break
+		}
+	}
+	if !hasAssignComment {
+		t.Errorf("expected assign timeline comment on issue")
+	}
+
+	_ = repo
+}
+
+func TestProjectKanbanFeatures(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	user, _ := database.CreateUser("dev_lead", "lead@example.com", "hash", "Lead Dev", true)
+	_, _ = database.CreateAccessToken(user.ID, "tok", "pgt_lead_12345", "repo,user")
+	token := "pgt_lead_12345"
+
+	repo, _ := database.CreateRepository(user.ID, "kanban-repo", "Kanban testing", false)
+
+	// 1. Create project
+	projBody := map[string]any{"title": "Release 1.0", "description": "Tracking v1.0"}
+	pb, _ := json.Marshal(projBody)
+	reqProj := httptest.NewRequest("POST", "/api/v1/repos/dev_lead/kanban-repo/projects", bytes.NewReader(pb))
+	reqProj.Header.Set("Authorization", "Bearer "+token)
+	reqProj.Header.Set("Content-Type", "application/json")
+	recProj := httptest.NewRecorder()
+	router.ServeHTTP(recProj, reqProj)
+
+	if recProj.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for project, got %d: %s", recProj.Code, recProj.Body.String())
+	}
+	var proj database.Project
+	_ = json.Unmarshal(recProj.Body.Bytes(), &proj)
+
+	// Default columns created: Todo, In Progress, Done
+	cols, _ := database.ListProjectColumns(proj.ID)
+	if len(cols) != 3 {
+		t.Fatalf("expected 3 default columns, got %d", len(cols))
+	}
+	todoCol := cols[0]
+	doneCol := cols[2]
+
+	// 2. Rename column (Todo -> Backlog)
+	renameBody := map[string]any{"title": "Backlog", "order_num": todoCol.OrderNum}
+	rb, _ := json.Marshal(renameBody)
+	reqCol := httptest.NewRequest("PUT", fmt.Sprintf("/api/v1/repos/dev_lead/kanban-repo/projects/%d/columns/%d", proj.ID, todoCol.ID), bytes.NewReader(rb))
+	reqCol.Header.Set("Authorization", "Bearer "+token)
+	reqCol.Header.Set("Content-Type", "application/json")
+	recCol := httptest.NewRecorder()
+	router.ServeHTTP(recCol, reqCol)
+
+	if recCol.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for rename column, got %d: %s", recCol.Code, recCol.Body.String())
+	}
+
+	// 3. Create a card
+	cardBody := map[string]any{
+		"column_id": todoCol.ID,
+		"content":   "Initial task note",
+		"order_num": 1,
+	}
+	cdb, _ := json.Marshal(cardBody)
+	reqCard := httptest.NewRequest("POST", fmt.Sprintf("/api/v1/repos/dev_lead/kanban-repo/projects/%d/cards", proj.ID), bytes.NewReader(cdb))
+	reqCard.Header.Set("Authorization", "Bearer "+token)
+	reqCard.Header.Set("Content-Type", "application/json")
+	recCard := httptest.NewRecorder()
+	router.ServeHTTP(recCard, reqCard)
+
+	if recCard.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for card, got %d: %s", recCard.Code, recCard.Body.String())
+	}
+	var card database.ProjectCard
+	_ = json.Unmarshal(recCard.Body.Bytes(), &card)
+
+	// 4. Update card content and move to Done column
+	moveBody := map[string]any{
+		"column_id": doneCol.ID,
+		"order_num": 1,
+		"content":   "Updated task note (completed)",
+	}
+	mb, _ := json.Marshal(moveBody)
+	reqMove := httptest.NewRequest("PUT", fmt.Sprintf("/api/v1/repos/dev_lead/kanban-repo/projects/%d/cards/%d", proj.ID, card.ID), bytes.NewReader(mb))
+	reqMove.Header.Set("Authorization", "Bearer "+token)
+	reqMove.Header.Set("Content-Type", "application/json")
+	recMove := httptest.NewRecorder()
+	router.ServeHTTP(recMove, reqMove)
+
+	if recMove.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for move card, got %d: %s", recMove.Code, recMove.Body.String())
+	}
+
+	// 5. Verify card updated and moved to Done column
+	reqGetProj := httptest.NewRequest("GET", fmt.Sprintf("/api/v1/repos/dev_lead/kanban-repo/projects/%d", proj.ID), nil)
+	recGetProj := httptest.NewRecorder()
+	router.ServeHTTP(recGetProj, reqGetProj)
+	var projDetail database.Project
+	_ = json.Unmarshal(recGetProj.Body.Bytes(), &projDetail)
+
+	if projDetail.DoneCards != 1 || projDetail.TotalCards != 1 {
+		t.Errorf("expected 1/1 done cards, got %d/%d", projDetail.DoneCards, projDetail.TotalCards)
+	}
+
+	// 6. Delete card
+	reqDelCard := httptest.NewRequest("DELETE", fmt.Sprintf("/api/v1/repos/dev_lead/kanban-repo/projects/%d/cards/%d", proj.ID, card.ID), nil)
+	reqDelCard.Header.Set("Authorization", "Bearer "+token)
+	recDelCard := httptest.NewRecorder()
+	router.ServeHTTP(recDelCard, reqDelCard)
+	if recDelCard.Code != http.StatusOK {
+		t.Errorf("expected 200 OK for delete card, got %d", recDelCard.Code)
+	}
+
+	// 7. Delete project
+	reqDelProj := httptest.NewRequest("DELETE", fmt.Sprintf("/api/v1/repos/dev_lead/kanban-repo/projects/%d", proj.ID), nil)
+	reqDelProj.Header.Set("Authorization", "Bearer "+token)
+	recDelProj := httptest.NewRecorder()
+	router.ServeHTTP(recDelProj, reqDelProj)
+	if recDelProj.Code != http.StatusOK {
+		t.Errorf("expected 200 OK for delete project, got %d", recDelProj.Code)
+	}
+
+	_ = repo
+}
+
+func Test10DevelopersMessagingWorkflow(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	// Provision 10 developers
+	devNames := []string{
+		"dev_alice", "dev_bob", "dev_charlie", "dev_diana", "dev_evan",
+		"dev_fiona", "dev_george", "dev_hannah", "dev_ian", "dev_julia",
+	}
+
+	tokens := make(map[string]string)
+	for i, name := range devNames {
+		u, err := database.CreateUser(name, name+"@example.com", "hash", strings.ToUpper(name), i == 0)
+		if err != nil {
+			t.Fatalf("failed to create user %s: %v", name, err)
+		}
+		tokStr := fmt.Sprintf("pgt_%s_12345", name)
+		_, _ = database.CreateAccessToken(u.ID, "tok", tokStr, "repo,user")
+		tokens[name] = tokStr
+	}
+
+	// 1. Test GET /api/v1/developers returns 10 developers
+	reqDevs := httptest.NewRequest("GET", "/api/v1/developers", nil)
+	recDevs := httptest.NewRecorder()
+	router.ServeHTTP(recDevs, reqDevs)
+
+	if recDevs.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for developers list, got %d: %s", recDevs.Code, recDevs.Body.String())
+	}
+	var devList []*database.User
+	_ = json.Unmarshal(recDevs.Body.Bytes(), &devList)
+	if len(devList) != 10 {
+		t.Fatalf("expected 10 developers, got %d", len(devList))
+	}
+
+	// 2. dev_alice sends message to dev_bob
+	msgAliceToBob := map[string]string{
+		"recipient_username": "dev_bob",
+		"subject":            "Review PR #42",
+		"content":            "Hey Bob, could you take a look at PR #42 for database indexing?",
+	}
+	mb1, _ := json.Marshal(msgAliceToBob)
+	reqMsg1 := httptest.NewRequest("POST", "/api/v1/messages", bytes.NewReader(mb1))
+	reqMsg1.Header.Set("Authorization", "Bearer "+tokens["dev_alice"])
+	reqMsg1.Header.Set("Content-Type", "application/json")
+	recMsg1 := httptest.NewRecorder()
+	router.ServeHTTP(recMsg1, reqMsg1)
+
+	if recMsg1.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for send message, got %d: %s", recMsg1.Code, recMsg1.Body.String())
+	}
+	var createdMsg1 database.Message
+	_ = json.Unmarshal(recMsg1.Body.Bytes(), &createdMsg1)
+	if createdMsg1.SenderUsername != "dev_alice" || createdMsg1.RecipientUsername != "dev_bob" {
+		t.Errorf("message sender/recipient mismatch: %+v", createdMsg1)
+	}
+
+	// 3. dev_bob checks unread count -> 1
+	reqUnreadBob := httptest.NewRequest("GET", "/api/v1/messages/unread-count", nil)
+	reqUnreadBob.Header.Set("Authorization", "Bearer "+tokens["dev_bob"])
+	recUnreadBob := httptest.NewRecorder()
+	router.ServeHTTP(recUnreadBob, reqUnreadBob)
+
+	var unreadData map[string]int
+	_ = json.Unmarshal(recUnreadBob.Body.Bytes(), &unreadData)
+	if unreadData["unread_count"] != 1 {
+		t.Errorf("expected 1 unread message for dev_bob, got %d", unreadData["unread_count"])
+	}
+
+	// 4. dev_bob checks inbox
+	reqInboxBob := httptest.NewRequest("GET", "/api/v1/messages/inbox", nil)
+	reqInboxBob.Header.Set("Authorization", "Bearer "+tokens["dev_bob"])
+	recInboxBob := httptest.NewRecorder()
+	router.ServeHTTP(recInboxBob, reqInboxBob)
+
+	var bobInbox []*database.Message
+	_ = json.Unmarshal(recInboxBob.Body.Bytes(), &bobInbox)
+	if len(bobInbox) != 1 || bobInbox[0].Subject != "Review PR #42" {
+		t.Fatalf("expected 1 message in dev_bob inbox, got %d", len(bobInbox))
+	}
+
+	// 5. dev_bob marks message as read
+	reqRead := httptest.NewRequest("PATCH", fmt.Sprintf("/api/v1/messages/%d/read", createdMsg1.ID), nil)
+	reqRead.Header.Set("Authorization", "Bearer "+tokens["dev_bob"])
+	recRead := httptest.NewRecorder()
+	router.ServeHTTP(recRead, reqRead)
+
+	if recRead.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for mark read, got %d", recRead.Code)
+	}
+
+	// Unread count is now 0
+	reqUnreadBob2 := httptest.NewRequest("GET", "/api/v1/messages/unread-count", nil)
+	reqUnreadBob2.Header.Set("Authorization", "Bearer "+tokens["dev_bob"])
+	recUnreadBob2 := httptest.NewRecorder()
+	router.ServeHTTP(recUnreadBob2, reqUnreadBob2)
+	_ = json.Unmarshal(recUnreadBob2.Body.Bytes(), &unreadData)
+	if unreadData["unread_count"] != 0 {
+		t.Errorf("expected 0 unread messages for dev_bob, got %d", unreadData["unread_count"])
+	}
+
+	// 6. dev_bob replies to dev_alice
+	msgBobToAlice := map[string]string{
+		"recipient_username": "dev_alice",
+		"subject":            "Re: Review PR #42",
+		"content":            "Reviewed and approved! Great job.",
+	}
+	mb2, _ := json.Marshal(msgBobToAlice)
+	reqMsg2 := httptest.NewRequest("POST", "/api/v1/messages", bytes.NewReader(mb2))
+	reqMsg2.Header.Set("Authorization", "Bearer "+tokens["dev_bob"])
+	reqMsg2.Header.Set("Content-Type", "application/json")
+	recMsg2 := httptest.NewRecorder()
+	router.ServeHTTP(recMsg2, reqMsg2)
+
+	if recMsg2.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for reply, got %d: %s", recMsg2.Code, recMsg2.Body.String())
+	}
+
+	// 7. dev_alice sent messages has 1 message
+	reqSentAlice := httptest.NewRequest("GET", "/api/v1/messages/sent", nil)
+	reqSentAlice.Header.Set("Authorization", "Bearer "+tokens["dev_alice"])
+	recSentAlice := httptest.NewRecorder()
+	router.ServeHTTP(recSentAlice, reqSentAlice)
+
+	var aliceSent []*database.Message
+	_ = json.Unmarshal(recSentAlice.Body.Bytes(), &aliceSent)
+	if len(aliceSent) != 1 || aliceSent[0].RecipientUsername != "dev_bob" {
+		t.Errorf("expected 1 sent message from dev_alice to dev_bob, got %d", len(aliceSent))
+	}
+
+	// 8. Delete message
+	reqDelMsg := httptest.NewRequest("DELETE", fmt.Sprintf("/api/v1/messages/%d", createdMsg1.ID), nil)
+	reqDelMsg.Header.Set("Authorization", "Bearer "+tokens["dev_bob"])
+	recDelMsg := httptest.NewRecorder()
+	router.ServeHTTP(recDelMsg, reqDelMsg)
+
+	if recDelMsg.Code != http.StatusOK {
+		t.Errorf("expected 200 OK for delete message, got %d", recDelMsg.Code)
+	}
+}
+
 
 
 

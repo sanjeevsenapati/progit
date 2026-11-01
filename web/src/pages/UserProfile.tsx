@@ -254,11 +254,22 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username }) => {
                 Edit profile
               </a>
             ) : (
-              <button
-                className="w-full py-1.5 px-3 text-center text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-colors"
-              >
-                Follow
-              </button>
+              <div className="space-y-2">
+                <button
+                  className="w-full py-1.5 px-3 text-center text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-colors cursor-pointer"
+                >
+                  Follow
+                </button>
+                {currentUser && (
+                  <a
+                    href={`/messages?to=${profile.username}`}
+                    className="flex items-center justify-center space-x-1.5 w-full py-1.5 px-3 text-center text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-800 dark:text-white transition-colors shadow-sm"
+                  >
+                    <Mail className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>Send Message</span>
+                  </a>
+                )}
+              </div>
             )}
 
             {/* Social & Followers stats */}

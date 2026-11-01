@@ -33,6 +33,7 @@ import { ProjectsList } from './pages/ProjectsList';
 import { ProjectBoard } from './pages/ProjectBoard';
 import { NewOrg } from './pages/NewOrg';
 import { OrgView } from './pages/OrgView';
+import { Messages } from './pages/Messages';
 import { GlobalDialogProvider } from './components/ModalDialog';
 
 export const App: React.FC = () => {
@@ -71,6 +72,7 @@ export const App: React.FC = () => {
     if (path === '/explore') return <Explore />;
     if (path === '/new') return <NewRepo />;
     if (path === '/settings') return <UserSettings />;
+    if (path === '/messages') return <Messages />;
     if (path === '/admin') return <AdminDashboard />;
     if (path === '/install') return <Install />;
     if (path === '/org/new') return <NewOrg />;

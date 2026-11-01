@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, Repository, Project } from '../lib/api';
 import { RepoNav } from '../components/RepoNav';
+import { showToast, showModalConfirm } from '../components/ModalDialog';
 import { 
   Kanban, 
   Plus, 
@@ -8,8 +9,8 @@ import {
   Clock, 
   X, 
   Layers, 
-  Check, 
-  FolderPlus 
+  FolderPlus,
+  Trash2
 } from 'lucide-react';
 
 interface ProjectsListProps {
@@ -65,10 +66,32 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({ owner, repo: repoNam
       setShowModal(false);
       setTitle('');
       setDescription('');
+      showToast('Project created successfully', 'success');
     } catch (err: any) {
       setError(err.message || 'Failed to create project');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleDeleteProject = async (e: React.MouseEvent, p: Project) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const confirmed = await showModalConfirm({
+      title: 'Delete Project Board',
+      message: `Are you sure you want to delete "${p.title}"? This cannot be undone.`,
+      confirmText: 'Delete Project',
+      cancelText: 'Cancel',
+      isDanger: true,
+    });
+    if (!confirmed) return;
+
+    try {
+      await api.deleteProject(owner, repoName, p.id);
+      setProjects(prev => prev.filter(item => item.id !== p.id));
+      showToast('Project deleted', 'info');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete project', 'error');
     }
   };
 
@@ -112,7 +135,7 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({ owner, repo: repoNam
           {canWrite && (
             <button
               onClick={() => setShowModal(true)}
-              className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-sm transition-colors"
+              className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-sm transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Project</span>
@@ -177,11 +200,11 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({ owner, repo: repoNam
                 <a
                   key={p.id}
                   href={`/${owner}/${repoName}/projects/${p.id}`}
-                  className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-dark-hover/30 transition-colors block"
+                  className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-dark-hover/30 transition-colors block group"
                 >
                   <div className="space-y-1">
                     <div className="flex items-center space-x-2">
-                      <span className="font-bold text-sm text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400">
+                      <span className="font-bold text-sm text-gray-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
                         {p.title}
                       </span>
                       {p.is_closed && (
@@ -200,19 +223,31 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({ owner, repo: repoNam
                     </p>
                   </div>
 
-                  <div className="sm:text-right min-w-40 space-y-1">
-                    <div className="flex items-center justify-between sm:justify-end space-x-2 text-xs">
-                      <span className="font-mono font-bold text-gray-700 dark:text-dark-text">
-                        {done}/{total} done
-                      </span>
-                      <span className="text-gray-400 font-mono text-[11px]">({percent}%)</span>
+                  <div className="flex items-center space-x-6 sm:justify-end">
+                    <div className="sm:text-right min-w-36 space-y-1">
+                      <div className="flex items-center justify-between sm:justify-end space-x-2 text-xs">
+                        <span className="font-mono font-bold text-gray-700 dark:text-dark-text">
+                          {done}/{total} done
+                        </span>
+                        <span className="text-gray-400 font-mono text-[11px]">({percent}%)</span>
+                      </div>
+                      <div className="w-full bg-gray-100 dark:bg-dark-hover h-2 rounded-full overflow-hidden">
+                        <div
+                          className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                          style={{ width: `${percent}%` }}
+                        ></div>
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-100 dark:bg-dark-hover h-2 rounded-full overflow-hidden">
-                      <div
-                        className="bg-emerald-500 h-full rounded-full transition-all duration-300"
-                        style={{ width: `${percent}%` }}
-                      ></div>
-                    </div>
+
+                    {canWrite && (
+                      <button
+                        onClick={(e) => handleDeleteProject(e, p)}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 rounded hover:bg-red-50 dark:hover:bg-red-950/30 transition-all"
+                        title="Delete project"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </a>
               );
@@ -278,7 +313,7 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({ owner, repo: repoNam
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors"
+                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50"
                 >
                   Cancel
                 </button>
@@ -297,4 +332,3 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({ owner, repo: repoNam
     </div>
   );
 };
-

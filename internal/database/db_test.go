@@ -102,7 +102,7 @@ func TestRepositoryAndIssues(t *testing.T) {
 	}
 
 	// Issues
-	issue, err := CreateIssue(repo.ID, user.ID, "Fix memory leak", "Description here", false)
+	issue, err := CreateIssue(repo.ID, user.ID, "Fix memory leak", "Description here", false, nil)
 	if err != nil {
 		t.Fatalf("failed to create issue: %v", err)
 	}

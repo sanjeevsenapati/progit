@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth, useTheme } from '../lib/theme';
+import { api } from '../lib/api';
 import { 
   GitBranch, 
   Search, 
@@ -12,9 +13,8 @@ import {
   Shield, 
   Compass, 
   LayoutDashboard,
-  CircleDot,
-  GitPullRequest,
-  Building2
+  Building2,
+  Mail
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -22,6 +22,19 @@ export const Navbar: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchUnread = () => {
+      api.getUnreadMessageCount().then(data => {
+        setUnreadCount(data?.unread_count || 0);
+      }).catch(() => {});
+    };
+    fetchUnread();
+    const timer = setInterval(fetchUnread, 30000);
+    return () => clearInterval(timer);
+  }, [user]);
 
   return (
     <nav className="border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface sticky top-0 z-50 transition-colors">
@@ -81,13 +94,26 @@ export const Navbar: React.FC = () => {
               {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-gray-600" />}
             </button>
 
+            {user && (
+              <a
+                href="/messages"
+                className="relative p-2 rounded-lg text-gray-500 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-dark-hover transition-colors"
+                title="Messages"
+              >
+                <Mail className="w-4 h-4 text-gray-600 dark:text-dark-muted" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-emerald-600 rounded-full ring-2 ring-white dark:ring-dark-surface" />
+                )}
+              </a>
+            )}
+
             {user ? (
               <>
                 {/* Create Menu */}
                 <div className="relative">
                   <button
                     onClick={() => setCreateMenuOpen(!createMenuOpen)}
-                    className="flex items-center space-x-1 p-1.5 rounded-md border border-gray-300 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text text-sm font-medium"
+                    className="flex items-center space-x-1 p-1.5 rounded-md border border-gray-300 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text text-sm font-medium cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
@@ -115,7 +141,7 @@ export const Navbar: React.FC = () => {
                 <div className="relative">
                   <button
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="flex items-center space-x-2 focus:outline-none"
+                    className="flex items-center space-x-2 focus:outline-none cursor-pointer"
                   >
                     <div className="w-7 h-7 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-xs ring-2 ring-emerald-500/20">
                       {user.username.charAt(0).toUpperCase()}
@@ -137,6 +163,17 @@ export const Navbar: React.FC = () => {
                           <UserIcon className="w-4 h-4 mr-2.5 text-gray-400" />
                           <span>Your Profile</span>
                         </a>
+                        <a href="/messages" className="flex items-center justify-between px-4 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+                          <div className="flex items-center">
+                            <Mail className="w-4 h-4 mr-2.5 text-gray-400" />
+                            <span>Messages</span>
+                          </div>
+                          {unreadCount > 0 && (
+                            <span className="px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[10px] font-bold">
+                              {unreadCount}
+                            </span>
+                          )}
+                        </a>
                         <a href="/settings" className="flex items-center px-4 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
                           <Settings className="w-4 h-4 mr-2.5 text-gray-400" />
                           <span>Settings</span>
@@ -152,7 +189,7 @@ export const Navbar: React.FC = () => {
                       <div className="py-1">
                         <button
                           onClick={logout}
-                          className="w-full text-left flex items-center px-4 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                          className="w-full text-left flex items-center px-4 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors cursor-pointer"
                         >
                           <LogOut className="w-4 h-4 mr-2.5" />
                           <span>Sign out</span>
@@ -163,11 +200,17 @@ export const Navbar: React.FC = () => {
                 </div>
               </>
             ) : (
-              <div className="flex items-center space-x-2 text-sm font-medium">
-                <a href="/login" className="px-3 py-1.5 rounded-md text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover">
+              <div className="flex items-center space-x-2">
+                <a
+                  href="/login"
+                  className="px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-dark-text hover:text-gray-900 dark:hover:text-white"
+                >
                   Sign in
                 </a>
-                <a href="/register" className="px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">
+                <a
+                  href="/register"
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-colors"
+                >
                   Sign up
                 </a>
               </div>
@@ -178,4 +221,3 @@ export const Navbar: React.FC = () => {
     </nav>
   );
 };
-

@@ -112,6 +112,9 @@ export interface Issue {
   poster_id: number;
   poster_name: string;
   poster_avatar: string;
+  assignee_id?: number;
+  assignee_name?: string;
+  assignee_avatar?: string;
   title: string;
   content: string;
   is_pull: boolean;
@@ -282,6 +285,25 @@ export interface ProjectCard {
   created_at: string;
   updated_at: string;
 }
+
+export interface Message {
+  id: number;
+  sender_id: number;
+  sender_username: string;
+  sender_full_name?: string;
+  sender_avatar_url?: string;
+  recipient_id: number;
+  recipient_username: string;
+  recipient_full_name?: string;
+  recipient_avatar_url?: string;
+  subject: string;
+  content: string;
+  is_read: boolean;
+  read_at?: string;
+  created_at: string;
+}
+
+export type Developer = User;
 
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -475,11 +497,15 @@ export const api = {
   },
 
   // Issues
-  async listIssues(owner: string, repo: string, state: 'open' | 'closed' = 'open') {
-    return fetchJSON<Issue[]>(`/api/v1/repos/${owner}/${repo}/issues?state=${state}`);
+  async listIssues(owner: string, repo: string, state: 'open' | 'closed' = 'open', assignee?: string) {
+    let url = `/api/v1/repos/${owner}/${repo}/issues?state=${state}`;
+    if (assignee) {
+      url += `&assignee=${encodeURIComponent(assignee)}`;
+    }
+    return fetchJSON<Issue[]>(url);
   },
 
-  async createIssue(owner: string, repo: string, data: { title: string; content: string }) {
+  async createIssue(owner: string, repo: string, data: { title: string; content: string; assignee?: string }) {
     return fetchJSON<Issue>(`/api/v1/repos/${owner}/${repo}/issues`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -490,10 +516,20 @@ export const api = {
     return fetchJSON<Issue>(`/api/v1/repos/${owner}/${repo}/issues/${index}`);
   },
 
-  async updateIssue(owner: string, repo: string, index: number, closed: boolean) {
+  async updateIssue(owner: string, repo: string, index: number, closed?: boolean, assignee?: string | null) {
+    const payload: any = {};
+    if (closed !== undefined) payload.closed = closed;
+    if (assignee !== undefined) payload.assignee = assignee;
     return fetchJSON<Issue>(`/api/v1/repos/${owner}/${repo}/issues/${index}`, {
       method: 'PATCH',
-      body: JSON.stringify({ closed }),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async assignIssue(owner: string, repo: string, index: number, assignee: string | null) {
+    return fetchJSON<Issue>(`/api/v1/repos/${owner}/${repo}/issues/${index}/assignee`, {
+      method: 'PUT',
+      body: JSON.stringify({ assignee: assignee || '' }),
     });
   },
 
@@ -901,6 +937,13 @@ export const api = {
     });
   },
 
+  async updateProjectColumn(owner: string, repo: string, projectId: number, columnId: number, data: { title: string; order_num?: number }) {
+    return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}/projects/${projectId}/columns/${columnId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
   async deleteProjectColumn(owner: string, repo: string, projectId: number, columnId: number) {
     return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}/projects/${projectId}/columns/${columnId}`, {
       method: 'DELETE',
@@ -914,7 +957,14 @@ export const api = {
     });
   },
 
-  async moveProjectCard(owner: string, repo: string, projectId: number, cardId: number, data: { column_id: number; order_num: number }) {
+  async moveProjectCard(owner: string, repo: string, projectId: number, cardId: number, data: { column_id?: number; order_num?: number; content?: string }) {
+    return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}/projects/${projectId}/cards/${cardId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateProjectCard(owner: string, repo: string, projectId: number, cardId: number, data: { column_id?: number; order_num?: number; content?: string }) {
     return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}/projects/${projectId}/cards/${cardId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -925,6 +975,46 @@ export const api = {
     return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}/projects/${projectId}/cards/${cardId}`, {
       method: 'DELETE',
     });
+  },
+
+  // Direct Messaging (Developer Communication)
+  async sendMessage(data: { recipient_username: string; subject?: string; content: string }) {
+    return fetchJSON<Message>('/api/v1/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async listInboxMessages() {
+    return fetchJSON<Message[]>('/api/v1/messages/inbox');
+  },
+
+  async listSentMessages() {
+    return fetchJSON<Message[]>('/api/v1/messages/sent');
+  },
+
+  async getUnreadMessageCount() {
+    return fetchJSON<{ unread_count: number }>('/api/v1/messages/unread-count');
+  },
+
+  async getMessage(id: number) {
+    return fetchJSON<Message>(`/api/v1/messages/${id}`);
+  },
+
+  async markMessageRead(id: number) {
+    return fetchJSON<{ message: string }>(`/api/v1/messages/${id}/read`, {
+      method: 'PATCH',
+    });
+  },
+
+  async deleteMessage(id: number) {
+    return fetchJSON<{ message: string }>(`/api/v1/messages/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async listDevelopers(limit = 100) {
+    return fetchJSON<User[]>(`/api/v1/developers?limit=${limit}`);
   },
 };
 

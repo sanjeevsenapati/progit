@@ -83,22 +83,25 @@ type WikiPage struct {
 }
 
 type Issue struct {
-	ID           int64      `json:"id"`
-	RepoID       int64      `json:"repo_id"`
-	RepoOwner    string     `json:"repo_owner,omitempty"`
-	RepoName     string     `json:"repo_name,omitempty"`
-	IndexNumber  int64      `json:"index_number"`
-	PosterID     int64      `json:"poster_id"`
-	PosterName   string     `json:"poster_name"`
-	PosterAvatar string     `json:"poster_avatar"`
-	Title        string     `json:"title"`
-	Content      string     `json:"content"`
-	IsPull       bool       `json:"is_pull"`
-	IsClosed     bool       `json:"is_closed"`
-	ClosedAt     *time.Time `json:"closed_at,omitempty"`
-	NumComments  int        `json:"num_comments"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	ID             int64      `json:"id"`
+	RepoID         int64      `json:"repo_id"`
+	RepoOwner      string     `json:"repo_owner,omitempty"`
+	RepoName       string     `json:"repo_name,omitempty"`
+	IndexNumber    int64      `json:"index_number"`
+	PosterID       int64      `json:"poster_id"`
+	PosterName     string     `json:"poster_name"`
+	PosterAvatar   string     `json:"poster_avatar"`
+	AssigneeID     *int64     `json:"assignee_id,omitempty"`
+	AssigneeName   string     `json:"assignee_name,omitempty"`
+	AssigneeAvatar string     `json:"assignee_avatar,omitempty"`
+	Title          string     `json:"title"`
+	Content        string     `json:"content"`
+	IsPull         bool       `json:"is_pull"`
+	IsClosed       bool       `json:"is_closed"`
+	ClosedAt       *time.Time `json:"closed_at,omitempty"`
+	NumComments    int        `json:"num_comments"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
 type PullRequest struct {
@@ -295,5 +298,22 @@ type ProjectCard struct {
 	CreatorName string    `json:"creator_name,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type Message struct {
+	ID                 int64      `json:"id"`
+	SenderID           int64      `json:"sender_id"`
+	SenderUsername     string     `json:"sender_username"`
+	SenderFullName     string     `json:"sender_full_name,omitempty"`
+	SenderAvatarURL    string     `json:"sender_avatar_url,omitempty"`
+	RecipientID        int64      `json:"recipient_id"`
+	RecipientUsername  string     `json:"recipient_username"`
+	RecipientFullName  string     `json:"recipient_full_name,omitempty"`
+	RecipientAvatarURL string     `json:"recipient_avatar_url,omitempty"`
+	Subject            string     `json:"subject"`
+	Content            string     `json:"content"`
+	IsRead             bool       `json:"is_read"`
+	ReadAt             *time.Time `json:"read_at,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
 }
 
