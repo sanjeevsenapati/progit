@@ -94,6 +94,8 @@ All admin endpoints require an active session or Personal Access Token from a us
 
 | Method | Endpoint | Description |
 |---|---|---|
+| `GET` | `/api/health` | Public service health check (checks DB & repositories) |
+| `GET` | `/api/ready` | Public service readiness probe (returns HTTP 200) |
 | `GET` | `/api/v1/install/status` | Check installation lock status and server configuration |
 | `POST` | `/api/v1/install` | Complete setup wizard and create Super Admin |
 | `GET` | `/api/v1/admin/stats` | System telemetry, runtime metrics, and storage paths |

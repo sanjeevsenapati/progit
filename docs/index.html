@@ -490,6 +490,7 @@
     .badge-get { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
     .badge-post { background: rgba(16, 185, 129, 0.2); color: #10b981; }
     .badge-put { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+    .badge-patch { background: rgba(168, 85, 247, 0.2); color: #a855f7; }
     .badge-delete { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
 
     /* Next / Previous Page Buttons */
@@ -775,6 +776,9 @@
           <li><a href="#feature-wiki" data-target="feature-wiki">Git-Backed Wiki Engine</a></li>
           <li><a href="#feature-projects" data-target="feature-projects">Kanban Project Boards</a></li>
           <li><a href="#feature-orgs" data-target="feature-orgs">Organizations, Teams &amp; Access</a></li>
+          <li><a href="#feature-webhooks" data-target="feature-webhooks">Webhooks &amp; Event Delivery</a></li>
+          <li><a href="#feature-messages" data-target="feature-messages">Developer Direct Messaging</a></li>
+          <li><a href="#feature-danger-zone" data-target="feature-danger-zone">Danger Zone &amp; Security Scoping</a></li>
         </ul>
       </div>
 
@@ -792,10 +796,19 @@
         <div class="sidebar-heading">REST API Reference (v1)</div>
         <ul class="sidebar-nav">
           <li><a href="#api-overview" data-target="api-overview">API Overview &amp; Authentication</a></li>
-          <li><a href="#api-repos" data-target="api-repos">Repositories &amp; File Tree API</a></li>
+          <li><a href="#api-users" data-target="api-users">Users, Tokens &amp; SSH Keys API</a></li>
+          <li><a href="#api-repos" data-target="api-repos">Repositories &amp; Branches API</a></li>
+          <li><a href="#api-contents" data-target="api-contents">File Tree &amp; Online Commits API</a></li>
+          <li><a href="#api-issues" data-target="api-issues">Issues &amp; Collaborator Assignees API</a></li>
           <li><a href="#api-pulls" data-target="api-pulls">Pull Requests &amp; Review API</a></li>
+          <li><a href="#api-forks" data-target="api-forks">Repository Forking API</a></li>
+          <li><a href="#api-wiki-pages" data-target="api-wiki-pages">Wiki &amp; Pages Hosting API</a></li>
+          <li><a href="#api-webhooks" data-target="api-webhooks">Webhooks &amp; Deliveries API</a></li>
+          <li><a href="#api-danger-zone" data-target="api-danger-zone">Danger Zone &amp; Governance API</a></li>
+          <li><a href="#api-messages" data-target="api-messages">Developer Messaging API</a></li>
           <li><a href="#api-orgs" data-target="api-orgs">Organizations &amp; Teams API</a></li>
           <li><a href="#api-projects" data-target="api-projects">Projects &amp; Cards API</a></li>
+          <li><a href="#api-admin" data-target="api-admin">System Admin &amp; Maintenance API</a></li>
         </ul>
       </div>
 
@@ -1847,6 +1860,168 @@ PRAGMA foreign_keys = ON;</code><button class="copy-btn" onclick="copyCode(this)
             <span class="dir">&larr; Previous</span>
             <span class="title">Kanban Project Boards</span>
           </a>
+          <a href="#feature-webhooks" class="nav-btn" onclick="navigate('feature-webhooks')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Webhooks &amp; Delivery</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 25B. Features: Webhooks -->
+      <article class="doc-page" id="page-feature-webhooks">
+        <div class="breadcrumbs">
+          <span>Features Guide</span>
+          <span>/</span>
+          <span class="current">Webhooks &amp; Automated Delivery</span>
+        </div>
+        <h1 class="page-title">Webhooks &amp; Automated Delivery</h1>
+        <p class="page-subtitle">Trigger CI/CD pipelines, Slack/Discord notifications, and custom webhooks automatically on Git push, issue, and pull request events.</p>
+
+        <h2>Overview</h2>
+        <p>ProGit features an asynchronous, pure-Go webhook dispatch engine. When events occur in your repository (such as code pushes over HTTP or native SSH, issue creation, or pull request reviews), ProGit queues and delivers HTTP POST payloads with cryptographic HMAC signatures to your subscribed endpoints.</p>
+
+        <h2>Supported Event Triggers</h2>
+        <table>
+          <thead>
+            <tr><th>Event</th><th>Trigger Condition</th><th>Payload Contents</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>push</code></td><td>Code committed or branch pushed via Git CLI (Smart HTTP / SSH) or online file editor</td><td>Repository metadata, pusher account, Git ref, before/after commit SHAs, commit array</td></tr>
+            <tr><td><code>issues</code></td><td>Issue opened, closed, edited, or assigned to a collaborator</td><td>Repository info, issue title, issue body, sender, state</td></tr>
+            <tr><td><code>pull_request</code></td><td>Pull request opened, closed, merged, or reviewed</td><td>Repository info, PR details, head/base branches, sender, action</td></tr>
+            <tr><td><code>ping</code></td><td>Manual test delivery triggered from repository settings</td><td>Repository info, zen message, delivery timestamp</td></tr>
+          </tbody>
+        </table>
+
+        <h2>Cryptographic Signature Verification (HMAC-SHA256)</h2>
+        <p>When you configure a secret token on a webhook, ProGit calculates a cryptographic HMAC-SHA256 signature for every payload and transmits it in both standard GitHub-compatible and ProGit headers:</p>
+        <ul>
+          <li><code>X-Hub-Signature-256</code>: <code>sha256=&lt;hex-encoded HMAC signature&gt;</code></li>
+          <li><code>X-ProGit-Signature</code>: <code>sha256=&lt;hex-encoded HMAC signature&gt;</code></li>
+          <li><code>X-ProGit-Event</code>: The event name (e.g. <code>push</code>, <code>issues</code>, <code>pull_request</code>, <code>ping</code>)</li>
+          <li><code>X-ProGit-Delivery</code>: Unique delivery UUID for tracing and idempotency</li>
+        </ul>
+
+        <div class="callout callout-tip">
+          <div class="callout-title">Verifying Signatures in Python</div>
+          <p>You can verify webhook requests in your backend using standard HMAC routines:</p>
+        </div>
+        <pre><code>import hmac, hashlib
+
+def verify_progit_signature(payload_bytes, secret_key, header_signature):
+    expected = "sha256=" + hmac.new(secret_key.encode(), payload_bytes, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, header_signature)</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h2>Delivery Logs &amp; Test Pings</h2>
+        <p>Repository administrators can trigger an immediate test ping from the <strong>Repository Settings &rarr; Webhooks</strong> tab to verify network connectivity and signature verification. Each delivery is logged with full request/response diagnostics, HTTP status codes, and execution duration.</p>
+
+        <div class="page-nav-buttons">
+          <a href="#feature-orgs" class="nav-btn" onclick="navigate('feature-orgs')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Organizations &amp; Teams</span>
+          </a>
+          <a href="#feature-messages" class="nav-btn" onclick="navigate('feature-messages')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Developer Messaging</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 25C. Features: Developer Messaging -->
+      <article class="doc-page" id="page-feature-messages">
+        <div class="breadcrumbs">
+          <span>Features Guide</span>
+          <span>/</span>
+          <span class="current">Developer Direct Messaging</span>
+        </div>
+        <h1 class="page-title">Developer Direct Messaging</h1>
+        <p class="page-subtitle">Built-in developer communication system for private messaging, peer feedback, and sprint coordination.</p>
+
+        <h2>Overview</h2>
+        <p>ProGit includes an integrated messaging system that allows developers and contributors to communicate privately within the platform without leaving their code workspace. Whether coordinating code reviews, discussing sprint priorities, or providing private feedback, developers can exchange messages directly.</p>
+
+        <h2>Key Capabilities</h2>
+        <ul>
+          <li><strong>Real-time Unread Badge</strong>: The top navigation bar displays a live unread message counter that updates as messages arrive.</li>
+          <li><strong>Inbox &amp; Outbox</strong>: Clean tabbed interface separating received messages from sent communications.</li>
+          <li><strong>One-Click Reply</strong>: Reply directly to sender with automated subject prefixing (<code>Re: ...</code>) and conversation continuity.</li>
+          <li><strong>Quick Developer Directory</strong>: Message composer with auto-population of active platform developers.</li>
+          <li><strong>Markdown Formatting</strong>: Messages support rich Markdown text, code blocks, lists, and inline links.</li>
+        </ul>
+
+        <div class="callout callout-info">
+          <div class="callout-title">Instant Access</div>
+          <p>Access your messaging portal anytime by clicking the <strong>Messages</strong> icon in the navigation bar or visiting <code>/messages</code> in the web client.</p>
+        </div>
+
+        <div class="page-nav-buttons">
+          <a href="#feature-webhooks" class="nav-btn" onclick="navigate('feature-webhooks')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Webhooks &amp; Delivery</span>
+          </a>
+          <a href="#feature-danger-zone" class="nav-btn" onclick="navigate('feature-danger-zone')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Danger Zone &amp; Security</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 25D. Features: Danger Zone & Security Scoping -->
+      <article class="doc-page" id="page-feature-danger-zone">
+        <div class="breadcrumbs">
+          <span>Features Guide</span>
+          <span>/</span>
+          <span class="current">Danger Zone &amp; Security Scoping</span>
+        </div>
+        <h1 class="page-title">Danger Zone &amp; Repository Security</h1>
+        <p class="page-subtitle">Critical administrative actions: visibility toggling, read-only archiving, ownership transfers, and collaborator security.</p>
+
+        <h2>Danger Zone Actions</h2>
+        <p>Located in the <strong>Settings &rarr; Danger Zone</strong> tab of every repository, these operations protect high-stakes repository transitions:</p>
+
+        <table>
+          <thead>
+            <tr><th>Action</th><th>Behavior</th><th>Security Safeguards</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Change Visibility</strong></td>
+              <td>Toggle between Public and Private status.</td>
+              <td>Requires repository administrator privileges. Immediately restricts access in Web UI, REST API, Git HTTP, and native SSH.</td>
+            </tr>
+            <tr>
+              <td><strong>Archive Repository</strong></td>
+              <td>Places repository into permanent read-only status.</td>
+              <td>Enforces strict read-only mode across all layers: rejects Git CLI pushes (<code>receive-pack</code>), online commits, file edits, uploads, and issue creation with HTTP 400. Can be unarchived at any time by owner.</td>
+            </tr>
+            <tr>
+              <td><strong>Transfer Ownership</strong></td>
+              <td>Reassigns repository to another developer or organization.</td>
+              <td>Atomically moves the Git bare repository folder on disk to the new owner namespace and reassigns database records. Validates target account existence and prevents collisions.</td>
+            </tr>
+            <tr>
+              <td><strong>Delete Repository</strong></td>
+              <td>Permanently purges repository and bare Git storage.</td>
+              <td>Requires typing repository name to confirm in a themed dialog. Destroys all issues, PRs, wiki pages, webhooks, and disk assets permanently.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>Collaborator-Scoped Issue Assignees</h2>
+        <div class="callout callout-warn">
+          <div class="callout-title">Security Hardening: Strict Collaborator Scoping</div>
+          <p>To eliminate information disclosure and unauthorized assignment risks, ProGit strictly restricts issue assignees to confirmed <strong>repository owners and collaborators</strong>:</p>
+        </div>
+        <ul>
+          <li>The <code>GET /api/v1/repos/{owner}/{repo}/assignees</code> endpoint returns exclusively users with valid collaborator or owner privileges.</li>
+          <li>Assigning an issue to any external user or stranger is blocked at the backend API layer with <code>HTTP 400 Bad Request ("user must be a collaborator or owner of this repository")</code>.</li>
+        </ul>
+
+        <div class="page-nav-buttons">
+          <a href="#feature-messages" class="nav-btn" onclick="navigate('feature-messages')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Developer Messaging</span>
+          </a>
           <a href="#admin-setup" class="nav-btn" onclick="navigate('admin-setup')">
             <span class="dir">Next &rarr;</span>
             <span class="title">Super Admin Setup</span>
@@ -1873,9 +2048,9 @@ podman exec -it progit /usr/local/bin/progit admin create-user \
   --admin</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
         <div class="page-nav-buttons">
-          <a href="#feature-orgs" class="nav-btn" onclick="navigate('feature-orgs')">
+          <a href="#feature-danger-zone" class="nav-btn" onclick="navigate('feature-danger-zone')">
             <span class="dir">&larr; Previous</span>
-            <span class="title">Organizations &amp; Teams</span>
+            <span class="title">Danger Zone &amp; Security</span>
           </a>
           <a href="#admin-users" class="nav-btn" onclick="navigate('admin-users')">
             <span class="dir">Next &rarr;</span>
@@ -1976,10 +2151,10 @@ podman exec -it progit /usr/local/bin/progit admin create-user \
         </div>
       </article>
 
-      <!-- 30. API: Overview -->
+            <!-- 30. API: Overview -->
       <article class="doc-page" id="page-api-overview">
         <div class="breadcrumbs">
-          <span>REST API</span>
+          <span>REST API Reference (v1)</span>
           <span>/</span>
           <span class="current">Overview &amp; Authentication</span>
         </div>
@@ -1989,25 +2164,145 @@ podman exec -it progit /usr/local/bin/progit admin create-user \
         <h2>Base URL</h2>
         <pre><code>http://localhost:3000/api/v1</code></pre>
 
-        <h2>Authentication</h2>
-        <p>Authenticate requests by passing a Personal Access Token in the <code>Authorization</code> header:</p>
-        <pre><code>Authorization: Bearer &lt;your_personal_access_token&gt;</code></pre>
+        <h2>Authentication Methods</h2>
+        <p>ProGit supports two primary authentication schemes for API interaction:</p>
+        <ol>
+          <li><strong>Personal Access Tokens (Bearer PAT)</strong>: Ideal for scripts, CI/CD runners, and automated tools.
+            <pre><code>Authorization: Bearer pgt_34f8a92...</code></pre>
+          </li>
+          <li><strong>Web Session Cookie</strong>: Sent automatically by browsers when authenticated (`progit_session`). SameSite is enforced with HttpOnly security.</li>
+        </ol>
 
-        <h2>Health Check Endpoints</h2>
-        <div class="api-endpoint">
-          <span class="badge badge-get">GET</span>
-          <span>/api/health</span>
-        </div>
-        <pre><code>{
-  "status": "ok",
-  "app": "ProGit",
-  "version": "1.0.0"
+        <h2>IP Rate Limiting</h2>
+        <p>To neutralize credential brute-force attacks while preserving automated test throughput, authentication routes (<code>/api/v1/auth/login</code> and <code>/api/v1/auth/register</code>) enforce an IP-based sliding window rate limit of <strong>120 requests per minute</strong>. Requests exceeding this threshold receive HTTP 429:</p>
+        <pre><code>HTTP/1.1 429 Too Many Requests
+Content-Type: application/json
+
+{
+  "error": "Too many authentication attempts. Please try again later."
 }</code></pre>
+
+        <h2>Standard JSON Error Format</h2>
+        <p>All client and server errors return structured JSON with an explanatory <code>error</code> key:</p>
+        <pre><code>{
+  "error": "resource not found or access denied"
+}</code></pre>
+
+        <h2>Health &amp; Readiness Probes</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/health</span></div>
+        <p>Verifies Go HTTP server, pure-Go SQLite WAL database connectivity, and repository disk access.</p>
+        <pre><code>{
+  "app": "ProGit",
+  "status": "ok",
+  "version": "1.0.0",
+  "database": "healthy",
+  "repositories": "accessible",
+  "ssh_enabled": true,
+  "uptime": "2h14m"
+}</code></pre>
+
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/ready</span></div>
+        <p>Kubernetes / container readiness probe returning HTTP 200 OK when ProGit is ready to accept traffic.</p>
 
         <div class="page-nav-buttons">
           <a href="#admin-maintenance" class="nav-btn" onclick="navigate('admin-maintenance')">
             <span class="dir">&larr; Previous</span>
             <span class="title">WAL Maintenance</span>
+          </a>
+          <a href="#api-users" class="nav-btn" onclick="navigate('api-users')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Users &amp; Auth API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 30B. API: Users, Tokens & Keys -->
+      <article class="doc-page" id="page-api-users">
+        <div class="breadcrumbs">
+          <span>REST API Reference (v1)</span>
+          <span>/</span>
+          <span class="current">Users, Tokens &amp; Keys API</span>
+        </div>
+        <h1 class="page-title">Users, Tokens &amp; SSH Keys API</h1>
+        <p class="page-subtitle">Endpoints for registration, session authentication, profile settings, PATs, and SSH keys.</p>
+
+        <h2>Register User Account</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/auth/register</span></div>
+        <pre><code>{
+  "username": "dev_alice",
+  "email": "alice@progit.local",
+  "password": "SecretPassword123!",
+  "full_name": "Developer Alice"
+}</code></pre>
+
+        <h2>User Login (Create Session)</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/auth/login</span></div>
+        <pre><code>{
+  "username": "dev_alice",
+  "password": "SecretPassword123!"
+}</code></pre>
+        <p>Response sets <code>Set-Cookie: progit_session=...</code> and returns user profile:</p>
+        <pre><code>{
+  "message": "Login successful",
+  "token": "d307a10bb36...",
+  "user": {
+    "id": 1,
+    "username": "dev_alice",
+    "email": "alice@progit.local",
+    "is_admin": false
+  }
+}</code></pre>
+
+        <h2>Get Current User Profile</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/auth/me</span></div>
+        <p>Returns the currently authenticated user's session profile, permissions, and administrator status.</p>
+
+        <h2>User Logout</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/auth/logout</span></div>
+        <p>Clears active session cookie and invalidates session token.</p>
+
+        <h2>Inspect Public User Profile</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/users/{username}</span></div>
+        <p>Returns public account details, repositories, bio, location, and activity metrics.</p>
+
+        <h2>Update User Settings</h2>
+        <div class="api-endpoint"><span class="badge badge-put">PUT</span><span>/api/v1/user/settings</span></div>
+        <pre><code>{
+  "full_name": "Alice Senior Engineer",
+  "bio": "Distributed systems and Go developer",
+  "location": "Bengaluru, India",
+  "website": "https://github.com/alice"
+}</code></pre>
+
+        <h2>Update Password</h2>
+        <div class="api-endpoint"><span class="badge badge-put">PUT</span><span>/api/v1/user/password</span></div>
+        <pre><code>{
+  "old_password": "SecretPassword123!",
+  "new_password": "NewSecretPassword456!"
+}</code></pre>
+
+        <h2>Personal Access Tokens (PAT)</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/user/tokens</span></div>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/user/tokens</span></div>
+        <pre><code>{
+  "name": "ci-builder-token",
+  "scopes": "repo,user"
+}</code></pre>
+        <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/user/tokens/{id}</span></div>
+
+        <h2>SSH Public Keys</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/user/keys</span></div>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/user/keys</span></div>
+        <pre><code>{
+  "title": "MacBook Pro M-Series",
+  "key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGt7..."
+}</code></pre>
+        <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/user/keys/{id}</span></div>
+
+        <div class="page-nav-buttons">
+          <a href="#api-overview" class="nav-btn" onclick="navigate('api-overview')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">API Overview</span>
           </a>
           <a href="#api-repos" class="nav-btn" onclick="navigate('api-repos')">
             <span class="dir">Next &rarr;</span>
@@ -2016,43 +2311,215 @@ podman exec -it progit /usr/local/bin/progit admin create-user \
         </div>
       </article>
 
-      <!-- 31. API: Repos -->
+      <!-- 31. API: Repos & Branches -->
       <article class="doc-page" id="page-api-repos">
         <div class="breadcrumbs">
-          <span>REST API</span>
+          <span>REST API Reference (v1)</span>
           <span>/</span>
-          <span class="current">Repositories &amp; Files</span>
+          <span class="current">Repositories &amp; Branches API</span>
         </div>
-        <h1 class="page-title">Repositories &amp; File Tree API</h1>
-        <p class="page-subtitle">Endpoints for repository management, branches, commits, and file operations.</p>
+        <h1 class="page-title">Repositories &amp; Branches API</h1>
+        <p class="page-subtitle">Endpoints for repository creation, metadata inspection, stars, collaborators, and branch lifecycle.</p>
 
-        <h2>List User Repositories</h2>
-        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/user/repos</span></div>
+        <h2>List Repositories</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos</span></div>
+        <p>Optional query parameter <code>?owner={username}</code> filters repositories by owner handle.</p>
 
         <h2>Create Repository</h2>
-        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/user/repos</span></div>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos</span></div>
         <pre><code>{
-  "name": "progit-service",
-  "description": "Core Git Engine",
+  "name": "cloud-distributed-kv",
+  "description": "High performance pure-Go key-value store",
   "private": false,
-  "auto_init": true
+  "auto_init": true,
+  "readme": "Default"
 }</code></pre>
 
-        <h2>Get Remote File Tree</h2>
-        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/tree/{branch}</span></div>
+        <h2>Get Repository Details</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}</span></div>
+        <pre><code>{
+  "id": 14,
+  "name": "cloud-distributed-kv",
+  "full_name": "dev_alice/cloud-distributed-kv",
+  "owner": "dev_alice",
+  "default_branch": "main",
+  "is_private": false,
+  "is_archived": false,
+  "can_write": true,
+  "is_admin": true,
+  "clone_urls": {
+    "http": "http://localhost:3000/dev_alice/cloud-distributed-kv.git",
+    "ssh": "ssh://git@localhost:2222/dev_alice/cloud-distributed-kv.git"
+  }
+}</code></pre>
 
-        <h2>Online File Creation / Update</h2>
+        <h2>Toggle Repository Star</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/star</span></div>
+        <pre><code>{
+  "starred": true,
+  "num_stars": 12
+}</code></pre>
+
+        <h2>List Collaborators</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/collaborators</span></div>
+
+        <h2>Add / Update Collaborator</h2>
+        <div class="api-endpoint"><span class="badge badge-put">PUT</span><span>/api/v1/repos/{owner}/{repo}/collaborators/{collaborator}</span></div>
+        <pre><code>{
+  "mode": "write"
+}</code></pre>
+        <p>Allowed modes: <code>read</code> (clone and inspect), <code>write</code> (commit and push code), <code>admin</code> (full repository settings).</p>
+
+        <h2>Revoke Collaborator</h2>
+        <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/repos/{owner}/{repo}/collaborators/{collaborator}</span></div>
+
+        <h2>List Branches</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/branches</span></div>
+        <p>Pass <code>?detail=true</code> to return rich branch metadata including author, latest commit SHA, commit message, and relative timestamp.</p>
+
+        <h2>Create Branch</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/branches</span></div>
+        <pre><code>{
+  "branch_name": "feature/raft-consensus",
+  "base_ref": "main"
+}</code></pre>
+
+        <h2>Delete Branch</h2>
+        <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/repos/{owner}/{repo}/branches/{branch}</span></div>
+        <p>Branch protection blocks deletion of the default repository branch (<code>main</code> / <code>master</code>) with HTTP 400.</p>
+
+        <h2>List Tags</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/tags</span></div>
+
+        <h2>Commit History &amp; Diffs</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/commits?ref=main</span></div>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/commits/{sha}</span></div>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/compare?base=main&amp;head=feature</span></div>
+
+        <div class="page-nav-buttons">
+          <a href="#api-users" class="nav-btn" onclick="navigate('api-users')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Users API</span>
+          </a>
+          <a href="#api-contents" class="nav-btn" onclick="navigate('api-contents')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Contents &amp; Files API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 31B. API: File Contents & Online Commits -->
+      <article class="doc-page" id="page-api-contents">
+        <div class="breadcrumbs">
+          <span>REST API Reference (v1)</span>
+          <span>/</span>
+          <span class="current">File Tree &amp; Online Commits API</span>
+        </div>
+        <h1 class="page-title">File Tree &amp; Online Commits API</h1>
+        <p class="page-subtitle">Endpoints for browsing trees, reading raw blobs, editing files online, and multi-file directory uploads.</p>
+
+        <h2>Get Directory Tree</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/tree?ref=main&amp;path=src/core</span></div>
+
+        <h2>Get Blob File Content</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/blob?ref=main&amp;path=README.md</span></div>
+        <pre><code>{
+  "name": "README.md",
+  "path": "README.md",
+  "size": 1820,
+  "content": "# Cloud KV Store\n\nUltra-fast in-memory...",
+  "is_binary": false,
+  "language": "markdown"
+}</code></pre>
+
+        <h2>Stream Raw File Bytes</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/raw?ref=main&amp;path=assets/banner.png</span></div>
+        <p>Streams raw file bytes with appropriate <code>Content-Type</code> headers (e.g. <code>image/png</code>, <code>application/octet-stream</code>).</p>
+
+        <h2>Online File Creation &amp; Update</h2>
         <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/contents/{path}</span></div>
         <pre><code>{
   "branch": "main",
-  "content": "package main\n\nfunc main() {}\n",
-  "message": "Add entrypoint"
+  "content": "package core\n\ntype KV struct {}\n",
+  "message": "Add KV core definition"
+}</code></pre>
+
+        <h2>Online File Deletion</h2>
+        <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/repos/{owner}/{repo}/contents/{path}</span></div>
+        <pre><code>{
+  "branch": "main",
+  "message": "Remove deprecated configuration"
+}</code></pre>
+
+        <h2>Multipart Multi-File &amp; Directory Upload</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/upload</span></div>
+        <p>Accepts <code>multipart/form-data</code> with form fields <code>branch</code>, <code>message</code>, and one or more file fields preserving relative paths (<code>webkitdirectory</code>).</p>
+
+        <div class="page-nav-buttons">
+          <a href="#api-repos" class="nav-btn" onclick="navigate('api-repos')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Repositories API</span>
+          </a>
+          <a href="#api-issues" class="nav-btn" onclick="navigate('api-issues')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Issues API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 31C. API: Issues & Assignees -->
+      <article class="doc-page" id="page-api-issues">
+        <div class="breadcrumbs">
+          <span>REST API Reference (v1)</span>
+          <span>/</span>
+          <span class="current">Issues &amp; Assignees API</span>
+        </div>
+        <h1 class="page-title">Issues &amp; Assignees API</h1>
+        <p class="page-subtitle">Endpoints for issue tracking, discussion comments, and security-scoped collaborator assignees.</p>
+
+        <h2>List Issues</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/issues</span></div>
+        <p>Query parameters: <code>?state=open|closed</code>, <code>?assignee=dev_alice</code>.</p>
+
+        <h2>Create Issue</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/issues</span></div>
+        <pre><code>{
+  "title": "Support distributed snapshotting",
+  "content": "We need to support checkpointing WAL files across multiple nodes."
+}</code></pre>
+
+        <h2>Get Issue Details</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/issues/{index}</span></div>
+
+        <h2>Update Issue Status &amp; Title</h2>
+        <div class="api-endpoint"><span class="badge badge-patch">PATCH</span><span>/api/v1/repos/{owner}/{repo}/issues/{index}</span></div>
+        <pre><code>{
+  "title": "Support distributed snapshotting (v2)",
+  "state": "closed"
+}</code></pre>
+
+        <h2>Get Collaborator Assignees (Security Scoped)</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/assignees</span></div>
+        <p>Returns only users eligible for issue assignment: confirmed repository owners and collaborators. External users and platform strangers are strictly excluded.</p>
+
+        <h2>Assign Issue to Collaborator</h2>
+        <div class="api-endpoint"><span class="badge badge-put">PUT</span><span>/api/v1/repos/{owner}/{repo}/issues/{index}/assignee</span></div>
+        <pre><code>{
+  "assignee": "dev_alice"
+}</code></pre>
+        <p>Assigning an issue to any user who is not an owner or collaborator returns <code>HTTP 400 Bad Request</code>.</p>
+
+        <h2>Issue Comments Thread</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/issues/{index}/comments</span></div>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/issues/{index}/comments</span></div>
+        <pre><code>{
+  "content": "Implemented in PR #5. Will verify with integration test."
 }</code></pre>
 
         <div class="page-nav-buttons">
-          <a href="#api-overview" class="nav-btn" onclick="navigate('api-overview')">
+          <a href="#api-contents" class="nav-btn" onclick="navigate('api-contents')">
             <span class="dir">&larr; Previous</span>
-            <span class="title">REST API Overview</span>
+            <span class="title">Contents &amp; Files API</span>
           </a>
           <a href="#api-pulls" class="nav-btn" onclick="navigate('api-pulls')">
             <span class="dir">Next &rarr;</span>
@@ -2061,39 +2528,291 @@ podman exec -it progit /usr/local/bin/progit admin create-user \
         </div>
       </article>
 
-      <!-- 32. API: Pulls -->
+      <!-- 32. API: Pull Requests & Reviews -->
       <article class="doc-page" id="page-api-pulls">
         <div class="breadcrumbs">
-          <span>REST API</span>
+          <span>REST API Reference (v1)</span>
           <span>/</span>
-          <span class="current">Pull Requests &amp; Reviews</span>
+          <span class="current">Pull Requests &amp; Reviews API</span>
         </div>
         <h1 class="page-title">Pull Requests &amp; Review API</h1>
-        <p class="page-subtitle">Endpoints for managing PRs, code reviews, and executing merges.</p>
+        <p class="page-subtitle">Endpoints for opening PRs, inspecting unified diffs, code reviews, and executing merges.</p>
 
-        <h2>Create Pull Request</h2>
+        <h2>List Pull Requests</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/pulls?state=open</span></div>
+
+        <h2>Open Pull Request</h2>
         <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/pulls</span></div>
         <pre><code>{
-  "title": "Add HTTPS support",
+  "title": "Add HTTPS support and ACME integration",
   "content": "Implements automatic TLS certificate provisioning",
-  "head_branch": "feature-https",
-  "base_branch": "main"
+  "head": "feature-https",
+  "base": "main"
 }</code></pre>
 
-        <h2>Submit Review</h2>
+        <h2>Inspect PR Details &amp; Mergeability</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/pulls/{index}</span></div>
+
+        <h2>Get Pull Request Unified Diff</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/pulls/{index}/diff</span></div>
+
+        <h2>Submit Code Review</h2>
         <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/pulls/{index}/reviews</span></div>
         <pre><code>{
-  "state": "APPROVED",
-  "comment": "Looks fantastic. Tested cleanly."
+  "content": "Architecture looks solid. Verified zero CGO compatibility.",
+  "review_state": "approved"
+}</code></pre>
+        <p>Review states: <code>approved</code>, <code>comment</code>, <code>changes_requested</code>.</p>
+
+        <h2>List &amp; Add Inline Review Comments</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/pulls/{index}/reviews/comments</span></div>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/pulls/{index}/reviews/comments</span></div>
+        <pre><code>{
+  "content": "Consider adding a timeout here to avoid socket leaks",
+  "path": "internal/https/cert.go",
+  "line": 42
 }</code></pre>
 
         <h2>Execute Native Git Merge</h2>
         <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/pulls/{index}/merge</span></div>
+        <pre><code>{
+  "merge_style": "merge"
+}</code></pre>
+        <p>Supported merge styles: <code>merge</code> (merge commit), <code>squash</code> (squash and merge), <code>rebase</code> (rebase and fast-forward).</p>
 
         <div class="page-nav-buttons">
-          <a href="#api-repos" class="nav-btn" onclick="navigate('api-repos')">
+          <a href="#api-issues" class="nav-btn" onclick="navigate('api-issues')">
             <span class="dir">&larr; Previous</span>
-            <span class="title">Repositories API</span>
+            <span class="title">Issues API</span>
+          </a>
+          <a href="#api-forks" class="nav-btn" onclick="navigate('api-forks')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Forking API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 32B. API: Repository Forking -->
+      <article class="doc-page" id="page-api-forks">
+        <div class="breadcrumbs">
+          <span>REST API Reference (v1)</span>
+          <span>/</span>
+          <span class="current">Repository Forking API</span>
+        </div>
+        <h1 class="page-title">Repository Forking API</h1>
+        <p class="page-subtitle">Endpoints for cloning repositories into user or organization namespaces with upstream tracking.</p>
+
+        <h2>Fork Repository</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/forks</span></div>
+        <pre><code>{
+  "organization": "prodevans"
+}</code></pre>
+        <p>Omit <code>organization</code> to fork into the authenticated user's personal namespace.</p>
+
+        <h2>List Downstream Forks</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/forks</span></div>
+        <p>Returns an array of all forks spawned from this parent repository.</p>
+
+        <div class="page-nav-buttons">
+          <a href="#api-pulls" class="nav-btn" onclick="navigate('api-pulls')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Pull Requests API</span>
+          </a>
+          <a href="#api-wiki-pages" class="nav-btn" onclick="navigate('api-wiki-pages')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Wiki &amp; Pages API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 32C. API: Wiki & Pages -->
+      <article class="doc-page" id="page-api-wiki-pages">
+        <div class="breadcrumbs">
+          <span>REST API Reference (v1)</span>
+          <span>/</span>
+          <span class="current">Wiki &amp; Pages Hosting API</span>
+        </div>
+        <h1 class="page-title">Wiki &amp; ProGit Pages API</h1>
+        <p class="page-subtitle">Endpoints for managing Git-backed wiki documentation and static Pages website hosting.</p>
+
+        <h2>List Wiki Pages</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/wiki/pages</span></div>
+
+        <h2>Get Single Wiki Page</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/wiki/pages/{slug}</span></div>
+
+        <h2>Create or Update Wiki Page</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/wiki/pages</span></div>
+        <pre><code>{
+  "title": "Architecture Overview",
+  "content": "# System Architecture\n\nProGit is built in pure Go...",
+  "message": "Add architecture overview"
+}</code></pre>
+
+        <h2>Delete Wiki Page</h2>
+        <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/repos/{owner}/{repo}/wiki/pages/{slug}</span></div>
+
+        <h2>Get Wiki Page Revision History</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/wiki/pages/{slug}/history</span></div>
+
+        <h2>ProGit Pages Configuration</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/pages</span></div>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/pages</span></div>
+        <pre><code>{
+  "branch": "main",
+  "folder": "/docs"
+}</code></pre>
+        <p>Configures static hosting. Rendered pages are served at <code>/pages/{owner}/{repo}/</code>.</p>
+
+        <div class="page-nav-buttons">
+          <a href="#api-forks" class="nav-btn" onclick="navigate('api-forks')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Forking API</span>
+          </a>
+          <a href="#api-webhooks" class="nav-btn" onclick="navigate('api-webhooks')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Webhooks API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 34B. REST API: Webhooks & Deliveries -->
+      <article class="doc-page" id="page-api-webhooks">
+        <div class="breadcrumbs">
+          <span>REST API Reference (v1)</span>
+          <span>/</span>
+          <span class="current">Webhooks &amp; Deliveries API</span>
+        </div>
+        <h1 class="page-title">Webhooks &amp; Deliveries API</h1>
+        <p class="page-subtitle">Programmatic control for registering webhooks, triggering test events, and reviewing delivery audit logs.</p>
+
+        <h2>List Repository Webhooks</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/hooks</span></div>
+        <p>Returns an array of all webhooks registered on the repository.</p>
+
+        <h2>Create Webhook</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/hooks</span></div>
+        <pre><code>{
+  "url": "https://ci.example.com/webhooks/progit",
+  "secret": "your_secure_hmac_secret",
+  "content_type": "json",
+  "events": "push,issues,pull_request",
+  "is_active": true
+}</code></pre>
+
+        <h2>Trigger Test Ping Delivery</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/hooks/{id}/test</span></div>
+        <p>Dispatches an immediate <code>ping</code> event to verify server connectivity and HMAC validation. Returns the created delivery record.</p>
+
+        <h2>List Webhook Deliveries</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/hooks/{id}/deliveries</span></div>
+        <p>Inspect up to 50 recent webhook delivery attempts, including HTTP status codes, response times, request headers, and response payloads.</p>
+
+        <h2>Delete Webhook</h2>
+        <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/repos/{owner}/{repo}/hooks/{id}</span></div>
+
+        <div class="page-nav-buttons">
+          <a href="#api-wiki-pages" class="nav-btn" onclick="navigate('api-wiki-pages')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Wiki &amp; Pages API</span>
+          </a>
+          <a href="#api-danger-zone" class="nav-btn" onclick="navigate('api-danger-zone')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Danger Zone API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 34D. REST API: Danger Zone & Governance -->
+      <article class="doc-page" id="page-api-danger-zone">
+        <div class="breadcrumbs">
+          <span>REST API Reference (v1)</span>
+          <span>/</span>
+          <span class="current">Danger Zone &amp; Governance API</span>
+        </div>
+        <h1 class="page-title">Danger Zone &amp; Repository Governance API</h1>
+        <p class="page-subtitle">Endpoints for changing repository visibility, read-only archiving, ownership transfer, and deletion.</p>
+
+        <h2>Change Repository Visibility</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/visibility</span></div>
+        <pre><code>{
+  "is_private": true
+}</code></pre>
+
+        <h2>Archive / Unarchive Repository</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/archive</span></div>
+        <p>Set <code>"archive": true</code> to lock repository to read-only; set <code>"archive": false</code> to restore write access.</p>
+        <pre><code>{
+  "archive": true
+}</code></pre>
+
+        <h2>Transfer Repository Ownership</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/transfer</span></div>
+        <pre><code>{
+  "new_owner": "dev_alice"
+}</code></pre>
+        <p>Atomically moves the Git bare repository directory on disk and reassigns ownership records in SQLite.</p>
+
+        <h2>Delete Repository</h2>
+        <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/repos/{owner}/{repo}</span></div>
+        <p>Permanently deletes the repository and removes its bare Git directory from disk.</p>
+
+        <div class="page-nav-buttons">
+          <a href="#api-webhooks" class="nav-btn" onclick="navigate('api-webhooks')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Webhooks API</span>
+          </a>
+          <a href="#api-messages" class="nav-btn" onclick="navigate('api-messages')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Developer Messaging API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 34C. REST API: Developer Messaging -->
+      <article class="doc-page" id="page-api-messages">
+        <div class="breadcrumbs">
+          <span>REST API Reference (v1)</span>
+          <span>/</span>
+          <span class="current">Developer Direct Messaging API</span>
+        </div>
+        <h1 class="page-title">Developer Messaging API</h1>
+        <p class="page-subtitle">Endpoints for direct peer messaging, inbox management, and notification counters.</p>
+
+        <h2>List Active Developers</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/developers</span></div>
+        <p>Returns a list of active developer accounts available for direct messaging.</p>
+
+        <h2>Send Direct Message</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/messages</span></div>
+        <pre><code>{
+  "recipient_username": "dev_bob",
+  "subject": "Sprint Targets Discussion",
+  "content": "Hi Bob, can we review the webhook signatures today?"
+}</code></pre>
+
+        <h2>Get Inbox Messages</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/messages/inbox</span></div>
+
+        <h2>Get Sent Messages (Outbox)</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/messages/sent</span></div>
+
+        <h2>Get Unread Message Count</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/messages/unread-count</span></div>
+        <pre><code>{
+  "unread_count": 3
+}</code></pre>
+
+        <h2>Mark Message as Read</h2>
+        <div class="api-endpoint"><span class="badge badge-patch">PATCH</span><span>/api/v1/messages/{id}/read</span></div>
+
+        <h2>Delete Message</h2>
+        <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/messages/{id}</span></div>
+
+        <div class="page-nav-buttons">
+          <a href="#api-danger-zone" class="nav-btn" onclick="navigate('api-danger-zone')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Danger Zone API</span>
           </a>
           <a href="#api-orgs" class="nav-btn" onclick="navigate('api-orgs')">
             <span class="dir">Next &rarr;</span>
@@ -2105,12 +2824,12 @@ podman exec -it progit /usr/local/bin/progit admin create-user \
       <!-- 33. API: Orgs -->
       <article class="doc-page" id="page-api-orgs">
         <div class="breadcrumbs">
-          <span>REST API</span>
+          <span>REST API Reference (v1)</span>
           <span>/</span>
           <span class="current">Organizations &amp; Teams</span>
         </div>
         <h1 class="page-title">Organizations &amp; Teams API</h1>
-        <p class="page-subtitle">REST endpoints for organization and team administration.</p>
+        <p class="page-subtitle">REST endpoints for organization, team, and member administration.</p>
 
         <h2>Create Organization</h2>
         <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/orgs</span></div>
@@ -2120,18 +2839,42 @@ podman exec -it progit /usr/local/bin/progit admin create-user \
   "description": "Cloud native solutions"
 }</code></pre>
 
-        <h2>Create Organization Team</h2>
+        <h2>List Organizations</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/orgs</span></div>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/user/orgs</span></div>
+
+        <h2>Get Organization Profile</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/orgs/{org}</span></div>
+
+        <h2>Organization Members</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/orgs/{org}/members</span></div>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/orgs/{org}/members</span></div>
+        <pre><code>{
+  "username": "dev_alice",
+  "role": "admin"
+}</code></pre>
+        <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/orgs/{org}/members/{username}</span></div>
+
+        <h2>Organization Teams</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/orgs/{org}/teams</span></div>
         <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/orgs/{org}/teams</span></div>
         <pre><code>{
-  "name": "Developers",
-  "description": "Core software engineers",
+  "name": "Backend Engineers",
+  "description": "Core backend team",
   "permission": "write"
 }</code></pre>
 
+        <h2>Team Members</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/orgs/{org}/teams/{team_id}/members</span></div>
+        <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/orgs/{org}/teams/{team_id}/members/{user_id}</span></div>
+
+        <h2>List Organization Repositories</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/orgs/{org}/repos</span></div>
+
         <div class="page-nav-buttons">
-          <a href="#api-pulls" class="nav-btn" onclick="navigate('api-pulls')">
+          <a href="#api-messages" class="nav-btn" onclick="navigate('api-messages')">
             <span class="dir">&larr; Previous</span>
-            <span class="title">Pull Requests API</span>
+            <span class="title">Developer Messaging API</span>
           </a>
           <a href="#api-projects" class="nav-btn" onclick="navigate('api-projects')">
             <span class="dir">Next &rarr;</span>
@@ -2143,12 +2886,15 @@ podman exec -it progit /usr/local/bin/progit admin create-user \
       <!-- 34. API: Projects -->
       <article class="doc-page" id="page-api-projects">
         <div class="breadcrumbs">
-          <span>REST API</span>
+          <span>REST API Reference (v1)</span>
           <span>/</span>
           <span class="current">Projects &amp; Cards</span>
         </div>
         <h1 class="page-title">Projects &amp; Kanban API</h1>
         <p class="page-subtitle">Endpoints for managing project boards, columns, and task cards.</p>
+
+        <h2>List Repository Projects</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/projects</span></div>
 
         <h2>Create Project Board</h2>
         <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/projects</span></div>
@@ -2157,17 +2903,100 @@ podman exec -it progit /usr/local/bin/progit admin create-user \
   "description": "Launch milestone tracking"
 }</code></pre>
 
-        <h2>Create Task Card</h2>
+        <h2>Get Project Board &amp; Columns</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/projects/{id}</span></div>
+        <p>Returns board columns, task cards, and progress metrics (`total_cards`, `done_cards`).</p>
+
+        <h2>Update / Delete Project</h2>
+        <div class="api-endpoint"><span class="badge badge-put">PUT</span><span>/api/v1/repos/{owner}/{repo}/projects/{id}</span></div>
+        <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/repos/{owner}/{repo}/projects/{id}</span></div>
+
+        <h2>Project Columns</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/projects/{id}/columns</span></div>
+        <pre><code>{
+  "title": "In Review"
+}</code></pre>
+        <div class="api-endpoint"><span class="badge badge-put">PUT</span><span>/api/v1/repos/{owner}/{repo}/projects/{id}/columns/{column_id}</span></div>
+        <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/repos/{owner}/{repo}/projects/{id}/columns/{column_id}</span></div>
+
+        <h2>Task Cards</h2>
         <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/projects/{id}/cards</span></div>
         <pre><code>{
   "column_id": 1,
   "content": "Verify zero CGO builds across Linux and macOS"
 }</code></pre>
+        <div class="api-endpoint"><span class="badge badge-put">PUT</span><span>/api/v1/repos/{owner}/{repo}/projects/{id}/cards/{card_id}</span></div>
+        <pre><code>{
+  "column_id": 3,
+  "content": "Verified: Alpine, Debian, macOS binaries all run without CGO"
+}</code></pre>
+        <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/repos/{owner}/{repo}/projects/{id}/cards/{card_id}</span></div>
 
         <div class="page-nav-buttons">
           <a href="#api-orgs" class="nav-btn" onclick="navigate('api-orgs')">
             <span class="dir">&larr; Previous</span>
             <span class="title">Organizations API</span>
+          </a>
+          <a href="#api-admin" class="nav-btn" onclick="navigate('api-admin')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">System Admin API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 34E. REST API: Admin & Maintenance -->
+      <article class="doc-page" id="page-api-admin">
+        <div class="breadcrumbs">
+          <span>REST API Reference (v1)</span>
+          <span>/</span>
+          <span class="current">System Admin &amp; Maintenance API</span>
+        </div>
+        <h1 class="page-title">System Admin &amp; Maintenance API</h1>
+        <p class="page-subtitle">Endpoints for Super Admin platform telemetry, user administration, and SQLite database maintenance.</p>
+
+        <h2>Inspect System Telemetry</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/admin/stats</span></div>
+        <pre><code>{
+  "users_count": 14,
+  "repos_count": 8,
+  "orgs_count": 2,
+  "goroutines": 32,
+  "go_version": "go1.23.4",
+  "mem_alloc_mb": 42.8,
+  "db_size_kb": 1280
+}</code></pre>
+
+        <h2>Manage Platform Users</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/admin/users</span></div>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/admin/users</span></div>
+        <pre><code>{
+  "username": "qa_operator",
+  "email": "qa@progit.local",
+  "password": "SecurePassword123!",
+  "is_admin": true
+}</code></pre>
+        <div class="api-endpoint"><span class="badge badge-patch">PATCH</span><span>/api/v1/admin/users/{id}</span></div>
+        <pre><code>{
+  "is_admin": false,
+  "is_active": true
+}</code></pre>
+        <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/admin/users/{id}</span></div>
+
+        <h2>Global Repository Registry</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/admin/repos</span></div>
+        <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/admin/repos/{id}</span></div>
+
+        <h2>Database Maintenance (WAL Checkpoint &amp; Vacuum)</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/admin/maintenance</span></div>
+        <pre><code>{
+  "op": "checkpoint_wal"
+}</code></pre>
+        <p>Operations: <code>checkpoint_wal</code> (runs <code>PRAGMA wal_checkpoint(TRUNCATE)</code>), <code>vacuum</code> (runs SQLite VACUUM to reclaim free pages).</p>
+
+        <div class="page-nav-buttons">
+          <a href="#api-projects" class="nav-btn" onclick="navigate('api-projects')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Projects API</span>
           </a>
           <a href="#ops-backup" class="nav-btn" onclick="navigate('ops-backup')">
             <span class="dir">Next &rarr;</span>
@@ -2175,6 +3004,8 @@ podman exec -it progit /usr/local/bin/progit admin create-user \
           </a>
         </div>
       </article>
+
+
 
       <!-- 35. Operations: Backup -->
       <article class="doc-page" id="page-ops-backup">
@@ -2199,9 +3030,9 @@ tar -czvf progit-backup-$(date +%F).tar.gz /data/db /data/repositories /data/con
 tar -xzvf progit-backup-2026-11-01.tar.gz -C /</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
         <div class="page-nav-buttons">
-          <a href="#api-projects" class="nav-btn" onclick="navigate('api-projects')">
+          <a href="#api-admin" class="nav-btn" onclick="navigate('api-admin')">
             <span class="dir">&larr; Previous</span>
-            <span class="title">Projects API</span>
+            <span class="title">System Admin API</span>
           </a>
           <a href="#ops-upgrade" class="nav-btn" onclick="navigate('ops-upgrade')">
             <span class="dir">Next &rarr;</span>
@@ -2350,15 +3181,27 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
       { id: 'feature-wiki', title: 'Git-Backed Wiki Engine', section: 'Features', desc: 'Dual-interface markdown wiki: edit online or clone as <repo>.wiki.git.' },
       { id: 'feature-projects', title: 'Kanban Project Boards', section: 'Features', desc: 'Agile task tracking, custom columns, and issue link integration.' },
       { id: 'feature-orgs', title: 'Organizations, Teams & Access', section: 'Features', desc: 'Enterprise organization structures, team permissions, and collaborators.' },
+      { id: 'feature-webhooks', title: 'Webhooks & Automated Delivery', section: 'Features', desc: 'Push, issue, and PR event triggers, HMAC-SHA256 signature verification, delivery logs.' },
+      { id: 'feature-messages', title: 'Developer Direct Messaging', section: 'Features', desc: 'Internal developer messaging system with real-time unread badges and replies.' },
+      { id: 'feature-danger-zone', title: 'Danger Zone & Security Scoping', section: 'Features', desc: 'Visibility toggling, read-only archiving, ownership transfers, and collaborator assignee guards.' },
       { id: 'admin-setup', title: 'Super Admin Setup & CLI', section: 'Administration', desc: 'CLI user creation with progit admin create-user.' },
       { id: 'admin-users', title: 'User & Key Administration', section: 'Administration', desc: 'Account suspension, role promotion, and SSH public key management.' },
       { id: 'admin-repos', title: 'Repository Oversight & Danger Zone', section: 'Administration', desc: 'Global repository oversight and permanent disk cleanup.' },
       { id: 'admin-maintenance', title: 'WAL Maintenance & Telemetry', section: 'Administration', desc: 'Live Go runtime diagnostics and SQLite WAL checkpoints.' },
-      { id: 'api-overview', title: 'REST API Overview & Auth', section: 'REST API', desc: 'Authentication via Bearer PATs, sessions, and /api/health.' },
-      { id: 'api-repos', title: 'Repositories & Files API', section: 'REST API', desc: 'REST endpoints for repository creation, trees, and file commits.' },
-      { id: 'api-pulls', title: 'Pull Requests & Review API', section: 'REST API', desc: 'API endpoints for opening PRs, submitting reviews, and merging.' },
-      { id: 'api-orgs', title: 'Organizations & Teams API', section: 'REST API', desc: 'REST endpoints for org and team administration.' },
-      { id: 'api-projects', title: 'Projects & Kanban API', section: 'REST API', desc: 'API endpoints for project boards, columns, and task cards.' },
+      { id: 'api-overview', title: 'REST API Overview & Auth', section: 'REST API', desc: 'Authentication via Bearer PATs, sessions, rate limiting, and /api/health.' },
+      { id: 'api-users', title: 'Users, Tokens & SSH Keys API', section: 'REST API', desc: 'Endpoints for registration, login, profile updates, PATs, and SSH keys.' },
+      { id: 'api-repos', title: 'Repositories & Branches API', section: 'REST API', desc: 'Endpoints for repository creation, stars, collaborators, and branch lifecycle.' },
+      { id: 'api-contents', title: 'File Tree & Online Commits API', section: 'REST API', desc: 'Endpoints for directory trees, raw file streaming, online commits, and uploads.' },
+      { id: 'api-issues', title: 'Issues & Collaborator Assignees API', section: 'REST API', desc: 'Endpoints for issue tracking, comments, and collaborator-scoped assignees.' },
+      { id: 'api-pulls', title: 'Pull Requests & Review API', section: 'REST API', desc: 'Endpoints for opening PRs, unified diffs, code reviews, and git merges.' },
+      { id: 'api-forks', title: 'Repository Forking API', section: 'REST API', desc: 'Endpoints for forking repositories into accounts and organizations.' },
+      { id: 'api-wiki-pages', title: 'Wiki & Pages Hosting API', section: 'REST API', desc: 'Endpoints for Git-backed wiki pages and ProGit Pages static hosting.' },
+      { id: 'api-webhooks', title: 'Webhooks & Deliveries API', section: 'REST API', desc: 'Endpoints for registering webhooks, HMAC-SHA256 signatures, and delivery logs.' },
+      { id: 'api-danger-zone', title: 'Danger Zone & Governance API', section: 'REST API', desc: 'Endpoints for visibility toggles, read-only archiving, and ownership transfer.' },
+      { id: 'api-messages', title: 'Developer Messaging API', section: 'REST API', desc: 'Endpoints for developer direct messaging, inbox, sent items, and unread counts.' },
+      { id: 'api-orgs', title: 'Organizations & Teams API', section: 'REST API', desc: 'Endpoints for organization, team, and member administration.' },
+      { id: 'api-projects', title: 'Projects & Cards API', section: 'REST API', desc: 'Endpoints for project boards, Kanban columns, and task cards.' },
+      { id: 'api-admin', title: 'System Admin & Maintenance API', section: 'REST API', desc: 'Endpoints for system telemetry, user administration, and WAL checkpoints.' },
       { id: 'ops-backup', title: 'Backup & Disaster Recovery', section: 'Operations', desc: 'Archiving /data/db and /data/repositories for safe recovery.' },
       { id: 'ops-upgrade', title: 'Upgrading ProGit', section: 'Operations', desc: 'Zero-downtime container and binary upgrade procedures.' },
       { id: 'ops-faq', title: 'Troubleshooting & FAQ', section: 'Operations', desc: 'Resolving port conflicts, SSH issues, and permissions.' }
