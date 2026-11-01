@@ -232,13 +232,19 @@ func GetBranchDetails(repoPath, defaultBranch string) ([]BranchDetail, error) {
 
 // CreateBranch creates a new branch pointing to baseRef.
 func CreateBranch(repoPath, branchName, baseRef string) error {
-	_, err := RunGit(repoPath, "branch", branchName, baseRef)
+	if strings.HasPrefix(branchName, "-") || strings.HasPrefix(baseRef, "-") {
+		return fmt.Errorf("invalid branch name or base ref")
+	}
+	_, err := RunGit(repoPath, "branch", "--", branchName, baseRef)
 	return err
 }
 
 // DeleteBranch deletes a branch.
 func DeleteBranch(repoPath, branchName string) error {
-	_, err := RunGit(repoPath, "branch", "-D", branchName)
+	if strings.HasPrefix(branchName, "-") {
+		return fmt.Errorf("invalid branch name")
+	}
+	_, err := RunGit(repoPath, "branch", "-D", "--", branchName)
 	return err
 }
 
@@ -264,12 +270,15 @@ func GetCommits(repoPath, ref string, limit, offset int) ([]Commit, error) {
 	if ref == "" {
 		ref = "HEAD"
 	}
+	if strings.HasPrefix(ref, "-") {
+		return []Commit{}, fmt.Errorf("invalid ref")
+	}
 	if limit <= 0 {
 		limit = 30
 	}
 
 	format := "%H%x1f%an%x1f%ae%x1f%at%x1f%s"
-	out, err := RunGit(repoPath, "log", ref, fmt.Sprintf("--skip=%d", offset), fmt.Sprintf("-n%d", limit), fmt.Sprintf("--pretty=format:%s", format))
+	out, err := RunGit(repoPath, "log", fmt.Sprintf("--skip=%d", offset), fmt.Sprintf("-n%d", limit), fmt.Sprintf("--pretty=format:%s", format), "--end-of-options", ref)
 	if err != nil {
 		return []Commit{}, nil // empty if no commits yet
 	}
@@ -307,13 +316,16 @@ func GetTree(repoPath, ref, subpath string) ([]TreeEntry, error) {
 	if ref == "" {
 		ref = "HEAD"
 	}
+	if strings.HasPrefix(ref, "-") {
+		return []TreeEntry{}, fmt.Errorf("invalid ref")
+	}
 
 	target := ref
 	if subpath != "" {
 		target = fmt.Sprintf("%s:%s", ref, subpath)
 	}
 
-	out, err := RunGit(repoPath, "ls-tree", "-l", target)
+	out, err := RunGit(repoPath, "ls-tree", "-l", "--", target)
 	if err != nil {
 		return []TreeEntry{}, nil
 	}
@@ -363,9 +375,12 @@ func GetBlob(repoPath, ref, filePath string) (*Blob, error) {
 	if ref == "" {
 		ref = "HEAD"
 	}
+	if strings.HasPrefix(ref, "-") {
+		return nil, fmt.Errorf("invalid ref")
+	}
 	target := fmt.Sprintf("%s:%s", ref, filePath)
 
-	out, err := RunGit(repoPath, "cat-file", "-p", target)
+	out, err := RunGit(repoPath, "cat-file", "-p", "--", target)
 	if err != nil {
 		return nil, err
 	}
@@ -404,12 +419,18 @@ func GetRaw(repoPath, ref, filePath string) ([]byte, error) {
 	if ref == "" {
 		ref = "HEAD"
 	}
+	if strings.HasPrefix(ref, "-") {
+		return nil, fmt.Errorf("invalid ref")
+	}
 	target := fmt.Sprintf("%s:%s", ref, filePath)
-	return RunGit(repoPath, "cat-file", "-p", target)
+	return RunGit(repoPath, "cat-file", "-p", "--", target)
 }
 
 // GetCommitDiff returns the commit diff for a specific commit SHA.
 func GetCommitDiff(repoPath, sha string) (*CommitDiff, error) {
+	if strings.HasPrefix(sha, "-") {
+		return nil, fmt.Errorf("invalid commit sha")
+	}
 	commits, err := GetCommits(repoPath, sha, 1, 0)
 	var c *Commit
 	if err == nil && len(commits) > 0 {
@@ -430,8 +451,11 @@ func GetCommitDiff(repoPath, sha string) (*CommitDiff, error) {
 
 // GetBranchDiff compares baseBranch and headBranch.
 func GetBranchDiff(repoPath, baseBranch, headBranch string) (*CompareResult, error) {
+	if strings.HasPrefix(baseBranch, "-") || strings.HasPrefix(headBranch, "-") {
+		return nil, fmt.Errorf("invalid branch name")
+	}
 	// Find merge base
-	mbOut, err := RunGit(repoPath, "merge-base", baseBranch, headBranch)
+	mbOut, err := RunGit(repoPath, "merge-base", "--", baseBranch, headBranch)
 	mergeBase := strings.TrimSpace(string(mbOut))
 	mergeable := err == nil && mergeBase != ""
 
@@ -440,7 +464,7 @@ func GetBranchDiff(repoPath, baseBranch, headBranch string) (*CompareResult, err
 	commits, _ := GetCommits(repoPath, commitRange, 100, 0)
 
 	// Get unified diff
-	diffOut, _ := RunGit(repoPath, "diff", "-u", baseBranch, headBranch)
+	diffOut, _ := RunGit(repoPath, "diff", "-u", baseBranch, headBranch, "--")
 	files := parseDiffOutput(string(diffOut))
 
 	return &CompareResult{
@@ -864,6 +888,9 @@ func SaveFile(repoPath, branch, filePath, content, authorName, authorEmail, mess
 	if branch == "" {
 		branch = "main"
 	}
+	if strings.HasPrefix(branch, "-") || strings.HasPrefix(newBranch, "-") {
+		return "", "", fmt.Errorf("invalid branch name")
+	}
 	targetBranch := branch
 	if newBranch != "" && newBranch != branch {
 		targetBranch = newBranch
@@ -953,6 +980,9 @@ func DeleteFile(repoPath, branch, filePath, authorName, authorEmail, message, ne
 	if branch == "" {
 		branch = "main"
 	}
+	if strings.HasPrefix(branch, "-") || strings.HasPrefix(newBranch, "-") {
+		return "", "", fmt.Errorf("invalid branch name")
+	}
 	targetBranch := branch
 	if newBranch != "" && newBranch != branch {
 		targetBranch = newBranch
@@ -1022,6 +1052,9 @@ func UploadFiles(repoPath, branch, baseSubPath string, files []UploadedFile, aut
 	}
 	if branch == "" {
 		branch = "main"
+	}
+	if strings.HasPrefix(branch, "-") || strings.HasPrefix(newBranch, "-") {
+		return "", "", fmt.Errorf("invalid branch name")
 	}
 	targetBranch := branch
 	if newBranch != "" && newBranch != branch {

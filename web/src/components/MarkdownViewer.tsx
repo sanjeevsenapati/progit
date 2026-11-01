@@ -60,11 +60,15 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, classNa
         if (match.index > lastIndex) {
           result.push(part.substring(lastIndex, match.index));
         }
-        const isExternal = match[2].startsWith('http://') || match[2].startsWith('https://');
+        const rawHref = match[2].trim();
+        // Defensive URI validation against javascript:, data:, vbscript: XSS
+        const isSafeScheme = /^(https?:\/\/|mailto:|#|\/)/i.test(rawHref) || (!rawHref.includes(':') && !rawHref.startsWith('//'));
+        const safeHref = isSafeScheme ? rawHref : '#';
+        const isExternal = safeHref.startsWith('http://') || safeHref.startsWith('https://');
         result.push(
           <a
             key={`link-${match.index}`}
-            href={match[2]}
+            href={safeHref}
             target={isExternal ? '_blank' : undefined}
             rel={isExternal ? 'noopener noreferrer' : undefined}
             className="text-emerald-600 dark:text-emerald-400 font-medium hover:underline inline-flex items-center"

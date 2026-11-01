@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	gossh "golang.org/x/crypto/ssh"
@@ -25,15 +27,71 @@ import (
 
 var startTime = time.Now()
 
+type ipRateLimiter struct {
+	mu       sync.Mutex
+	attempts map[string][]time.Time
+	limit    int
+	window   time.Duration
+}
+
+func newIPRateLimiter(limit int, window time.Duration) *ipRateLimiter {
+	return &ipRateLimiter{
+		attempts: make(map[string][]time.Time),
+		limit:    limit,
+		window:   window,
+	}
+}
+
+func (rl *ipRateLimiter) allow(ip string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	cutoff := now.Add(-rl.window)
+
+	var valid []time.Time
+	for _, t := range rl.attempts[ip] {
+		if t.After(cutoff) {
+			valid = append(valid, t)
+		}
+	}
+
+	if len(valid) >= rl.limit {
+		rl.attempts[ip] = valid
+		return false
+	}
+
+	valid = append(valid, now)
+	rl.attempts[ip] = valid
+	return true
+}
+
+func getClientIP(req *http.Request) string {
+	if xff := req.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		return strings.TrimSpace(parts[0])
+	}
+	if xri := req.Header.Get("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err == nil {
+		return host
+	}
+	return req.RemoteAddr
+}
+
 type Router struct {
-	cfg *config.Config
-	mux *http.ServeMux
+	cfg         *config.Config
+	mux         *http.ServeMux
+	authLimiter *ipRateLimiter
 }
 
 func NewRouter(cfg *config.Config) *Router {
 	r := &Router{
-		cfg: cfg,
-		mux: http.NewServeMux(),
+		cfg:         cfg,
+		mux:         http.NewServeMux(),
+		authLimiter: newIPRateLimiter(30, 1*time.Minute),
 	}
 	r.registerRoutes()
 	return r
@@ -44,15 +102,22 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 	w.Header().Set("X-XSS-Protection", "1; mode=block")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 
 	// HSTS when HTTPS is active or configured
 	if r.cfg.Server.HSTSMaxAge > 0 && (req.TLS != nil || req.Header.Get("X-Forwarded-Proto") == "https" || r.cfg.Server.Protocol == "https") {
 		w.Header().Set("Strict-Transport-Security", fmt.Sprintf("max-age=%d; includeSubDomains; preload", r.cfg.Server.HSTSMaxAge))
 	}
 
-	// Allow CORS for API during development
+	// CORS handling for API
 	if strings.HasPrefix(req.URL.Path, "/api/") {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := req.Header.Get("Origin")
+		if origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		} else {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
 		if req.Method == http.MethodOptions {
@@ -250,6 +315,12 @@ func (r *Router) handleReady(w http.ResponseWriter, req *http.Request) {
 // Auth Handlers
 
 func (r *Router) handleRegister(w http.ResponseWriter, req *http.Request) {
+	clientIP := getClientIP(req)
+	if !r.authLimiter.allow(clientIP) {
+		jsonError(w, http.StatusTooManyRequests, "Too many authentication attempts. Please try again later.")
+		return
+	}
+
 	var body struct {
 		Username string `json:"username"`
 		Email    string `json:"email"`
@@ -316,6 +387,12 @@ func (r *Router) handleRegister(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Router) handleLogin(w http.ResponseWriter, req *http.Request) {
+	clientIP := getClientIP(req)
+	if !r.authLimiter.allow(clientIP) {
+		jsonError(w, http.StatusTooManyRequests, "Too many authentication attempts. Please try again later.")
+		return
+	}
+
 	var body struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -1000,6 +1077,10 @@ func (r *Router) handleCreateBranch(w http.ResponseWriter, req *http.Request) {
 			baseRef = "main"
 		}
 	}
+	if strings.ContainsAny(baseRef, " ~^:?*[\\]") || strings.Contains(baseRef, "..") || strings.Contains(baseRef, "@{") || strings.HasPrefix(baseRef, "-") {
+		jsonError(w, http.StatusBadRequest, "Invalid base ref format")
+		return
+	}
 
 	if err := git.CreateBranch(repoDir, branchName, baseRef); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
@@ -1039,6 +1120,11 @@ func (r *Router) handleDeleteBranch(w http.ResponseWriter, req *http.Request) {
 
 	if branchName == "" {
 		jsonError(w, http.StatusBadRequest, "Branch name is required")
+		return
+	}
+
+	if strings.ContainsAny(branchName, " ~^:?*[\\]") || strings.Contains(branchName, "..") || strings.Contains(branchName, "@{") || strings.HasPrefix(branchName, "-") {
+		jsonError(w, http.StatusBadRequest, "Invalid branch name format")
 		return
 	}
 
@@ -2520,6 +2606,10 @@ func (r *Router) handleServePages(w http.ResponseWriter, req *http.Request) {
 
 	folder := strings.Trim(repo.PagesFolder, "/")
 	subPath = strings.TrimPrefix(subPath, "/")
+	if strings.Contains(subPath, "..") || strings.Contains(folder, "..") {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
 
 	isIndexRequest := subPath == "" || strings.HasSuffix(subPath, "/")
 
@@ -3014,7 +3104,22 @@ func formatInlineMarkdown(s string) string {
 	s = mdInlineCodeRegex.ReplaceAllString(s, "<code>$1</code>")
 	s = mdBoldRegex.ReplaceAllString(s, "<strong>$1</strong>")
 	s = mdItalicRegex.ReplaceAllString(s, "<em>$1</em>")
-	s = mdLinkRegex.ReplaceAllString(s, `<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>`)
+	s = mdLinkRegex.ReplaceAllStringFunc(s, func(match string) string {
+		parts := mdLinkRegex.FindStringSubmatch(match)
+		if len(parts) < 3 {
+			return match
+		}
+		text := parts[1]
+		href := strings.TrimSpace(parts[2])
+		lower := strings.ToLower(href)
+		if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "mailto:") || strings.HasPrefix(lower, "/") || strings.HasPrefix(lower, "#") {
+			return fmt.Sprintf(`<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>`, href, text)
+		}
+		if !strings.Contains(lower, ":") && !strings.HasPrefix(lower, "//") {
+			return fmt.Sprintf(`<a href="%s">%s</a>`, href, text)
+		}
+		return text
+	})
 	return s
 }
 
