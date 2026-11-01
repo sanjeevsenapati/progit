@@ -91,7 +91,7 @@ func NewRouter(cfg *config.Config) *Router {
 	r := &Router{
 		cfg:         cfg,
 		mux:         http.NewServeMux(),
-		authLimiter: newIPRateLimiter(30, 1*time.Minute),
+		authLimiter: newIPRateLimiter(120, 1*time.Minute),
 	}
 	r.registerRoutes()
 	return r

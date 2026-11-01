@@ -989,7 +989,7 @@ echo "${UNARCH_RES}" | grep -q '"is_archived":false' || assert_fail "Failed to u
 assert_pass "Repository unarchived and write access restored"
 
 log_test "Danger Zone: Transfer Repository Ownership to dev_alice (POST /transfer)"
-TRANS_REPO="transfer-demo-repo"
+TRANS_REPO="transfer-demo-repo-${RANDOM}"
 curl -s -b "${TEST_DIR}/dev_cookies.txt" -X POST "${PROGIT_URL}/api/v1/repos" \
   -H "Content-Type: application/json" \
   -d "{\"name\":\"${TRANS_REPO}\",\"description\":\"Temporary repo to test transfer\",\"private\":false,\"auto_init\":true}" > /dev/null
