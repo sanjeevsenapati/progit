@@ -1773,6 +1773,42 @@ func TestRepositorySearch(t *testing.T) {
 	if len(resExplore.Repositories) != 1 || resExplore.Repositories[0].Name != pubRepo.Name {
 		t.Errorf("expected explore to find %s, got %+v", pubRepo.Name, resExplore.Repositories)
 	}
+
+	// 7. Search by owner/repo string (e.g. search_alice/quantum)
+	reqOwnerSlash := httptest.NewRequest("GET", "/api/v1/repos/search?q=search_alice/quantum", nil)
+	recOwnerSlash := httptest.NewRecorder()
+	router.ServeHTTP(recOwnerSlash, reqOwnerSlash)
+	var resOwnerSlash struct {
+		Repositories []*database.Repository `json:"repositories"`
+	}
+	_ = json.Unmarshal(recOwnerSlash.Body.Bytes(), &resOwnerSlash)
+	if len(resOwnerSlash.Repositories) != 1 || resOwnerSlash.Repositories[0].Name != pubRepo.Name {
+		t.Errorf("expected search_alice/quantum to find %s, got %+v", pubRepo.Name, resOwnerSlash.Repositories)
+	}
+
+	// 8. Search by owner/ string (e.g. search_alice/)
+	reqOwnerOnlySlash := httptest.NewRequest("GET", "/api/v1/repos/search?q=search_alice/", nil)
+	recOwnerOnlySlash := httptest.NewRecorder()
+	router.ServeHTTP(recOwnerOnlySlash, reqOwnerOnlySlash)
+	var resOwnerOnlySlash struct {
+		Repositories []*database.Repository `json:"repositories"`
+	}
+	_ = json.Unmarshal(recOwnerOnlySlash.Body.Bytes(), &resOwnerOnlySlash)
+	if len(resOwnerOnlySlash.Repositories) != 1 || resOwnerOnlySlash.Repositories[0].Name != pubRepo.Name {
+		t.Errorf("expected search_alice/ to find %s, got %+v", pubRepo.Name, resOwnerOnlySlash.Repositories)
+	}
+
+	// 9. Search by '/' (should return all visible repositories rather than empty)
+	reqJustSlash := httptest.NewRequest("GET", "/api/v1/repos/search?q=/", nil)
+	recJustSlash := httptest.NewRecorder()
+	router.ServeHTTP(recJustSlash, reqJustSlash)
+	var resJustSlash struct {
+		Repositories []*database.Repository `json:"repositories"`
+	}
+	_ = json.Unmarshal(recJustSlash.Body.Bytes(), &resJustSlash)
+	if len(resJustSlash.Repositories) == 0 {
+		t.Errorf("expected '/' to return visible repositories, got 0")
+	}
 }
 
 

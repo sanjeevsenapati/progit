@@ -876,9 +876,9 @@ func SearchRepositories(keyword string, userID int64, isAdmin bool, limit, offse
 		}
 	}
 
-	if keyword != "" {
-		whereClauses = append(whereClauses, "(r.name LIKE ? OR r.description LIKE ? OR u.username LIKE ?)")
-		args = append(args, param, param, param)
+	if keyword != "" && keyword != "/" {
+		whereClauses = append(whereClauses, "(r.name LIKE ? OR r.description LIKE ? OR u.username LIKE ? OR (u.username || '/' || r.name) LIKE ?)")
+		args = append(args, param, param, param, param)
 	}
 
 	query := baseQuery

@@ -49,8 +49,18 @@ export const Navbar: React.FC = () => {
       );
       if (e.key === '/' && !isInput) {
         e.preventDefault();
-        searchInputRef.current?.focus();
-        setSearchOpen(true);
+        e.stopPropagation();
+        setTimeout(() => {
+          if (searchInputRef.current) {
+            // Ensure any accidental '/' inserted by keydown is not kept if field was empty
+            if (searchInputRef.current.value === '/') {
+              setSearchQuery('');
+            }
+            searchInputRef.current.focus();
+            searchInputRef.current.select();
+            setSearchOpen(true);
+          }
+        }, 0);
       }
       if (e.key === 'Escape') {
         setSearchOpen(false);
@@ -193,10 +203,23 @@ export const Navbar: React.FC = () => {
                   setSearchOpen(true);
                 }}
                 onFocus={() => {
-                  if (searchQuery.trim()) setSearchOpen(true);
+                  setSearchOpen(true);
+                  if (searchResults.length === 0) {
+                    setSearchLoading(true);
+                    api.searchRepos(searchQuery.trim())
+                      .then(data => {
+                        setSearchResults(data.repositories || data.data || []);
+                      })
+                      .catch(() => {
+                        setSearchResults([]);
+                      })
+                      .finally(() => {
+                        setSearchLoading(false);
+                      });
+                  }
                 }}
                 onKeyDown={handleSearchKeyDown}
-                placeholder="Type / to search repositories..."
+                placeholder="Search repositories (e.g. owner/name)..."
                 className="w-full pl-9 pr-8 py-1.5 text-xs rounded-lg bg-gray-100 dark:bg-dark-bg border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-dark-bg focus:outline-none dark:text-white placeholder-gray-400 shadow-inner transition-all"
               />
               {searchQuery ? (
@@ -214,7 +237,7 @@ export const Navbar: React.FC = () => {
                 </button>
               ) : (
                 <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
-                  <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-gray-400 bg-gray-200 dark:bg-dark-hover rounded border border-gray-300 dark:border-dark-border">
+                  <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-gray-400 bg-gray-200 dark:bg-dark-hover rounded border border-gray-300 dark:border-dark-border" title="Press / to focus">
                     /
                   </kbd>
                 </div>
@@ -222,7 +245,7 @@ export const Navbar: React.FC = () => {
             </div>
 
             {/* Search Dropdown */}
-            {searchOpen && searchQuery.trim() && (
+            {searchOpen && (searchQuery.trim() !== '' || searchResults.length > 0) && (
               <div
                 ref={searchDropdownRef}
                 className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl shadow-2xl z-50 text-xs overflow-hidden divide-y divide-gray-100 dark:divide-dark-border"
@@ -294,7 +317,7 @@ export const Navbar: React.FC = () => {
                     }
                   }}
                 >
-                  Search all repositories for "{searchQuery}" &rarr;
+                  {searchQuery.trim() ? `Search all repositories for "${searchQuery}" \u2192` : 'Explore all repositories \u2192'}
                 </a>
               </div>
             )}

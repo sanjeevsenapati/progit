@@ -21,9 +21,6 @@ COPY . .
 # Copy frontend dist to internal/ui/dist for embedding
 COPY --from=frontend-builder /build/web/dist ./internal/ui/dist
 
-# Ensure go.mod is in sync with actual dependencies
-RUN go mod tidy
-
 # Build static pure-Go binary with embedded UI
 ENV CGO_ENABLED=0
 RUN go build -trimpath -ldflags="-s -w" -o /progit ./cmd/progit

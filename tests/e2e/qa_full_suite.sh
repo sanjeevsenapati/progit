@@ -1017,6 +1017,16 @@ EXPLORE_RES=$(curl -s "${PROGIT_URL}/api/v1/explore?q=qa-public-repo")
 echo "${EXPLORE_RES}" | grep -q "qa-public-repo" || assert_fail "Explore query filtering failed: ${EXPLORE_RES}"
 assert_pass "Explore API returned query-filtered repositories"
 
+log_test "Repository Search by owner/repo string (GET /api/v1/repos/search?q=dev_alice/)"
+OWNER_SLASH_RES=$(curl -s "${PROGIT_URL}/api/v1/repos/search?q=dev_alice/")
+echo "${OWNER_SLASH_RES}" | grep -q "dev_alice" || assert_fail "Search by owner/ failed: ${OWNER_SLASH_RES}"
+assert_pass "Repository Search by owner/ returned repositories"
+
+log_test "Repository Search by '/' root query (GET /api/v1/repos/search?q=/)"
+SLASH_RES=$(curl -s "${PROGIT_URL}/api/v1/repos/search?q=/")
+echo "${SLASH_RES}" | grep -q "repositories" || assert_fail "Search by / failed: ${SLASH_RES}"
+assert_pass "Repository Search by / returned all visible repositories"
+
 # -----------------------------------------------------------------------------
 # SUMMARY & SCORECARD
 # -----------------------------------------------------------------------------
