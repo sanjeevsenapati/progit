@@ -160,6 +160,7 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("GET /api/v1/repos", r.handleListRepos)
 	r.mux.HandleFunc("GET /api/v1/repos/search", r.handleSearchRepos)
 	r.mux.HandleFunc("POST /api/v1/repos", r.handleCreateRepo)
+	r.mux.HandleFunc("POST /api/v1/repos/import", r.handleImportRepo)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}", r.handleGetRepo)
 	r.mux.HandleFunc("DELETE /api/v1/repos/{owner}/{repo}", r.handleDeleteRepo)
 	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/star", r.handleToggleStar)
@@ -992,6 +993,121 @@ func (r *Router) handleCreateRepo(w http.ResponseWriter, req *http.Request) {
 	}
 
 	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "create_repo", fmt.Sprintf("Created repository %s/%s", targetOwnerName, repo.Name))
+
+	jsonResponse(w, http.StatusCreated, repo)
+}
+
+func (r *Router) handleImportRepo(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	var body struct {
+		CloneURL     string `json:"clone_url"`
+		Owner        string `json:"owner"`
+		Name         string `json:"name"`
+		Description  string `json:"description"`
+		Private      bool   `json:"private"`
+		AuthUsername string `json:"auth_username"`
+		AuthPassword string `json:"auth_password"`
+	}
+
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	body.CloneURL = strings.TrimSpace(body.CloneURL)
+	if body.CloneURL == "" {
+		jsonError(w, http.StatusBadRequest, "Clone URL is required")
+		return
+	}
+	if strings.HasPrefix(body.CloneURL, "-") {
+		jsonError(w, http.StatusBadRequest, "Invalid clone URL")
+		return
+	}
+
+	body.Name = strings.TrimSpace(body.Name)
+	if body.Name == "" {
+		trimmed := strings.TrimRight(body.CloneURL, "/")
+		parts := strings.Split(trimmed, "/")
+		if len(parts) > 0 {
+			rawName := parts[len(parts)-1]
+			rawName = strings.TrimSuffix(rawName, ".git")
+			body.Name = rawName
+		}
+	}
+
+	if len(body.Name) < 1 {
+		jsonError(w, http.StatusBadRequest, "Repository name is required")
+		return
+	}
+
+	validName := regexp.MustCompile(`^[a-zA-Z0-9_\.\-]+$`)
+	if !validName.MatchString(body.Name) || body.Name == "." || body.Name == ".." {
+		jsonError(w, http.StatusBadRequest, "Invalid repository name")
+		return
+	}
+
+	targetOwnerID := user.ID
+	targetOwnerName := user.Username
+
+	if body.Owner != "" && !strings.EqualFold(body.Owner, user.Username) {
+		org, err := database.GetOrgByName(body.Owner)
+		if err != nil || org == nil {
+			jsonError(w, http.StatusBadRequest, "Selected organization does not exist")
+			return
+		}
+		if !user.IsAdmin && !database.IsOrgAdmin(org.ID, user.ID) {
+			jsonError(w, http.StatusForbidden, "You do not have permission to create repositories under this organization")
+			return
+		}
+		orgUser, err := database.GetUserByUsername(org.Name)
+		if err != nil || orgUser == nil {
+			jsonError(w, http.StatusInternalServerError, "Organization account stub missing")
+			return
+		}
+		targetOwnerID = orgUser.ID
+		targetOwnerName = org.Name
+	}
+
+	if existing, _ := database.GetRepositoryByName(targetOwnerName, body.Name); existing != nil {
+		jsonError(w, http.StatusConflict, "Repository already exists")
+		return
+	}
+
+	repoDir := filepath.Join(r.cfg.Repository.Root, targetOwnerName, body.Name+".git")
+	if _, err := os.Stat(repoDir); err == nil {
+		jsonError(w, http.StatusConflict, "Repository directory already exists on disk")
+		return
+	}
+
+	if err := git.ImportRepository(body.CloneURL, repoDir, body.AuthUsername, body.AuthPassword); err != nil {
+		_ = os.RemoveAll(repoDir)
+		jsonError(w, http.StatusBadRequest, fmt.Sprintf("Failed to clone remote repository: %v", err))
+		return
+	}
+
+	defaultBranch := git.GetDefaultBranch(repoDir)
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+
+	repo, err := database.CreateRepository(targetOwnerID, body.Name, body.Description, body.Private)
+	if err != nil {
+		_ = os.RemoveAll(repoDir)
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if defaultBranch != "main" {
+		_ = database.SetRepositoryDefaultBranch(repo.ID, defaultBranch)
+		repo.DefaultBranch = defaultBranch
+	}
+
+	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "create_repo", fmt.Sprintf("Imported repository %s/%s from %s", targetOwnerName, repo.Name, git.SanitizeURL(body.CloneURL)))
 
 	jsonResponse(w, http.StatusCreated, repo)
 }

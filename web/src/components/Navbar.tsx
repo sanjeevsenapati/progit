@@ -18,7 +18,8 @@ import {
   Lock,
   Star,
   Loader2,
-  X
+  X,
+  DownloadCloud
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -366,11 +367,15 @@ export const Navbar: React.FC = () => {
                       <div className="py-1">
                         <a href="/new" className="flex items-center space-x-2.5 px-3.5 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover hover:text-emerald-600 dark:hover:text-emerald-400 font-medium transition-colors">
                           <Plus className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                          <span>New Repository</span>
+                          <span>New repository</span>
+                        </a>
+                        <a href="/new/import" className="flex items-center space-x-2.5 px-3.5 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover hover:text-emerald-600 dark:hover:text-emerald-400 font-medium transition-colors">
+                          <DownloadCloud className="w-4 h-4 text-sky-500" />
+                          <span>Import repository</span>
                         </a>
                         <a href="/org/new" className="flex items-center space-x-2.5 px-3.5 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover hover:text-emerald-600 dark:hover:text-emerald-400 font-medium transition-colors">
                           <Building2 className="w-4 h-4 text-blue-500" />
-                          <span>New Organization</span>
+                          <span>New organization</span>
                         </a>
                       </div>
                     </div>

@@ -55,14 +55,23 @@ export const NewRepo: React.FC = () => {
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
-      <div className="border-b border-gray-200 dark:border-dark-border pb-5 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
-          <GitBranch className="w-6 h-6 mr-2 text-emerald-600 dark:text-emerald-400" />
-          Create a new repository
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-dark-muted mt-1">
-          A repository contains all project files, revision history, and collaboration tools.
-        </p>
+      <div className="border-b border-gray-200 dark:border-dark-border pb-5 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
+            <GitBranch className="w-6 h-6 mr-2 text-emerald-600 dark:text-emerald-400" />
+            Create a new repository
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-dark-muted mt-1">
+            A repository contains all project files, revision history, and collaboration tools.
+          </p>
+        </div>
+        <a
+          href="/new/import"
+          className="text-xs sm:text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center space-x-1 shrink-0"
+        >
+          <span>Import a repository</span>
+          <span>&rarr;</span>
+        </a>
       </div>
 
       {error && (

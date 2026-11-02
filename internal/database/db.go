@@ -1000,6 +1000,19 @@ func UpdateRepositorySettings(repoID int64, description string, isPrivate, enabl
 	return err
 }
 
+func SetRepositoryDefaultBranch(repoID int64, defaultBranch string) error {
+	defaultBranch = strings.TrimSpace(defaultBranch)
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+	_, err := DB.Exec(`
+		UPDATE repositories 
+		SET default_branch = ?, pages_branch = CASE WHEN pages_branch = 'main' OR pages_branch = 'master' THEN ? ELSE pages_branch END, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, defaultBranch, defaultBranch, repoID)
+	return err
+}
+
 func CountRepositories() (int, error) {
 	var count int
 	err := DB.QueryRow(`SELECT COUNT(*) FROM repositories`).Scan(&count)

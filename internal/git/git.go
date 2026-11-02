@@ -3,7 +3,9 @@ package git
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -59,9 +61,14 @@ type CompareResult struct {
 	Mergeable  bool       `json:"mergeable"`
 }
 
-// RunGit runs a git command with timeout in the specified directory.
+// RunGit runs a git command with standard 30s timeout in the specified directory.
 func RunGit(dir string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	return RunGitWithTimeout(30*time.Second, dir, args...)
+}
+
+// RunGitWithTimeout runs a git command with a specified timeout in the specified directory.
+func RunGitWithTimeout(timeout time.Duration, dir string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "git", args...)
@@ -78,6 +85,98 @@ func RunGit(dir string, args ...string) ([]byte, error) {
 		return nil, fmt.Errorf("git %s failed: %w (stderr: %s)", strings.Join(args, " "), err, stderr.String())
 	}
 	return out, nil
+}
+
+// SanitizeURL removes sensitive credentials (e.g. passwords, personal access tokens) from a URL.
+func SanitizeURL(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.User == nil {
+		return rawURL
+	}
+	parsed.User = url.User("redacted")
+	return parsed.String()
+}
+
+// ImportRepository clones a remote Git repository into a bare destination repository.
+func ImportRepository(cloneURL, destRepoPath, username, password string) error {
+	cloneURL = strings.TrimSpace(cloneURL)
+	if cloneURL == "" {
+		return errors.New("clone URL cannot be empty")
+	}
+	if strings.HasPrefix(cloneURL, "-") {
+		return errors.New("invalid clone URL")
+	}
+
+	if abs, err := filepath.Abs(destRepoPath); err == nil {
+		destRepoPath = abs
+	}
+	if err := os.MkdirAll(filepath.Dir(destRepoPath), 0755); err != nil {
+		return err
+	}
+
+	targetURL := cloneURL
+	username = strings.TrimSpace(username)
+	password = strings.TrimSpace(password)
+
+	// If credentials provided and scheme is HTTP/HTTPS, inject credentials into URL safely
+	if username != "" || password != "" {
+		if parsed, err := url.Parse(cloneURL); err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") {
+			if username != "" && password != "" {
+				parsed.User = url.UserPassword(username, password)
+			} else if username != "" {
+				parsed.User = url.User(username)
+			} else {
+				parsed.User = url.UserPassword(password, "")
+			}
+			targetURL = parsed.String()
+		}
+	}
+
+	// Try cloning with --mirror first to preserve all branches, tags, and commits
+	_, err := RunGitWithTimeout(3*time.Minute, "", "clone", "--mirror", targetURL, destRepoPath)
+	if err != nil {
+		// Clean up partial destination and retry with --bare
+		_ = os.RemoveAll(destRepoPath)
+		_, err = RunGitWithTimeout(3*time.Minute, "", "clone", "--bare", targetURL, destRepoPath)
+	}
+
+	if err != nil {
+		_ = os.RemoveAll(destRepoPath)
+		// Mask credentials in error output so tokens/passwords never leak
+		errStr := err.Error()
+		if password != "" {
+			errStr = strings.ReplaceAll(errStr, password, "******")
+		}
+		if username != "" {
+			errStr = strings.ReplaceAll(errStr, username, "******")
+		}
+		return errors.New(errStr)
+	}
+
+	// Update server info for HTTP dumb transport compatibility
+	_, _ = RunGit(destRepoPath, "update-server-info")
+	return nil
+}
+
+// GetDefaultBranch returns the default branch for a bare repository.
+func GetDefaultBranch(repoPath string) string {
+	out, err := RunGit(repoPath, "symbolic-ref", "--short", "HEAD")
+	if err == nil {
+		branch := strings.TrimSpace(string(out))
+		if branch != "" {
+			return branch
+		}
+	}
+	branches, err := GetBranches(repoPath)
+	if err == nil && len(branches) > 0 {
+		for _, b := range branches {
+			if b == "main" || b == "master" {
+				return b
+			}
+		}
+		return branches[0]
+	}
+	return "main"
 }
 
 // InitBareRepository initializes a bare Git repository with the given default branch.

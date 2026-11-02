@@ -34,6 +34,7 @@ import { ProjectBoard } from './pages/ProjectBoard';
 import { NewOrg } from './pages/NewOrg';
 import { OrgView } from './pages/OrgView';
 import { Messages } from './pages/Messages';
+import { ImportRepo } from './pages/ImportRepo';
 import { GlobalDialogProvider } from './components/ModalDialog';
 
 export const App: React.FC = () => {
@@ -70,6 +71,7 @@ export const App: React.FC = () => {
     if (path === '/forgot-password') return <ForgotPassword />;
     if (path === '/dashboard') return <Dashboard />;
     if (path === '/explore') return <Explore />;
+    if (path === '/new/import' || path === '/import') return <ImportRepo />;
     if (path === '/new') return <NewRepo />;
     if (path === '/settings') return <UserSettings />;
     if (path === '/messages') return <Messages />;

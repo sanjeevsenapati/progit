@@ -419,6 +419,21 @@ export const api = {
     });
   },
 
+  async importRepo(data: {
+    clone_url: string;
+    owner?: string;
+    name: string;
+    description: string;
+    private: boolean;
+    auth_username?: string;
+    auth_password?: string;
+  }) {
+    return fetchJSON<Repository>('/api/v1/repos/import', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   async getRepo(owner: string, repo: string) {
     return fetchJSON<{
       repository: Repository;

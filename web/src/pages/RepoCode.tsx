@@ -20,7 +20,8 @@ import {
   UploadCloud,
   FilePlus,
   History,
-  GitCommit
+  GitCommit,
+  DownloadCloud
 } from 'lucide-react';
 
 interface RepoCodeProps {
@@ -69,6 +70,30 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
   const [branchFilter, setBranchFilter] = useState('');
   const [creatingBranch, setCreatingBranch] = useState(false);
+  const [copiedQuick, setCopiedQuick] = useState(false);
+  const [copiedBlock1, setCopiedBlock1] = useState(false);
+  const [copiedBlock2, setCopiedBlock2] = useState(false);
+
+  const selectedCloneUrl = cloneTab === 'ssh' && cloneSSH ? cloneSSH : (cloneHTTP || `${window.location.origin}/${owner}/${repoName}.git`);
+  const isEmptyRepo = !initialPath && entries.length === 0 && !latestCommit;
+
+  const block1Commands = `echo "# ${repoName}" >> README.md\ngit init\ngit add README.md\ngit commit -m "first commit"\ngit branch -M ${currentBranch || 'main'}\ngit remote add origin ${selectedCloneUrl}\ngit push -u origin ${currentBranch || 'main'}`;
+
+  const block2Commands = `git remote add origin ${selectedCloneUrl}\ngit branch -M ${currentBranch || 'main'}\ngit push -u origin ${currentBranch || 'main'}`;
+
+  const handleCopyCode = (text: string, type: 'quick' | 'block1' | 'block2') => {
+    navigator.clipboard.writeText(text);
+    if (type === 'quick') {
+      setCopiedQuick(true);
+      setTimeout(() => setCopiedQuick(false), 2000);
+    } else if (type === 'block1') {
+      setCopiedBlock1(true);
+      setTimeout(() => setCopiedBlock1(false), 2000);
+    } else if (type === 'block2') {
+      setCopiedBlock2(true);
+      setTimeout(() => setCopiedBlock2(false), 2000);
+    }
+  };
 
   useEffect(() => {
     async function loadRepo() {
@@ -418,130 +443,275 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
         </div>
       </div>
 
-        {/* File Tree Table & GitHub-Style Latest Commit Banner */}
-        <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-sm overflow-hidden">
-          {/* Latest Commit Bar (GitHub Style) */}
-          {latestCommit ? (
-            <div className="px-4 py-3 bg-gray-50/90 dark:bg-dark-hover/40 border-b border-gray-200 dark:border-dark-border flex flex-col md:flex-row md:items-center justify-between gap-3 text-sm">
-              {/* Left: Avatar + Author + Commit message */}
-              <div className="flex items-center space-x-3 min-w-0">
-                <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 font-bold flex items-center justify-center shrink-0 border border-emerald-300 dark:border-emerald-800 text-xs shadow-2xs">
-                  {latestCommit.author ? latestCommit.author.charAt(0).toUpperCase() : 'U'}
+        {/* GitHub-Style Blank / Empty Repo Quick Setup OR File Tree Table */}
+        {isEmptyRepo ? (
+          <div className="space-y-6">
+            {/* Quick setup — if you've done this kind of thing before */}
+            <div className="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-xs overflow-hidden">
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-950/20 dark:via-dark-surface border-b border-gray-200 dark:border-dark-border flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-bold text-gray-900 dark:text-white text-base flex items-center space-x-2">
+                    <Terminal className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                    <span>Quick setup — if you've done this kind of thing before</span>
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-dark-muted mt-1">
+                    Get started by{' '}
+                    <a
+                      href={`/${owner}/${repoName}/new/${currentBranch || 'main'}`}
+                      className="font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
+                    >
+                      creating a new file
+                    </a>{' '}
+                    or{' '}
+                    <a
+                      href={`/${owner}/${repoName}/upload/${currentBranch || 'main'}`}
+                      className="font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
+                    >
+                      uploading an existing file
+                    </a>
+                    . We recommend every repository include a README, LICENSE, and .gitignore.
+                  </p>
                 </div>
-                <div className="flex items-center space-x-2 truncate">
-                  <a
-                    href={`/${latestCommit.author || owner}`}
-                    className="font-bold text-gray-900 dark:text-white hover:underline shrink-0"
-                  >
-                    {latestCommit.author || owner}
-                  </a>
-                  <a
-                    href={`/${owner}/${repoName}/commit/${latestCommit.sha}`}
-                    className="text-gray-700 dark:text-dark-text hover:text-emerald-600 dark:hover:text-emerald-400 truncate hover:underline"
-                    title={latestCommit.message}
-                  >
-                    {latestCommit.message}
-                  </a>
+
+                {/* Clone switcher & URL */}
+                <div className="flex items-center space-x-2 shrink-0">
+                  <div className="inline-flex rounded-lg p-0.5 bg-gray-100 dark:bg-dark-hover border border-gray-200 dark:border-dark-border text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setCloneTab('http')}
+                      className={`px-2.5 py-1 rounded-md transition-colors ${
+                        cloneTab === 'http'
+                          ? 'bg-white dark:bg-dark-surface text-emerald-600 dark:text-emerald-400 shadow-xs'
+                          : 'text-gray-500 dark:text-dark-muted hover:text-gray-800 dark:hover:text-white'
+                      }`}
+                    >
+                      HTTPS
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCloneTab('ssh')}
+                      className={`px-2.5 py-1 rounded-md transition-colors ${
+                        cloneTab === 'ssh'
+                          ? 'bg-white dark:bg-dark-surface text-emerald-600 dark:text-emerald-400 shadow-xs'
+                          : 'text-gray-500 dark:text-dark-muted hover:text-gray-800 dark:hover:text-white'
+                      }`}
+                    >
+                      SSH
+                    </button>
+                  </div>
+
+                  <div className="flex items-center space-x-1">
+                    <input
+                      type="text"
+                      readOnly
+                      value={selectedCloneUrl}
+                      className="w-56 sm:w-72 px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-dark-bg border border-gray-300 dark:border-dark-border text-xs font-mono text-gray-800 dark:text-dark-text select-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleCopyCode(selectedCloneUrl, 'quick')}
+                      className="p-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-100 dark:hover:bg-dark-hover text-gray-600 dark:text-dark-text shadow-xs transition-colors cursor-pointer"
+                      title="Copy clone URL"
+                    >
+                      {copiedQuick ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              {/* Right: Short SHA + Copy + Relative Time + Total Commits link */}
-              <div className="flex items-center space-x-3 shrink-0 text-xs text-gray-500 dark:text-dark-muted self-end md:self-center">
-                <div className="flex items-center space-x-1 font-mono">
-                  <a
-                    href={`/${owner}/${repoName}/commit/${latestCommit.sha}`}
-                    className="px-2 py-0.5 rounded-md bg-white dark:bg-dark-hover hover:bg-gray-100 dark:hover:bg-dark-border text-gray-800 dark:text-dark-text border border-gray-200 dark:border-dark-border text-xs hover:underline shadow-2xs"
-                    title="View commit details"
-                  >
-                    {latestCommit.short_sha || latestCommit.sha.slice(0, 7)}
-                  </a>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(latestCommit.sha);
-                      setCopiedSha(true);
-                      setTimeout(() => setCopiedSha(false), 2000);
-                    }}
-                    className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-dark-hover text-gray-400 hover:text-gray-700 dark:hover:text-dark-text transition-colors"
-                    title="Copy full SHA"
-                  >
-                    {copiedSha ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-500" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                  </button>
+            {/* Terminal Card 1: create a new repo on the command line */}
+            <div className="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-xs p-5 space-y-3">
+              <h4 className="font-bold text-gray-900 dark:text-white text-sm">
+                …or create a new repository on the command line
+              </h4>
+              <div className="relative rounded-xl bg-gray-900 dark:bg-black/90 border border-gray-800 p-4 text-xs font-mono text-gray-200 overflow-x-auto shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => handleCopyCode(block1Commands, 'block1')}
+                  className="absolute top-3 right-3 p-1.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 transition-colors shadow-xs cursor-pointer"
+                  title="Copy commands"
+                >
+                  {copiedBlock1 ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                </button>
+                <div className="space-y-1">
+                  <div><span className="text-emerald-400">echo</span> &quot;# {repoName}&quot; &gt;&gt; README.md</div>
+                  <div><span className="text-emerald-400">git</span> init</div>
+                  <div><span className="text-emerald-400">git</span> add README.md</div>
+                  <div><span className="text-emerald-400">git</span> commit -m &quot;first commit&quot;</div>
+                  <div><span className="text-emerald-400">git</span> branch -M {currentBranch || 'main'}</div>
+                  <div><span className="text-emerald-400">git</span> remote add origin {selectedCloneUrl}</div>
+                  <div><span className="text-emerald-400">git</span> push -u origin {currentBranch || 'main'}</div>
                 </div>
-
-                <span
-                  className="flex items-center text-gray-500 dark:text-dark-muted"
-                  title={new Date(latestCommit.timestamp).toLocaleString()}
-                >
-                  <Clock className="w-3.5 h-3.5 mr-1 text-gray-400" />
-                  {formatRelativeTime(latestCommit.timestamp)}
-                </span>
-
-                <a
-                  href={`/${owner}/${repoName}/commits/${currentBranch}`}
-                  className="flex items-center space-x-1 font-semibold text-gray-700 dark:text-dark-text hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline pl-3 border-l border-gray-200 dark:border-dark-border"
-                  title="View complete commit history"
-                >
-                  <History className="w-3.5 h-3.5" />
-                  <span>{totalCommits || 1} {totalCommits === 1 ? 'commit' : 'commits'}</span>
-                </a>
               </div>
             </div>
-          ) : (
-            <div className="px-4 py-2.5 bg-gray-50 dark:bg-dark-hover/40 border-b border-gray-200 dark:border-dark-border flex items-center justify-between text-xs text-gray-500 dark:text-dark-muted">
-              <span className="font-semibold text-gray-900 dark:text-white">Files</span>
-              <span>Latest revision</span>
-            </div>
-          )}
 
-          <div className="divide-y divide-gray-100 dark:divide-dark-border">
-            {initialPath && (
+            {/* Terminal Card 2: push an existing repository from the command line */}
+            <div className="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-xs p-5 space-y-3">
+              <h4 className="font-bold text-gray-900 dark:text-white text-sm">
+                …or push an existing repository from the command line
+              </h4>
+              <div className="relative rounded-xl bg-gray-900 dark:bg-black/90 border border-gray-800 p-4 text-xs font-mono text-gray-200 overflow-x-auto shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => handleCopyCode(block2Commands, 'block2')}
+                  className="absolute top-3 right-3 p-1.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 transition-colors shadow-xs cursor-pointer"
+                  title="Copy commands"
+                >
+                  {copiedBlock2 ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                </button>
+                <div className="space-y-1">
+                  <div><span className="text-emerald-400">git</span> remote add origin {selectedCloneUrl}</div>
+                  <div><span className="text-emerald-400">git</span> branch -M {currentBranch || 'main'}</div>
+                  <div><span className="text-emerald-400">git</span> push -u origin {currentBranch || 'main'}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: import code from another repository */}
+            <div className="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-xs p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h4 className="font-bold text-gray-900 dark:text-white text-sm">
+                  …or import code from another repository
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-dark-muted">
+                  You can initialize this repository with code from Subversion, Mercurial, TFS, or an existing Git repository.
+                </p>
+              </div>
               <a
-                href={`/${owner}/${repoName}`}
-                className="flex items-center px-4 py-2.5 text-sm text-emerald-600 dark:text-emerald-400 hover:bg-gray-50 dark:hover:bg-dark-hover font-semibold transition-colors"
+                href={`/new/import?owner=${owner}&name=${repoName}`}
+                className="inline-flex items-center space-x-1.5 px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text shadow-xs transition-colors shrink-0"
               >
-                ..
+                <DownloadCloud className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>Import code</span>
               </a>
-            )}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-sm overflow-hidden">
+            {/* Latest Commit Bar (GitHub Style) */}
+            {latestCommit ? (
+              <div className="px-4 py-3 bg-gray-50/90 dark:bg-dark-hover/40 border-b border-gray-200 dark:border-dark-border flex flex-col md:flex-row md:items-center justify-between gap-3 text-sm">
+                {/* Left: Avatar + Author + Commit message */}
+                <div className="flex items-center space-x-3 min-w-0">
+                  <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 font-bold flex items-center justify-center shrink-0 border border-emerald-300 dark:border-emerald-800 text-xs shadow-2xs">
+                    {latestCommit.author ? latestCommit.author.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                  <div className="flex items-center space-x-2 truncate">
+                    <a
+                      href={`/${latestCommit.author || owner}`}
+                      className="font-bold text-gray-900 dark:text-white hover:underline shrink-0"
+                    >
+                      {latestCommit.author || owner}
+                    </a>
+                    <a
+                      href={`/${owner}/${repoName}/commit/${latestCommit.sha}`}
+                      className="text-gray-700 dark:text-dark-text hover:text-emerald-600 dark:hover:text-emerald-400 truncate hover:underline"
+                      title={latestCommit.message}
+                    >
+                      {latestCommit.message}
+                    </a>
+                  </div>
+                </div>
 
-            {entries.length === 0 ? (
-              <div className="p-8 text-center text-sm text-gray-400">
-                This repository is empty. Push commits or initialize with a README.
+                {/* Right: Short SHA + Copy + Relative Time + Total Commits link */}
+                <div className="flex items-center space-x-3 shrink-0 text-xs text-gray-500 dark:text-dark-muted self-end md:self-center">
+                  <div className="flex items-center space-x-1 font-mono">
+                    <a
+                      href={`/${owner}/${repoName}/commit/${latestCommit.sha}`}
+                      className="px-2 py-0.5 rounded-md bg-white dark:bg-dark-hover hover:bg-gray-100 dark:hover:bg-dark-border text-gray-800 dark:text-dark-text border border-gray-200 dark:border-dark-border text-xs hover:underline shadow-2xs"
+                      title="View commit details"
+                    >
+                      {latestCommit.short_sha || latestCommit.sha.slice(0, 7)}
+                    </a>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(latestCommit.sha);
+                        setCopiedSha(true);
+                        setTimeout(() => setCopiedSha(false), 2000);
+                      }}
+                      className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-dark-hover text-gray-400 hover:text-gray-700 dark:hover:text-dark-text transition-colors"
+                      title="Copy full SHA"
+                    >
+                      {copiedSha ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-500" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+
+                  <span
+                    className="flex items-center text-gray-500 dark:text-dark-muted"
+                    title={new Date(latestCommit.timestamp).toLocaleString()}
+                  >
+                    <Clock className="w-3.5 h-3.5 mr-1 text-gray-400" />
+                    {formatRelativeTime(latestCommit.timestamp)}
+                  </span>
+
+                  <a
+                    href={`/${owner}/${repoName}/commits/${currentBranch}`}
+                    className="flex items-center space-x-1 font-semibold text-gray-700 dark:text-dark-text hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline pl-3 border-l border-gray-200 dark:border-dark-border"
+                    title="View complete commit history"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    <span>{totalCommits || 1} {totalCommits === 1 ? 'commit' : 'commits'}</span>
+                  </a>
+                </div>
               </div>
             ) : (
-              entries.map(entry => {
-                const isDir = entry.type === 'tree';
-                const linkHref = isDir
-                  ? `/${owner}/${repoName}/tree/${currentBranch}/${entry.path}`
-                  : `/${owner}/${repoName}/blob/${currentBranch}/${entry.path}`;
-
-                return (
-                  <div
-                    key={entry.sha + entry.name}
-                    className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-dark-hover transition-colors text-sm"
-                  >
-                    <a href={linkHref} className="flex items-center space-x-2.5 text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 truncate font-medium">
-                      {isDir ? (
-                        <Folder className="w-4 h-4 text-sky-500 shrink-0" />
-                      ) : (
-                        <FileText className="w-4 h-4 text-gray-400 shrink-0" />
-                      )}
-                      <span className="truncate">{entry.name}</span>
-                    </a>
-                    {entry.size !== undefined && (
-                      <span className="text-xs text-gray-400 font-mono">
-                        {(entry.size / 1024).toFixed(1)} KB
-                      </span>
-                    )}
-                  </div>
-                );
-              })
+              <div className="px-4 py-2.5 bg-gray-50 dark:bg-dark-hover/40 border-b border-gray-200 dark:border-dark-border flex items-center justify-between text-xs text-gray-500 dark:text-dark-muted">
+                <span className="font-semibold text-gray-900 dark:text-white">Files</span>
+                <span>Latest revision</span>
+              </div>
             )}
+
+            <div className="divide-y divide-gray-100 dark:divide-dark-border">
+              {initialPath && (
+                <a
+                  href={`/${owner}/${repoName}`}
+                  className="flex items-center px-4 py-2.5 text-sm text-emerald-600 dark:text-emerald-400 hover:bg-gray-50 dark:hover:bg-dark-hover font-semibold transition-colors"
+                >
+                  ..
+                </a>
+              )}
+
+              {entries.length === 0 ? (
+                <div className="p-8 text-center text-sm text-gray-400">
+                  This repository is empty. Push commits or initialize with a README.
+                </div>
+              ) : (
+                entries.map(entry => {
+                  const isDir = entry.type === 'tree';
+                  const linkHref = isDir
+                    ? `/${owner}/${repoName}/tree/${currentBranch}/${entry.path}`
+                    : `/${owner}/${repoName}/blob/${currentBranch}/${entry.path}`;
+
+                  return (
+                    <div
+                      key={entry.sha + entry.name}
+                      className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-dark-hover transition-colors text-sm"
+                    >
+                      <a href={linkHref} className="flex items-center space-x-2.5 text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 truncate font-medium">
+                        {isDir ? (
+                          <Folder className="w-4 h-4 text-sky-500 shrink-0" />
+                        ) : (
+                          <FileText className="w-4 h-4 text-gray-400 shrink-0" />
+                        )}
+                        <span className="truncate">{entry.name}</span>
+                      </a>
+                      {entry.size !== undefined && (
+                        <span className="text-xs text-gray-400 font-mono">
+                          {(entry.size / 1024).toFixed(1)} KB
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* README.md Preview */}
         {readme && (

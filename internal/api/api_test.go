@@ -1811,6 +1811,88 @@ func TestRepositorySearch(t *testing.T) {
 	}
 }
 
+func TestImportRepositoryEndpoint(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	// 1. Create test user
+	alice, err := database.CreateUser("import_alice", "alice@example.com", "hash", "Alice Import", false)
+	if err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+	token := "pgt_import_alice_token"
+	_, _ = database.CreateAccessToken(alice.ID, "import-tok", token, "repo,user")
+
+	// 2. Prepare an existing source repository
+	tempSrcDir, err := os.MkdirTemp("", "progit-test-src-*")
+	if err != nil {
+		t.Fatalf("failed to create temp src dir: %v", err)
+	}
+	defer os.RemoveAll(tempSrcDir)
+
+	srcRepoPath := filepath.Join(tempSrcDir, "external-project.git")
+	if err := git.InitRepositoryWithReadme(srcRepoPath, "external-project", "External upstream project", "main", "Upstream", "upstream@example.com"); err != nil {
+		t.Fatalf("failed to init upstream git: %v", err)
+	}
+
+	// 3. Test Unauthorized
+	bodyUnauth := `{"clone_url":"` + srcRepoPath + `","name":"no-auth"}`
+	reqUnauth := httptest.NewRequest("POST", "/api/v1/repos/import", bytes.NewBufferString(bodyUnauth))
+	recUnauth := httptest.NewRecorder()
+	router.ServeHTTP(recUnauth, reqUnauth)
+	if recUnauth.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 Unauthorized, got %d", recUnauth.Code)
+	}
+
+	// 4. Test Authorized Import
+	importPayload := map[string]interface{}{
+		"clone_url":   srcRepoPath,
+		"name":        "my-imported-repo",
+		"description": "Successfully imported repository",
+		"private":     false,
+	}
+	bodyJSON, _ := json.Marshal(importPayload)
+	reqAuth := httptest.NewRequest("POST", "/api/v1/repos/import", bytes.NewBuffer(bodyJSON))
+	reqAuth.Header.Set("Authorization", "Bearer "+token)
+	reqAuth.Header.Set("Content-Type", "application/json")
+	recAuth := httptest.NewRecorder()
+	router.ServeHTTP(recAuth, reqAuth)
+
+	if recAuth.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created, got %d: %s", recAuth.Code, recAuth.Body.String())
+	}
+
+	var importedRepo database.Repository
+	if err := json.Unmarshal(recAuth.Body.Bytes(), &importedRepo); err != nil {
+		t.Fatalf("failed to unmarshal imported repo: %v", err)
+	}
+	if importedRepo.Name != "my-imported-repo" {
+		t.Errorf("expected repo name 'my-imported-repo', got '%s'", importedRepo.Name)
+	}
+	if importedRepo.OwnerName != "import_alice" {
+		t.Errorf("expected owner 'import_alice', got '%s'", importedRepo.OwnerName)
+	}
+
+	// 5. Verify database record
+	dbRepo, err := database.GetRepositoryByName("import_alice", "my-imported-repo")
+	if err != nil || dbRepo == nil {
+		t.Fatalf("expected to find repo in database: %v", err)
+	}
+	if dbRepo.DefaultBranch != "main" {
+		t.Errorf("expected default branch 'main', got '%s'", dbRepo.DefaultBranch)
+	}
+
+	// 6. Test duplicate import returns 409 Conflict
+	recDup := httptest.NewRecorder()
+	reqDup := httptest.NewRequest("POST", "/api/v1/repos/import", bytes.NewBuffer(bodyJSON))
+	reqDup.Header.Set("Authorization", "Bearer "+token)
+	reqDup.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recDup, reqDup)
+	if recDup.Code != http.StatusConflict {
+		t.Errorf("expected 409 Conflict on duplicate repo, got %d", recDup.Code)
+	}
+}
+
 
 
 

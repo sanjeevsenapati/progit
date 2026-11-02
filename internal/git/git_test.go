@@ -243,3 +243,47 @@ func TestOnlineFileOperations(t *testing.T) {
 	}
 }
 
+func TestImportRepositoryAndUtilities(t *testing.T) {
+	// 1. SanitizeURL
+	rawURL := "https://myuser:secret_token_12345@github.com/foo/bar.git"
+	sanitized := SanitizeURL(rawURL)
+	if strings.Contains(sanitized, "secret_token_12345") {
+		t.Errorf("SanitizeURL leaked password: %s", sanitized)
+	}
+	if !strings.Contains(sanitized, "redacted") {
+		t.Errorf("expected redacted user in %s", sanitized)
+	}
+
+	// 2. Import Repository from local bare repo
+	tempDir, err := os.MkdirTemp("", "progit-import-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	srcRepo := filepath.Join(tempDir, "source.git")
+	destRepo := filepath.Join(tempDir, "imported.git")
+
+	if err := InitRepositoryWithReadme(srcRepo, "source", "Source repository for import", "main", "Author", "author@example.com"); err != nil {
+		t.Fatalf("InitRepositoryWithReadme failed: %v", err)
+	}
+
+	if err := ImportRepository(srcRepo, destRepo, "", ""); err != nil {
+		t.Fatalf("ImportRepository failed: %v", err)
+	}
+
+	branches, err := GetBranches(destRepo)
+	if err != nil || len(branches) == 0 {
+		t.Fatalf("expected branches in imported repo: %v", err)
+	}
+	if branches[0] != "main" {
+		t.Errorf("expected branch main, got %s", branches[0])
+	}
+
+	defBranch := GetDefaultBranch(destRepo)
+	if defBranch != "main" {
+		t.Errorf("expected default branch main, got %s", defBranch)
+	}
+}
+
+

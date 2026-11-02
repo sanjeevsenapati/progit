@@ -18,6 +18,8 @@ async function run() {
 
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 850 });
+  page.on('pageerror', err => console.log('PAGE ERROR:', err.message));
+  page.on('console', msg => { if (msg.type() === 'error') console.log('CONSOLE ERROR:', msg.text()); });
 
   let passed = 0;
   let failed = 0;
@@ -175,6 +177,12 @@ async function run() {
     const hasActivityPaginationOrStream = dashboardText.includes('activities') || dashboardText.includes('Showing') || dashboardText.includes('No recent activity');
     assert(hasActivityPaginationOrStream, 'Dashboard Recent Activity renders pagination or feed state');
 
+    // Profile Overview Button check
+    const profileLink = await page.$('a[href*="/user/ui_tester"]');
+    assert(profileLink !== null, 'Dashboard contains Profile Overview link');
+    const profileBtnHtml = await page.evaluate(el => el ? el.outerHTML : '', profileLink);
+    assert(profileBtnHtml.includes('w-3 h-3') && profileBtnHtml.includes('whitespace-nowrap'), 'Profile Overview button has compact w-3 h-3 icon and whitespace-nowrap');
+
     // --- 7. Repository Creation UI (/new) ---
     console.log('\n=== [7/10] CREATE REPOSITORY UI ===');
     await page.goto(`${BASE_URL}/new`, { waitUntil: 'networkidle0' });
@@ -219,14 +227,16 @@ async function run() {
 
     // Wiki tab
     await page.goto(`${BASE_URL}/ui_tester/${testRepoName}/wiki`, { waitUntil: 'networkidle0' });
-    await page.waitForFunction(() => {
-      const text = document.body.textContent || '';
-      return text.includes('Wiki') || text.includes('Page Not Found') || text.includes('Create Page');
-    }, { timeout: 8000 }).catch(() => {});
-    const wikiText = await page.evaluate(() => document.body.textContent || '');
-    if (!wikiText.includes('Wiki') && !wikiText.includes('Page Not Found') && !wikiText.includes('Create Page')) {
-      console.log('DEBUG WIKI TEXT:', JSON.stringify(wikiText));
+    try {
+      await page.waitForFunction(() => {
+        const text = document.body.textContent || '';
+        return text.includes('Wiki') || text.includes('Page Not Found') || text.includes('Create Page');
+      }, { timeout: 8000 });
+    } catch (e) {
+      const dbg = await page.evaluate(() => ({ url: window.location.href, text: document.body.innerText }));
+      console.log('DEBUG WIKI FAILURE:', dbg);
     }
+    const wikiText = await page.evaluate(() => document.body.textContent || '');
     assert(wikiText.includes('Wiki') || wikiText.includes('Page Not Found') || wikiText.includes('Create Page'), 'Repository wiki view loaded');
 
     // Projects tab
@@ -253,6 +263,51 @@ async function run() {
 
     const adminStatsVisible = adminText.includes('Repositories') || adminText.includes('Users') || adminText.includes('Memory');
     assert(adminStatsVisible, 'System telemetry and management controls displayed on admin dashboard');
+
+    // --- 11. Blank Repository GitHub Setup Guide ---
+    console.log('\n=== [11/12] BLANK REPOSITORY GITHUB SETUP GUIDE ===');
+    const blankRepo = `blank-guide-${Date.now()}`;
+    await page.goto(`${BASE_URL}/new`, { waitUntil: 'networkidle0' });
+    const repoInput = await page.$('form input[placeholder="my-awesome-project"]');
+    if (repoInput) await repoInput.type(blankRepo);
+    const initCheck = await page.$('input[type="checkbox"]');
+    if (initCheck && await page.evaluate(el => el.checked, initCheck)) {
+      await initCheck.click();
+    }
+    const createBlankBtn = await page.$('form button[type="submit"]');
+    if (createBlankBtn) await createBlankBtn.click();
+    await page.waitForNavigation({ waitUntil: 'networkidle0' });
+
+    const blankBody = await page.evaluate(() => document.body.textContent || '');
+    assert(blankBody.includes('Quick setup — if you\'ve done this kind of thing before'), 'Blank repo shows GitHub Quick setup banner');
+    assert(blankBody.includes('…or create a new repository on the command line'), 'Shows create repo command line instructions');
+    assert(blankBody.includes('…or push an existing repository from the command line'), 'Shows push existing repo command line instructions');
+    assert(blankBody.includes('…or import code from another repository'), 'Shows import code section');
+    const importCodeLink = await page.$(`a[href*="/new/import?owner=ui_tester&name=${blankRepo}"]`);
+    assert(importCodeLink !== null, 'Import code link is prefilled with target repo name and owner');
+
+    // --- 12. Import Repository Feature ---
+    console.log('\n=== [12/12] IMPORT REPOSITORY FEATURE (/new/import) ===');
+    await page.goto(`${BASE_URL}/new/import`, { waitUntil: 'networkidle0' });
+    const importHeader = await page.evaluate(() => document.body.textContent || '');
+    assert(importHeader.includes('Import your project to ProGit'), 'Import project page rendered');
+
+    const importedRepoName = `imported-auto-${Date.now()}`;
+    const cloneUrlInput = await page.$('input[placeholder*="Hello-World.git"]');
+    if (cloneUrlInput) {
+      await cloneUrlInput.type('http://localhost:3000/cbdc/website.git');
+    }
+    const targetNameInput = await page.$('input[placeholder="repository-name"]');
+    if (targetNameInput) {
+      await page.evaluate(el => { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); }, targetNameInput);
+      await targetNameInput.type(importedRepoName);
+    }
+    const beginBtn = await page.$('form button[type="submit"]');
+    if (beginBtn) await beginBtn.click();
+    await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 30000 });
+
+    const importedPageBody = await page.evaluate(() => document.body.textContent || '');
+    assert(importedPageBody.includes('commit') || importedPageBody.includes('index.html'), 'Repository imported successfully with full tree and commits');
 
   } catch (err) {
     console.error('Test execution error:', err);

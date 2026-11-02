@@ -21,7 +21,8 @@ import {
   FileCode,
   Globe,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Download
 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
@@ -100,13 +101,23 @@ export const Dashboard: React.FC = () => {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="font-bold text-gray-900 dark:text-white text-base">Top Repositories</h2>
-              <a
-                href="/new"
-                className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>New</span>
-              </a>
+              <div className="flex items-center space-x-1.5">
+                <a
+                  href="/new/import"
+                  title="Import repository"
+                  className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5 text-gray-500 dark:text-dark-muted" />
+                  <span>Import</span>
+                </a>
+                <a
+                  href="/new"
+                  className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>New</span>
+                </a>
+              </div>
             </div>
 
             <div className="relative">
@@ -260,10 +271,11 @@ export const Dashboard: React.FC = () => {
               </div>
               <a
                 href={`/user/${user?.username}`}
-                className="hidden sm:inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg border border-gray-300 dark:border-dark-border text-gray-700 dark:text-dark-text hover:bg-white dark:hover:bg-dark-surface shadow-xs transition-colors"
+                className="hidden sm:inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-medium rounded-md border border-gray-200 dark:border-dark-border text-gray-600 dark:text-dark-muted hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-white dark:hover:bg-dark-surface shadow-xs transition-colors whitespace-nowrap shrink-0"
+                title="View your public profile overview"
               >
                 <span>Profile Overview</span>
-                <ExternalLink className="w-3.5 h-3.5" />
+                <ExternalLink className="w-3 h-3 ml-0.5 text-gray-400 dark:text-dark-muted shrink-0" />
               </a>
             </div>
 
