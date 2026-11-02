@@ -2086,10 +2086,11 @@ def verify_progit_signature(payload_bytes, secret_key, header_signature):
           </table>
         </div>
 
-        <h2>Explore Page Search &amp; URL Synchronization</h2>
-        <p>The <strong>Explore</strong> page (<code>/explore</code>) allows comprehensive repository discovery:</p>
+        <h2>Explore Page Search &amp; Pagination</h2>
+        <p>The <strong>Explore</strong> page (<code>/explore</code>) allows comprehensive repository discovery with server-side pagination:</p>
         <ul>
-          <li><strong>URL Query Binding</strong>: Directly open or bookmark <code>/explore?q=keyword</code> to immediately filter repositories.</li>
+          <li><strong>URL Query &amp; Page Binding</strong>: Directly open or bookmark <code>/explore?q=keyword&amp;page=2</code> to immediately navigate to filtered results.</li>
+          <li><strong>Interactive Pagination Controls</strong>: Displays total repository counts, previous/next controls, and direct page jumps with smooth scrolling.</li>
           <li><strong>Live Browser History</strong>: Searching inside the Explore view automatically updates the browser's URL using <code>window.history.replaceState</code>, enabling instant copy-paste sharing with team members.</li>
         </ul>
 
@@ -2432,8 +2433,25 @@ Content-Type: application/json
 }</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
         <h2>Explore Repositories</h2>
-        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/explore?q={query}</span></div>
-        <p>Retrieves public repositories and platform highlights for the Explore page, filterable by <code>?q={query}</code>.</p>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/explore?q={query}&amp;page=1&amp;limit=12</span></div>
+        <p>Retrieves paginated repositories and platform highlights for the Explore page. Supports keyword search via <code>?q={query}</code>, current page selection via <code>?page={page}</code>, and page size via <code>?limit={limit}</code>.</p>
+        <pre><code>{
+  "repositories": [
+    {
+      "id": 14,
+      "name": "cloud-distributed-kv",
+      "owner_name": "dev_alice",
+      "description": "High performance pure-Go key-value store",
+      "is_private": false,
+      "num_stars": 12,
+      "default_branch": "main"
+    }
+  ],
+  "total": 48,
+  "page": 1,
+  "limit": 12,
+  "total_pages": 4
+}</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
         <h2>Create Repository</h2>
         <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos</span></div>
@@ -2530,6 +2548,28 @@ Content-Type: application/json
 
         <h2>Get Directory Tree</h2>
         <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/tree?ref=main&amp;path=src/core</span></div>
+        <p>Returns tree entries, root README content (if available), total commits count, and the latest commit details for the requested ref and path (matching GitHub's repository code view).</p>
+        <pre><code>{
+  "entries": [
+    {
+      "name": "README.md",
+      "path": "README.md",
+      "type": "blob",
+      "size": 1820,
+      "sha": "a1b2c3d..."
+    }
+  ],
+  "readme": "# README...",
+  "latest_commit": {
+    "sha": "f1aecdf5ec1f4faf9656087606decb823193dcc0",
+    "short_sha": "f1aecdf",
+    "author": "sanjeevsenapati",
+    "email": "sanjeev@therasoftonline.com",
+    "message": "Initial Commit from cli",
+    "timestamp": "2026-11-02T05:07:59Z"
+  },
+  "total_commits": 7
+}</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
         <h2>Get Blob File Content</h2>
         <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/blob?ref=main&amp;path=README.md</span></div>
