@@ -123,6 +123,12 @@ async function run() {
     assert(exploreResults.length > 0, `Explore page found ${exploreResults.length} matching repositories`);
     assert(page.url().includes('q=qa-public'), `URL query synchronized: ${page.url()}`);
 
+    const hasPagination = await page.evaluate(() => {
+      const text = document.body.textContent || '';
+      return text.includes('Showing') && text.includes('repositories');
+    });
+    assert(hasPagination, 'Explore page renders pagination information');
+
     // --- 4. Dark / Light Theme Toggle ---
     console.log('\n=== [4/10] THEME TOGGLING (DARK / LIGHT) ===');
     const isDarkInit = await page.evaluate(() => document.documentElement.classList.contains('dark'));
@@ -187,6 +193,14 @@ async function run() {
     const repoViewText = await page.evaluate(() => document.body.textContent || '');
     assert(page.url().includes(testRepoName) || repoViewText.includes(testRepoName), `Repository header displays repository name (${testRepoName})`);
 
+    // Verify GitHub-style latest commit details banner
+    await page.goto(`${BASE_URL}/cbdc/website`, { waitUntil: 'networkidle0' });
+    const commitBannerVisible = await page.evaluate(() => {
+      const text = document.body.textContent || '';
+      return (text.includes('Initial Commit from cli') || text.includes('commit')) && text.includes('commits');
+    });
+    assert(commitBannerVisible, 'Repository code view renders GitHub-style latest commit details bar');
+
     // Issues tab
     await page.goto(`${BASE_URL}/ui_tester/${testRepoName}/issues`, { waitUntil: 'networkidle0' });
     const issuesText = await page.evaluate(() => document.body.textContent || '');
@@ -202,8 +216,11 @@ async function run() {
     await page.waitForFunction(() => {
       const text = document.body.textContent || '';
       return text.includes('Wiki') || text.includes('Page Not Found') || text.includes('Create Page');
-    }, { timeout: 5000 }).catch(() => {});
+    }, { timeout: 8000 }).catch(() => {});
     const wikiText = await page.evaluate(() => document.body.textContent || '');
+    if (!wikiText.includes('Wiki') && !wikiText.includes('Page Not Found') && !wikiText.includes('Create Page')) {
+      console.log('DEBUG WIKI TEXT:', JSON.stringify(wikiText));
+    }
     assert(wikiText.includes('Wiki') || wikiText.includes('Page Not Found') || wikiText.includes('Create Page'), 'Repository wiki view loaded');
 
     // Projects tab

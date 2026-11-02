@@ -544,21 +544,28 @@ func (r *Router) handleExplore(w http.ResponseWriter, req *http.Request) {
 		q = strings.TrimSpace(req.URL.Query().Get("query"))
 	}
 
-	var repos []*database.Repository
-	var err error
-
-	if q != "" {
-		var userID int64
-		isAdmin := false
-		if user != nil {
-			userID = user.ID
-			isAdmin = user.IsAdmin
-		}
-		repos, err = database.SearchRepositories(q, userID, isAdmin, 50, 0)
-	} else {
-		repos, err = database.ListRepositories(50, 0, true)
+	page, _ := strconv.Atoi(req.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
 	}
 
+	limit, _ := strconv.Atoi(req.URL.Query().Get("limit"))
+	if limit <= 0 {
+		limit = 12
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	offset := (page - 1) * limit
+
+	var userID int64
+	isAdmin := false
+	if user != nil {
+		userID = user.ID
+		isAdmin = user.IsAdmin
+	}
+
+	repos, err := database.SearchRepositories(q, userID, isAdmin, limit, offset)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -566,10 +573,24 @@ func (r *Router) handleExplore(w http.ResponseWriter, req *http.Request) {
 	if repos == nil {
 		repos = []*database.Repository{}
 	}
+
+	total, err := database.CountSearchRepositories(q, userID, isAdmin)
+	if err != nil {
+		total = len(repos)
+	}
+
+	totalPages := 0
+	if total > 0 {
+		totalPages = (total + limit - 1) / limit
+	}
+
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"repositories": repos,
 		"data":         repos,
-		"total":        len(repos),
+		"total":        total,
+		"page":         page,
+		"limit":        limit,
+		"total_pages":  totalPages,
 	})
 }
 
@@ -1340,9 +1361,19 @@ func (r *Router) handleGetTree(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	// Fetch latest commit and commit count for ref
+	var latestCommit *git.Commit
+	commits, err := git.GetCommits(repoDir, ref, 1, 0)
+	if err == nil && len(commits) > 0 {
+		latestCommit = &commits[0]
+	}
+	totalCommits := git.CountCommits(repoDir, ref)
+
 	jsonResponse(w, http.StatusOK, map[string]any{
-		"entries": entries,
-		"readme":  readmeContent,
+		"entries":       entries,
+		"readme":        readmeContent,
+		"latest_commit": latestCommit,
+		"total_commits": totalCommits,
 	})
 }
 

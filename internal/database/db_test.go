@@ -101,6 +101,17 @@ func TestRepositoryAndIssues(t *testing.T) {
 		t.Errorf("unexpected repo state: %+v", repo)
 	}
 
+	// Search and Count
+	searchResults, err := SearchRepositories("demo", 0, false, 10, 0)
+	if err != nil || len(searchResults) != 1 {
+		t.Fatalf("expected 1 search result, got %d (err: %v)", len(searchResults), err)
+	}
+
+	totalFound, err := CountSearchRepositories("demo", 0, false)
+	if err != nil || totalFound != 1 {
+		t.Fatalf("expected count 1, got %d (err: %v)", totalFound, err)
+	}
+
 	// Issues
 	issue, err := CreateIssue(repo.ID, user.ID, "Fix memory leak", "Description here", false, nil)
 	if err != nil {

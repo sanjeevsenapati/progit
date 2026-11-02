@@ -910,6 +910,48 @@ func SearchRepositories(keyword string, userID int64, isAdmin bool, limit, offse
 	return list, rows.Err()
 }
 
+// CountSearchRepositories counts total repositories matching search criteria and visibility rules.
+func CountSearchRepositories(keyword string, userID int64, isAdmin bool) (int, error) {
+	keyword = strings.TrimSpace(keyword)
+	param := "%" + keyword + "%"
+
+	baseQuery := `
+		SELECT COUNT(*)
+		FROM repositories r
+		JOIN users u ON u.id = r.owner_id
+	`
+	var whereClauses []string
+	var args []any
+
+	if !isAdmin {
+		if userID > 0 {
+			whereClauses = append(whereClauses, `(
+				r.is_private = 0 
+				OR r.owner_id = ?
+				OR EXISTS (SELECT 1 FROM collaborators c WHERE c.repo_id = r.id AND c.user_id = ?)
+				OR EXISTS (SELECT 1 FROM org_members om WHERE om.org_id = r.owner_id AND om.user_id = ?)
+			)`)
+			args = append(args, userID, userID, userID)
+		} else {
+			whereClauses = append(whereClauses, "r.is_private = 0")
+		}
+	}
+
+	if keyword != "" && keyword != "/" {
+		whereClauses = append(whereClauses, "(r.name LIKE ? OR r.description LIKE ? OR u.username LIKE ? OR (u.username || '/' || r.name) LIKE ?)")
+		args = append(args, param, param, param, param)
+	}
+
+	query := baseQuery
+	if len(whereClauses) > 0 {
+		query += " WHERE " + strings.Join(whereClauses, " AND ")
+	}
+
+	var count int
+	err := DB.QueryRow(query, args...).Scan(&count)
+	return count, err
+}
+
 func ListUserRepositories(userID int64, includePrivate bool) ([]*Repository, error) {
 	query := `
 		SELECT r.id, r.owner_id, u.username, r.name, r.description, r.is_private, r.is_fork, r.fork_parent_id,

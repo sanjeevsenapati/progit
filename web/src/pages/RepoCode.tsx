@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository, TreeEntry } from '../lib/api';
+import { api, Repository, TreeEntry, Commit } from '../lib/api';
 import { RepoNav } from '../components/RepoNav';
 import { MarkdownViewer } from '../components/MarkdownViewer';
 import { showToast } from '../components/ModalDialog';
@@ -18,13 +18,34 @@ import {
   Plus,
   ChevronDown,
   UploadCloud,
-  FilePlus
+  FilePlus,
+  History,
+  GitCommit
 } from 'lucide-react';
 
 interface RepoCodeProps {
   owner: string;
   repo: string;
   initialPath?: string;
+}
+
+function formatRelativeTime(dateInput: string | Date | number): string {
+  if (!dateInput) return '';
+  const date = typeof dateInput === 'string' || typeof dateInput === 'number' ? new Date(dateInput) : dateInput;
+  const now = new Date();
+  const diffInSeconds = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
+
+  if (diffInSeconds < 5) return 'just now';
+  if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `${diffInHours}h ago`;
+  const diffInDays = Math.floor(diffInSeconds / 86400);
+  if (diffInDays < 30) return `${diffInDays}d ago`;
+  const diffInMonths = Math.floor(diffInDays / 30);
+  if (diffInMonths < 12) return `${diffInMonths}mo ago`;
+  return `${Math.floor(diffInDays / 365)}y ago`;
 }
 
 export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initialPath = '' }) => {
@@ -34,6 +55,9 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
   const [currentBranch, setCurrentBranch] = useState('main');
   const [entries, setEntries] = useState<TreeEntry[]>([]);
   const [readme, setReadme] = useState<string | null>(null);
+  const [latestCommit, setLatestCommit] = useState<Commit | null>(null);
+  const [totalCommits, setTotalCommits] = useState<number>(0);
+  const [copiedSha, setCopiedSha] = useState(false);
   const [cloneHTTP, setCloneHTTP] = useState('');
   const [cloneSSH, setCloneSSH] = useState('');
   const [cloneTab, setCloneTab] = useState<'http' | 'ssh'>('http');
@@ -54,15 +78,28 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
         setIsStarred(data.is_starred);
         setCanWrite(Boolean(data.can_write || data.permissions?.write));
         setBranches(data.branches || ['main']);
+        const branch = data.branches?.[0] || 'main';
         if (data.branches?.length > 0) {
-          setCurrentBranch(data.branches[0]);
+          setCurrentBranch(branch);
         }
         setCloneHTTP(data.clone_url_http);
         setCloneSSH(data.clone_url_ssh);
 
-        const treeData = await api.getTree(owner, repoName, data.branches?.[0] || 'main', initialPath);
+        const treeData = await api.getTree(owner, repoName, branch, initialPath);
         setEntries(treeData.entries || []);
         setReadme(treeData.readme || null);
+        if (treeData.latest_commit) {
+          setLatestCommit(treeData.latest_commit);
+          setTotalCommits(treeData.total_commits || 1);
+        } else {
+          try {
+            const commits = await api.getCommits(owner, repoName, branch);
+            if (commits && commits.length > 0) {
+              setLatestCommit(commits[0]);
+              setTotalCommits(commits.length);
+            }
+          } catch {}
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -79,6 +116,21 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
       const treeData = await api.getTree(owner, repoName, newBranch, initialPath);
       setEntries(treeData.entries || []);
       setReadme(treeData.readme || null);
+      if (treeData.latest_commit) {
+        setLatestCommit(treeData.latest_commit);
+        setTotalCommits(treeData.total_commits || 1);
+      } else {
+        try {
+          const commits = await api.getCommits(owner, repoName, newBranch);
+          if (commits && commits.length > 0) {
+            setLatestCommit(commits[0]);
+            setTotalCommits(commits.length);
+          } else {
+            setLatestCommit(null);
+            setTotalCommits(0);
+          }
+        } catch {}
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -153,11 +205,11 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
               <button
                 type="button"
                 onClick={() => setShowBranchDropdown(!showBranchDropdown)}
-                className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-50 dark:bg-dark-surface border border-gray-300 dark:border-dark-border text-gray-800 dark:text-white hover:bg-gray-100 dark:hover:bg-dark-hover shadow-sm"
+                className="inline-flex items-center space-x-2 px-3 py-1.5 text-sm font-semibold rounded-lg bg-gray-50 dark:bg-dark-surface border border-gray-300 dark:border-dark-border text-gray-800 dark:text-white hover:bg-gray-100 dark:hover:bg-dark-hover shadow-xs transition-colors"
               >
-                <GitBranch className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span className="font-mono">{currentBranch}</span>
-                <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                <GitBranch className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="font-mono text-xs sm:text-sm">{currentBranch}</span>
+                <ChevronDown className="w-4 h-4 text-gray-400" />
               </button>
 
               {showBranchDropdown && (
@@ -181,7 +233,7 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
                       placeholder="Find or create a branch..."
                       value={branchFilter}
                       onChange={(e) => setBranchFilter(e.target.value)}
-                      className="w-full px-2.5 py-1 text-xs rounded border border-gray-300 dark:border-dark-border bg-gray-50 dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+                      className="w-full px-2.5 py-1.5 text-xs rounded border border-gray-300 dark:border-dark-border bg-gray-50 dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
                     />
                   </div>
 
@@ -229,7 +281,7 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
                   <div className="p-2 bg-gray-50 dark:bg-dark-hover/40 border-t border-gray-100 dark:border-dark-border text-center">
                     <a
                       href={`/${owner}/${repoName}/branches`}
-                      className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
+                      className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
                     >
                       View all branches ({branches.length})
                     </a>
@@ -241,14 +293,14 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
             {/* Direct Link to all branches */}
             <a
               href={`/${owner}/${repoName}/branches`}
-              className="hidden sm:inline-flex items-center space-x-1 text-xs font-semibold text-gray-500 dark:text-dark-muted hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+              className="hidden sm:inline-flex items-center space-x-1.5 text-xs font-semibold text-gray-500 dark:text-dark-muted hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
             >
-              <GitBranch className="w-3.5 h-3.5" />
+              <GitBranch className="w-4 h-4" />
               <span>{branches.length} branches</span>
             </a>
 
             {/* Breadcrumb Path */}
-            <div className="flex items-center space-x-1.5 text-sm font-semibold">
+            <div className="flex items-center space-x-1.5 text-sm sm:text-base font-semibold">
               <a href={`/${owner}/${repoName}`} className="text-emerald-600 dark:text-emerald-400 hover:underline">
                 {repoName}
               </a>
@@ -275,10 +327,10 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
               <div className="relative">
                 <button
                   onClick={() => setShowAddFileModal(!showAddFileModal)}
-                  className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text font-semibold text-xs shadow-sm transition-colors"
+                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text font-semibold text-sm shadow-xs transition-colors"
                 >
                   <span>Add file</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
                 </button>
 
                 {showAddFileModal && (
@@ -286,7 +338,7 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
                     <div className="py-1">
                       <a
                         href={`/${owner}/${repoName}/new/${currentBranch}${initialPath ? '/' + initialPath : ''}`}
-                        className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 dark:text-dark-text hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-700 dark:hover:text-emerald-400 font-medium"
+                        className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 dark:text-dark-text hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-700 dark:hover:text-emerald-400 font-medium text-xs"
                       >
                         <FilePlus className="w-4 h-4 text-emerald-600" />
                         <span>Create new file</span>
@@ -295,7 +347,7 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
                     <div className="py-1">
                       <a
                         href={`/${owner}/${repoName}/upload/${currentBranch}${initialPath ? '/' + initialPath : ''}`}
-                        className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 dark:text-dark-text hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-700 dark:hover:text-emerald-400 font-medium"
+                        className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 dark:text-dark-text hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-700 dark:hover:text-emerald-400 font-medium text-xs"
                       >
                         <UploadCloud className="w-4 h-4 text-emerald-600" />
                         <span>Upload files</span>
@@ -310,9 +362,9 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
             <div className="relative">
               <button
                 onClick={() => setShowCloneModal(!showCloneModal)}
-                className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition-colors"
+                className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-xs transition-colors"
               >
-                <Download className="w-3.5 h-3.5" />
+                <Download className="w-4 h-4" />
                 <span>Code</span>
               </button>
 
@@ -346,7 +398,7 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
                     type="text"
                     readOnly
                     value={cloneTab === 'http' ? cloneHTTP : cloneSSH}
-                    className="flex-1 px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-dark-bg border border-gray-300 dark:border-dark-border text-[11px] font-mono text-gray-800 dark:text-dark-text select-all"
+                    className="flex-1 px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-dark-bg border border-gray-300 dark:border-dark-border text-xs font-mono text-gray-800 dark:text-dark-text select-all"
                   />
                   <button
                     onClick={() => handleCopyClone(cloneTab === 'http' ? cloneHTTP : cloneSSH)}
@@ -357,7 +409,7 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
                   </button>
                 </div>
 
-                <p className="text-[11px] text-gray-500 dark:text-dark-muted">
+                <p className="text-xs text-gray-500 dark:text-dark-muted">
                   Use Git or checkout with SVN using the web URL.
                 </p>
               </div>
@@ -366,18 +418,90 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
         </div>
       </div>
 
-        {/* File Tree Table */}
+        {/* File Tree Table & GitHub-Style Latest Commit Banner */}
         <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-sm overflow-hidden">
-          <div className="px-4 py-2.5 bg-gray-50 dark:bg-dark-hover/40 border-b border-gray-200 dark:border-dark-border flex items-center justify-between text-xs text-gray-500 dark:text-dark-muted">
-            <span className="font-semibold text-gray-900 dark:text-white">Files</span>
-            <span>Latest revision</span>
-          </div>
+          {/* Latest Commit Bar (GitHub Style) */}
+          {latestCommit ? (
+            <div className="px-4 py-3 bg-gray-50/90 dark:bg-dark-hover/40 border-b border-gray-200 dark:border-dark-border flex flex-col md:flex-row md:items-center justify-between gap-3 text-sm">
+              {/* Left: Avatar + Author + Commit message */}
+              <div className="flex items-center space-x-3 min-w-0">
+                <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 font-bold flex items-center justify-center shrink-0 border border-emerald-300 dark:border-emerald-800 text-xs shadow-2xs">
+                  {latestCommit.author ? latestCommit.author.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div className="flex items-center space-x-2 truncate">
+                  <a
+                    href={`/${latestCommit.author || owner}`}
+                    className="font-bold text-gray-900 dark:text-white hover:underline shrink-0"
+                  >
+                    {latestCommit.author || owner}
+                  </a>
+                  <a
+                    href={`/${owner}/${repoName}/commit/${latestCommit.sha}`}
+                    className="text-gray-700 dark:text-dark-text hover:text-emerald-600 dark:hover:text-emerald-400 truncate hover:underline"
+                    title={latestCommit.message}
+                  >
+                    {latestCommit.message}
+                  </a>
+                </div>
+              </div>
+
+              {/* Right: Short SHA + Copy + Relative Time + Total Commits link */}
+              <div className="flex items-center space-x-3 shrink-0 text-xs text-gray-500 dark:text-dark-muted self-end md:self-center">
+                <div className="flex items-center space-x-1 font-mono">
+                  <a
+                    href={`/${owner}/${repoName}/commit/${latestCommit.sha}`}
+                    className="px-2 py-0.5 rounded-md bg-white dark:bg-dark-hover hover:bg-gray-100 dark:hover:bg-dark-border text-gray-800 dark:text-dark-text border border-gray-200 dark:border-dark-border text-xs hover:underline shadow-2xs"
+                    title="View commit details"
+                  >
+                    {latestCommit.short_sha || latestCommit.sha.slice(0, 7)}
+                  </a>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(latestCommit.sha);
+                      setCopiedSha(true);
+                      setTimeout(() => setCopiedSha(false), 2000);
+                    }}
+                    className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-dark-hover text-gray-400 hover:text-gray-700 dark:hover:text-dark-text transition-colors"
+                    title="Copy full SHA"
+                  >
+                    {copiedSha ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+
+                <span
+                  className="flex items-center text-gray-500 dark:text-dark-muted"
+                  title={new Date(latestCommit.timestamp).toLocaleString()}
+                >
+                  <Clock className="w-3.5 h-3.5 mr-1 text-gray-400" />
+                  {formatRelativeTime(latestCommit.timestamp)}
+                </span>
+
+                <a
+                  href={`/${owner}/${repoName}/commits/${currentBranch}`}
+                  className="flex items-center space-x-1 font-semibold text-gray-700 dark:text-dark-text hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline pl-3 border-l border-gray-200 dark:border-dark-border"
+                  title="View complete commit history"
+                >
+                  <History className="w-3.5 h-3.5" />
+                  <span>{totalCommits || 1} {totalCommits === 1 ? 'commit' : 'commits'}</span>
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div className="px-4 py-2.5 bg-gray-50 dark:bg-dark-hover/40 border-b border-gray-200 dark:border-dark-border flex items-center justify-between text-xs text-gray-500 dark:text-dark-muted">
+              <span className="font-semibold text-gray-900 dark:text-white">Files</span>
+              <span>Latest revision</span>
+            </div>
+          )}
 
           <div className="divide-y divide-gray-100 dark:divide-dark-border">
             {initialPath && (
               <a
                 href={`/${owner}/${repoName}`}
-                className="flex items-center px-4 py-2 text-xs text-emerald-600 dark:text-emerald-400 hover:bg-gray-50 dark:hover:bg-dark-hover font-semibold"
+                className="flex items-center px-4 py-2.5 text-sm text-emerald-600 dark:text-emerald-400 hover:bg-gray-50 dark:hover:bg-dark-hover font-semibold transition-colors"
               >
                 ..
               </a>
@@ -397,18 +521,18 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
                 return (
                   <div
                     key={entry.sha + entry.name}
-                    className="flex items-center justify-between px-4 py-2 hover:bg-gray-50 dark:hover:bg-dark-hover transition-colors text-xs"
+                    className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-dark-hover transition-colors text-sm"
                   >
-                    <a href={linkHref} className="flex items-center space-x-2 text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 truncate">
+                    <a href={linkHref} className="flex items-center space-x-2.5 text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 truncate font-medium">
                       {isDir ? (
-                        <Folder className="w-4 h-4 text-sky-500 flex-shrink-0" />
+                        <Folder className="w-4 h-4 text-sky-500 shrink-0" />
                       ) : (
-                        <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <FileText className="w-4 h-4 text-gray-400 shrink-0" />
                       )}
                       <span className="truncate">{entry.name}</span>
                     </a>
                     {entry.size !== undefined && (
-                      <span className="text-[11px] text-gray-400 font-mono">
+                      <span className="text-xs text-gray-400 font-mono">
                         {(entry.size / 1024).toFixed(1)} KB
                       </span>
                     )}
@@ -422,7 +546,7 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
         {/* README.md Preview */}
         {readme && (
           <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-sm overflow-hidden">
-            <div className="px-4 py-2.5 bg-gray-50 dark:bg-dark-hover/40 border-b border-gray-200 dark:border-dark-border flex items-center space-x-2 text-xs font-semibold text-gray-800 dark:text-white">
+            <div className="px-4 py-3 bg-gray-50/80 dark:bg-dark-hover/40 border-b border-gray-200 dark:border-dark-border flex items-center space-x-2 text-sm font-semibold text-gray-800 dark:text-white">
               <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>README.md</span>
             </div>

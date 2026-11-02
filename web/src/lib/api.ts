@@ -379,9 +379,21 @@ export const api = {
     }>('/api/v1/user/dashboard');
   },
 
-  async explore(query?: string) {
-    const url = query ? `/api/v1/explore?q=${encodeURIComponent(query)}` : '/api/v1/explore';
-    return fetchJSON<{ repositories: Repository[] }>(url);
+  async explore(query?: string, page = 1, limit = 12) {
+    const params = new URLSearchParams();
+    if (query) params.set('q', query);
+    if (page > 1) params.set('page', String(page));
+    if (limit) params.set('limit', String(limit));
+    const qs = params.toString();
+    const url = qs ? `/api/v1/explore?${qs}` : '/api/v1/explore';
+    return fetchJSON<{
+      repositories: Repository[];
+      data?: Repository[];
+      total: number;
+      page?: number;
+      limit?: number;
+      total_pages?: number;
+    }>(url);
   },
 
   async searchRepos(query: string) {
@@ -447,7 +459,12 @@ export const api = {
     const params = new URLSearchParams();
     if (ref) params.set('ref', ref);
     if (path) params.set('path', path);
-    return fetchJSON<{ entries: TreeEntry[]; readme?: string }>(`/api/v1/repos/${owner}/${repo}/tree?${params.toString()}`);
+    return fetchJSON<{
+      entries: TreeEntry[];
+      readme?: string;
+      latest_commit?: Commit | null;
+      total_commits?: number;
+    }>(`/api/v1/repos/${owner}/${repo}/tree?${params.toString()}`);
   },
 
   async getBlob(owner: string, repo: string, ref: string, path: string) {

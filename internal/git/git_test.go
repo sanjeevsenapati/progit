@@ -40,6 +40,11 @@ func TestGitOperations(t *testing.T) {
 		t.Errorf("unexpected commit message: %s", commits[0].Message)
 	}
 
+	totalCommits := CountCommits(repoPath, "main")
+	if totalCommits != 1 {
+		t.Errorf("expected 1 total commit, got %d", totalCommits)
+	}
+
 	// 4. Get tree entries
 	tree, err := GetTree(repoPath, "main", "")
 	if err != nil || len(tree) == 0 {

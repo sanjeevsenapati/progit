@@ -311,6 +311,22 @@ func GetCommits(repoPath, ref string, limit, offset int) ([]Commit, error) {
 	return commits, nil
 }
 
+// CountCommits returns the total number of commits reachable from ref.
+func CountCommits(repoPath, ref string) int {
+	if ref == "" {
+		ref = "HEAD"
+	}
+	if strings.HasPrefix(ref, "-") {
+		return 0
+	}
+	out, err := RunGit(repoPath, "rev-list", "--count", "--end-of-options", ref)
+	if err != nil {
+		return 0
+	}
+	cnt, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+	return cnt
+}
+
 // GetTree lists files and subdirectories at the given path and ref.
 func GetTree(repoPath, ref, subpath string) ([]TreeEntry, error) {
 	if ref == "" {
