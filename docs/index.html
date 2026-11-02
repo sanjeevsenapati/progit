@@ -1556,6 +1556,18 @@ PRAGMA foreign_keys = ON;</code><button class="copy-btn" onclick="copyCode(this)
           <div>When pushing over HTTP, developers can authenticate using Personal Access Tokens (PATs) instead of their primary account password. Create PATs in <strong>Settings &gt; Access Tokens</strong>.</div>
         </div>
 
+        <h2>Blank Repository Quick Setup (GitHub-Style)</h2>
+        <p>When creating a repository without an initial README (or when a bare repository has zero commits), ProGit displays a comprehensive setup guide matching GitHub's workflow:</p>
+        <ul>
+          <li><strong>Quick Setup Bar</strong>: Instant toggle between HTTPS and SSH clone URLs with one-click clipboard copying.</li>
+          <li><strong>Create a new repository on the command line</strong>: Ready-to-copy terminal commands initializing Git, adding a README, committing, setting main branch, and pushing to ProGit.</li>
+          <li><strong>Push an existing repository from the command line</strong>: Copyable commands to add ProGit as remote and push existing branches.</li>
+          <li><strong>Import code from another repository</strong>: Direct shortcut button linking to the repository import wizard.</li>
+        </ul>
+
+        <h2>Repository Import</h2>
+        <p>ProGit allows importing external Git repositories directly via <code>/new/import</code> or <code>POST /api/v1/repos/import</code>. The server clones the entire history (all commits, branches, and tags) using Git mirror replication and seamlessly binds it to your personal or organization account.</p>
+
         <div class="page-nav-buttons">
           <a href="#config-ssh" class="nav-btn" onclick="navigate('config-ssh')">
             <span class="dir">&larr; Previous</span>
@@ -2465,6 +2477,19 @@ Content-Type: application/json
   "private": false,
   "auto_init": true,
   "readme": "Default"
+}</code></pre>
+
+        <h2>Import Repository</h2>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/import</span></div>
+        <p>Clones an external Git repository from GitHub, GitLab, Bitbucket, or any Git remote URL directly into ProGit with complete commit history, branches, and tags. Supports optional authentication credentials for private repositories.</p>
+        <pre><code>{
+  "clone_url": "https://github.com/octocat/Hello-World.git",
+  "owner": "dev_alice",
+  "name": "Hello-World",
+  "description": "Imported repository with full history",
+  "private": false,
+  "auth_username": "",
+  "auth_password": ""
 }</code></pre>
 
         <h2>Get Repository Details</h2>
