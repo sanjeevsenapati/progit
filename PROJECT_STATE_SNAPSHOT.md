@@ -115,6 +115,14 @@ flowchart TD
   ```
 - **Backup Snapshot**:
   `backups/progit-backup-20261102-122415.tar.gz` (2.4 MB) containing WAL-checkpointed SQLite database and all bare Git repositories.
+- **Cross-Platform Releases & GitHub Actions**:
+  - Automated release workflow configured in `.github/workflows/release.yml` triggers on `v*` tags and builds standalone binary packages for macOS, Windows, and Linux.
+  - Standalone local release builder: `scripts/build-release.sh <version>`.
+  - Built packages in `dist/release/v1.1.0/`:
+    - macOS: `progit_1.1.0_darwin_arm64.tar.gz`, `progit_1.1.0_darwin_amd64.tar.gz`
+    - Linux: `progit_1.1.0_linux_amd64.tar.gz`, `progit_1.1.0_linux_arm64.tar.gz`
+    - Windows: `progit_1.1.0_windows_amd64.zip`, `progit_1.1.0_windows_arm64.zip`
+    - SHA256 integrity checksums: `checksums.txt`
 
 ---
 
@@ -130,3 +138,4 @@ flowchart TD
    - Implement Git LFS pointer storage with local filesystem or S3 object store backends.
 5. **Two-Factor Authentication (2FA / TOTP)**:
    - Add QR-code time-based one-time password verification for enhanced account security.
+
