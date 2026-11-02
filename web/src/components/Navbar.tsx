@@ -237,7 +237,7 @@ export const Navbar: React.FC = () => {
                 </button>
               ) : (
                 <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
-                  <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-gray-400 bg-gray-200 dark:bg-dark-hover rounded border border-gray-300 dark:border-dark-border" title="Press / to focus">
+                  <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-xs font-mono text-gray-400 bg-gray-200 dark:bg-dark-hover rounded border border-gray-300 dark:border-dark-border" title="Press / to focus">
                     /
                   </kbd>
                 </div>
@@ -248,10 +248,10 @@ export const Navbar: React.FC = () => {
             {searchOpen && (searchQuery.trim() !== '' || searchResults.length > 0) && (
               <div
                 ref={searchDropdownRef}
-                className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl shadow-2xl z-50 text-xs overflow-hidden divide-y divide-gray-100 dark:divide-dark-border"
+                className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl shadow-2xl z-50 text-sm overflow-hidden divide-y divide-gray-100 dark:divide-dark-border"
               >
                 {searchLoading && searchResults.length === 0 ? (
-                  <div className="p-4 text-center text-gray-400 flex items-center justify-center space-x-2">
+                  <div className="p-4 text-center text-gray-400 flex items-center justify-center space-x-2 text-sm">
                     <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
                     <span>Searching repositories...</span>
                   </div>
@@ -279,19 +279,19 @@ export const Navbar: React.FC = () => {
                               <span className="text-gray-500 dark:text-dark-muted font-normal">{repo.owner_name} /</span>
                               <span className="font-bold text-gray-900 dark:text-white truncate">{repo.name}</span>
                               {repo.is_private && (
-                                <span className="text-[10px] px-1.5 py-0.2 rounded-full border border-amber-500/30 text-amber-500 bg-amber-500/10">
+                                <span className="text-xs px-1.5 py-0.2 rounded-full border border-amber-500/30 text-amber-500 bg-amber-500/10">
                                   Private
                                 </span>
                               )}
                             </div>
                             {repo.description && (
-                              <p className="text-[11px] text-gray-500 dark:text-dark-muted truncate mt-0.5 max-w-xs">
+                              <p className="text-xs text-gray-500 dark:text-dark-muted truncate mt-0.5 max-w-xs">
                                 {repo.description}
                               </p>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center space-x-1 text-gray-400 text-[11px] flex-shrink-0 pt-0.5">
+                        <div className="flex items-center space-x-1 text-gray-400 text-xs flex-shrink-0 pt-0.5">
                           <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                           <span>{repo.num_stars}</span>
                         </div>
@@ -390,12 +390,12 @@ export const Navbar: React.FC = () => {
 
                   {userMenuOpen && (
                     <div 
-                      className="absolute right-0 mt-2 w-56 rounded-xl shadow-2xl py-1.5 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border text-xs z-50 divide-y divide-gray-100 dark:divide-dark-border/40 overflow-hidden"
+                      className="absolute right-0 mt-2 w-56 rounded-xl shadow-2xl py-1.5 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border text-sm z-50 divide-y divide-gray-100 dark:divide-dark-border/40 overflow-hidden"
                       onClick={() => setUserMenuOpen(false)}
                     >
                       <div className="px-4 py-2.5 bg-gray-50/50 dark:bg-dark-hover/30">
-                        <p className="text-[11px] text-gray-500 dark:text-dark-muted">Signed in as</p>
-                        <p className="font-bold text-gray-900 dark:text-white truncate text-xs">@{user.username}</p>
+                        <p className="text-xs text-gray-500 dark:text-dark-muted">Signed in as</p>
+                        <p className="font-bold text-gray-900 dark:text-white truncate text-sm">@{user.username}</p>
                       </div>
 
                       <div className="py-1">
@@ -409,7 +409,7 @@ export const Navbar: React.FC = () => {
                             <span>Messages</span>
                           </div>
                           {unreadCount > 0 && (
-                            <span className="px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[10px] font-bold">
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-xs font-bold">
                               {unreadCount}
                             </span>
                           )}

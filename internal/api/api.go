@@ -515,7 +515,7 @@ func (r *Router) handleUserDashboard(w http.ResponseWriter, req *http.Request) {
 	if repos == nil {
 		repos = []*database.Repository{}
 	}
-	activities, _ := database.ListActivities(30)
+	activities, _ := database.ListActivities(100)
 	if activities == nil {
 		activities = []*database.Activity{}
 	}

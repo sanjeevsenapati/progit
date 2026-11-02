@@ -169,6 +169,12 @@ async function run() {
     const dashSearch = await page.$('main input[placeholder*="Find a repository"]');
     assert(dashSearch !== null, 'Dashboard contains repository quick-filter input');
 
+    const hasRecentActivity = dashboardText.includes('Recent Activity');
+    assert(hasRecentActivity, 'Dashboard contains Recent Activity feed');
+
+    const hasActivityPaginationOrStream = dashboardText.includes('activities') || dashboardText.includes('Showing') || dashboardText.includes('No recent activity');
+    assert(hasActivityPaginationOrStream, 'Dashboard Recent Activity renders pagination or feed state');
+
     // --- 7. Repository Creation UI (/new) ---
     console.log('\n=== [7/10] CREATE REPOSITORY UI ===');
     await page.goto(`${BASE_URL}/new`, { waitUntil: 'networkidle0' });
