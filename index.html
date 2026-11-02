@@ -2043,7 +2043,9 @@ def verify_progit_signature(payload_bytes, secret_key, header_signature):
         <h2>Global Navbar Search</h2>
         <p>ProGit provides a responsive, debounced search bar embedded in the global top navigation on every page:</p>
         <ul>
-          <li><strong>Real-Time Autocomplete</strong>: Matches repositories dynamically across repository names, descriptions, and owner handles as you type.</li>
+          <li><strong>Real-Time Autocomplete</strong>: Matches repositories dynamically across repository names, descriptions, owner handles, and combined <code>owner/repo</code> paths (e.g., <code>cbdc/website</code> or <code>cbdc/</code>) as you type.</li>
+          <li><strong>Canonical Git Path Search</strong>: Developers can search in <code>owner/repository</code> format directly, allowing instant filtering of specific organizations or owners.</li>
+          <li><strong>Root Query &amp; Clean Shortcut Handling</strong>: Typing <code>/</code> cleanly focuses the input without character leakage, or returns all accessible repositories when queried directly.</li>
           <li><strong>Rich Dropdown Feedback</strong>: Results display the repository owner, name, visibility badges (Private lock or Public), description snippet, and star counts.</li>
           <li><strong>Direct Navigation</strong>: Clicking any search result or selecting it via keyboard navigates instantly to the target repository overview.</li>
         </ul>
@@ -2412,7 +2414,7 @@ Content-Type: application/json
 
         <h2>Search Repositories</h2>
         <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/search?q={query}&amp;limit=20&amp;page=1</span></div>
-        <p>Global repository search supporting keyword matching against repository name, description, and owner username. Includes strict access control: unauthenticated users only discover public repositories; authenticated users discover public repositories and private repositories where they are the owner, a confirmed collaborator, or an organization member.</p>
+        <p>Global repository search supporting keyword matching against repository name, description, owner username, and combined <code>owner/repo</code> paths (e.g. <code>cbdc/website</code> or <code>cbdc/</code>). Supports <code>?q=/</code> to discover all accessible repositories without filter elimination. Includes strict access control: unauthenticated users only discover public repositories; authenticated users discover public repositories and private repositories where they are the owner, a confirmed collaborator, or an organization member.</p>
         <pre><code>{
   "ok": true,
   "repositories": [
