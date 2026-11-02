@@ -199,6 +199,10 @@ async function run() {
 
     // Wiki tab
     await page.goto(`${BASE_URL}/ui_tester/${testRepoName}/wiki`, { waitUntil: 'networkidle0' });
+    await page.waitForFunction(() => {
+      const text = document.body.textContent || '';
+      return text.includes('Wiki') || text.includes('Page Not Found') || text.includes('Create Page');
+    }, { timeout: 5000 }).catch(() => {});
     const wikiText = await page.evaluate(() => document.body.textContent || '');
     assert(wikiText.includes('Wiki') || wikiText.includes('Page Not Found') || wikiText.includes('Create Page'), 'Repository wiki view loaded');
 
