@@ -23,9 +23,31 @@ ProGit persists all dynamic state within isolated volumes:
 
 ## 3. Building the Container Image
 
+### 3.1 Multi-Architecture Build (Recommended)
+Builds images for both `linux/amd64` (standard Linux servers) and `linux/arm64` (Apple Silicon / AWS Graviton):
 ```bash
-# Build production image
-podman build -t localhost/progit:latest -f Containerfile .
+./podman/build.sh all
+```
+
+### 3.2 Linux x86_64 (`linux/amd64`) for Production Servers
+If building on an Apple Silicon Mac to deploy on a Linux server:
+```bash
+# Build amd64 and automatically package progit-linux-amd64.tar
+./podman/build.sh amd64 --save
+```
+Transfer `progit-linux-amd64.tar` to your Linux server and deploy:
+```bash
+podman load -i progit-linux-amd64.tar
+./podman/deploy.sh
+```
+
+### 3.3 Direct Podman CLI
+```bash
+# For Linux x86_64 servers
+podman build --platform linux/amd64 -t localhost/progit:linux-amd64 -f Containerfile .
+
+# For Apple Silicon / ARM64
+podman build --platform linux/arm64 -t localhost/progit:linux-arm64 -f Containerfile .
 ```
 
 The multi-stage `Containerfile`:

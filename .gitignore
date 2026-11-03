@@ -1,6 +1,9 @@
 # Binaries and build artifacts (root only)
 /progit
 /progit.exe
+bin/
+/dist/
+/release/
 *.exe
 *.dll
 *.so
@@ -21,6 +24,7 @@ web/dist/
 .vite/
 
 # Archives & Temporary files
+*.tar
 *.tar.gz
 *.zip
 *.tmp
