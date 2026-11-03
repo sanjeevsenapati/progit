@@ -2,7 +2,7 @@
 set -euo pipefail
 
 CONTAINER_NAME="progit"
-IMAGE_NAME="localhost/progit:latest"
+IMAGE_NAME="${1:-localhost/progit:latest}"
 
 echo "==> Ensuring persistent volumes exist..."
 podman volume create progit-data >/dev/null 2>&1 || true

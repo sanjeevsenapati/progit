@@ -292,6 +292,7 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("GET /api/v1/admin/repos", r.handleAdminRepos)
 	r.mux.HandleFunc("DELETE /api/v1/admin/repos/{id}", r.handleAdminDeleteRepo)
 	r.mux.HandleFunc("POST /api/v1/admin/maintenance", r.handleAdminMaintenance)
+	r.mux.HandleFunc("PUT /api/v1/admin/config", r.handleAdminUpdateConfig)
 }
 
 // Helpers
@@ -529,12 +530,26 @@ func (r *Router) handleUserDashboard(w http.ResponseWriter, req *http.Request) {
 		starred = []*database.Repository{}
 	}
 
+	rootURL := strings.TrimRight(r.cfg.Server.RootURL, "/") + "/"
+	sshDomain := r.cfg.Server.Domain
+	if sshDomain == "" {
+		sshDomain = "localhost"
+	}
+	sshPort := r.cfg.SSH.Port
+	if sshPort <= 0 {
+		sshPort = 2222
+	}
+
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"user":          user,
 		"repositories":  repos,
 		"activities":    activities,
 		"organizations": orgs,
 		"starred":       starred,
+		"root_url":      rootURL,
+		"domain":        sshDomain,
+		"ssh_port":      sshPort,
+		"ssh_enabled":   r.cfg.SSH.Enabled,
 	})
 }
 
@@ -1161,11 +1176,22 @@ func (r *Router) handleGetRepo(w http.ResponseWriter, req *http.Request) {
 	branches, _ := git.GetBranches(repoDir)
 	tags, _ := git.GetTags(repoDir)
 
-	httpCloneURL := fmt.Sprintf("%s%s/%s.git", r.cfg.Server.RootURL, owner, repoName)
-	sshCloneURL := fmt.Sprintf("ssh://git@%s:%d/%s/%s.git", r.cfg.Server.Domain, r.cfg.SSH.Port, owner, repoName)
-	wikiCloneURLHTTP := fmt.Sprintf("%s%s/%s.wiki.git", r.cfg.Server.RootURL, owner, repoName)
-	wikiCloneURLSSH := fmt.Sprintf("ssh://git@%s:%d/%s/%s.wiki.git", r.cfg.Server.Domain, r.cfg.SSH.Port, owner, repoName)
-	pagesURL := fmt.Sprintf("%spages/%s/%s/", r.cfg.Server.RootURL, owner, repoName)
+	rootURL := strings.TrimRight(r.cfg.Server.RootURL, "/") + "/"
+	httpCloneURL := fmt.Sprintf("%s%s/%s.git", rootURL, owner, repoName)
+	var sshCloneURL string
+	if r.cfg.SSH.Port == 22 {
+		sshCloneURL = fmt.Sprintf("git@%s:%s/%s.git", r.cfg.Server.Domain, owner, repoName)
+	} else {
+		sshCloneURL = fmt.Sprintf("ssh://git@%s:%d/%s/%s.git", r.cfg.Server.Domain, r.cfg.SSH.Port, owner, repoName)
+	}
+	wikiCloneURLHTTP := fmt.Sprintf("%s%s/%s.wiki.git", rootURL, owner, repoName)
+	var wikiCloneURLSSH string
+	if r.cfg.SSH.Port == 22 {
+		wikiCloneURLSSH = fmt.Sprintf("git@%s:%s/%s.wiki.git", r.cfg.Server.Domain, owner, repoName)
+	} else {
+		wikiCloneURLSSH = fmt.Sprintf("ssh://git@%s:%d/%s/%s.wiki.git", r.cfg.Server.Domain, r.cfg.SSH.Port, owner, repoName)
+	}
+	pagesURL := fmt.Sprintf("%spages/%s/%s/", rootURL, owner, repoName)
 
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"repository": repo,
@@ -3991,6 +4017,72 @@ func (r *Router) handleAdminMaintenance(w http.ResponseWriter, req *http.Request
 	default:
 		jsonError(w, http.StatusBadRequest, "Unknown maintenance operation")
 	}
+}
+
+func (r *Router) handleAdminUpdateConfig(w http.ResponseWriter, req *http.Request) {
+	currentAdmin := auth.AuthenticateRequest(req)
+	if currentAdmin == nil || !currentAdmin.IsAdmin {
+		jsonError(w, http.StatusForbidden, "Administrator privileges required")
+		return
+	}
+
+	var body struct {
+		AppName  string `json:"app_name"`
+		Domain   string `json:"domain"`
+		RootURL  string `json:"root_url"`
+		SSHPort  int    `json:"ssh_port"`
+		HTTPPort int    `json:"http_port"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if body.AppName != "" {
+		r.cfg.Server.AppName = strings.TrimSpace(body.AppName)
+	}
+	if body.Domain != "" {
+		r.cfg.Server.Domain = strings.TrimSpace(body.Domain)
+	}
+	if body.RootURL != "" {
+		rootURL := strings.TrimSpace(body.RootURL)
+		if !strings.HasSuffix(rootURL, "/") {
+			rootURL += "/"
+		}
+		r.cfg.Server.RootURL = rootURL
+	}
+	if body.SSHPort > 0 {
+		r.cfg.SSH.Port = body.SSHPort
+	}
+	if body.HTTPPort > 0 {
+		r.cfg.Server.HTTPPort = body.HTTPPort
+	}
+
+	// Persist to configuration file if standard directory exists
+	configPaths := []string{
+		"conf/app.ini",
+		"data/config/app.ini",
+		"/data/config/app.ini",
+	}
+	savePath := "conf/app.ini"
+	for _, p := range configPaths {
+		if _, err := os.Stat(p); err == nil {
+			savePath = p
+			break
+		}
+	}
+	_ = config.Save(savePath, r.cfg)
+
+	database.CreateActivity(currentAdmin.ID, currentAdmin.Username, nil, "", "admin_config", fmt.Sprintf("Updated server configuration: RootURL=%s, Domain=%s", r.cfg.Server.RootURL, r.cfg.Server.Domain))
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"message":   "Server configuration updated successfully",
+		"app_name":  r.cfg.Server.AppName,
+		"domain":    r.cfg.Server.Domain,
+		"root_url":  r.cfg.Server.RootURL,
+		"ssh_port":  r.cfg.SSH.Port,
+		"http_port": r.cfg.Server.HTTPPort,
+	})
 }
 
 // ============================================================================

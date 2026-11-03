@@ -376,6 +376,10 @@ export const api = {
       activities: Activity[];
       organizations?: Organization[];
       starred?: Repository[];
+      root_url?: string;
+      domain?: string;
+      ssh_port?: number;
+      ssh_enabled?: boolean;
     }>('/api/v1/user/dashboard');
   },
 
@@ -844,6 +848,26 @@ export const api = {
       active_sessions_count: number;
       install_locked: boolean;
     }>('/api/v1/admin/stats');
+  },
+
+  async updateAdminConfig(config: {
+    app_name?: string;
+    domain?: string;
+    root_url?: string;
+    ssh_port?: number;
+    http_port?: number;
+  }) {
+    return fetchJSON<{
+      message: string;
+      app_name: string;
+      domain: string;
+      root_url: string;
+      ssh_port: number;
+      http_port: number;
+    }>('/api/v1/admin/config', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    });
   },
 
   async getAdminUsers() {

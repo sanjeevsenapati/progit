@@ -42,6 +42,10 @@ export const Dashboard: React.FC = () => {
   const [repoPage, setRepoPage] = useState(1);
   const repoPageSize = 6;
 
+  const [serverRootUrl, setServerRootUrl] = useState('');
+  const [serverDomain, setServerDomain] = useState('');
+  const [serverSshPort, setServerSshPort] = useState(2222);
+
   useEffect(() => {
     async function load() {
       try {
@@ -50,6 +54,9 @@ export const Dashboard: React.FC = () => {
         setActivities(data.activities || []);
         setOrganizations(data.organizations || []);
         setStarred(data.starred || []);
+        if (data.root_url) setServerRootUrl(data.root_url);
+        if (data.domain) setServerDomain(data.domain);
+        if (data.ssh_port) setServerSshPort(data.ssh_port);
       } catch (err) {
         console.error(err);
       } finally {
@@ -500,16 +507,52 @@ export const Dashboard: React.FC = () => {
               <Terminal className="w-4 h-4 text-emerald-600" />
               <span>Git CLI Quick Reference</span>
             </h3>
-            <div className="text-xs sm:text-sm space-y-2">
-              <p className="text-gray-500 dark:text-dark-muted text-xs font-medium">Clone via Smart HTTP:</p>
-              <code className="block p-2 rounded-lg bg-gray-100 dark:bg-dark-bg font-mono text-xs text-gray-800 dark:text-emerald-300 break-all select-all">
-                git clone http://localhost:3000/{user?.username}/&lt;repo&gt;.git
-              </code>
-              <p className="text-gray-500 dark:text-dark-muted text-xs font-medium">Clone via Native SSH:</p>
-              <code className="block p-2 rounded-lg bg-gray-100 dark:bg-dark-bg font-mono text-xs text-gray-800 dark:text-emerald-300 break-all select-all">
-                git clone ssh://git@localhost:2222/{user?.username}/&lt;repo&gt;.git
-              </code>
-            </div>
+            {(() => {
+              const getHttpCloneBase = () => {
+                if (serverRootUrl && serverRootUrl.trim()) {
+                  const cleanRoot = serverRootUrl.trim().replace(/\/+$/, '');
+                  const isLocalRoot = cleanRoot.includes('localhost') || cleanRoot.includes('127.0.0.1');
+                  const isBrowserLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                  if (!isLocalRoot || isBrowserLocal) {
+                    return cleanRoot;
+                  }
+                }
+                return window.location.origin;
+              };
+
+              const getSshCloneHost = () => {
+                if (serverDomain && serverDomain.trim()) {
+                  const cleanDomain = serverDomain.trim();
+                  const isLocalDomain = cleanDomain === 'localhost' || cleanDomain === '127.0.0.1';
+                  const isBrowserLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                  if (!isLocalDomain || isBrowserLocal) {
+                    return cleanDomain;
+                  }
+                }
+                return window.location.hostname;
+              };
+
+              const httpBaseUrl = getHttpCloneBase();
+              const sshHost = getSshCloneHost();
+              const targetUsername = user?.username || 'admin';
+              const httpCloneCmd = `git clone ${httpBaseUrl}/${targetUsername}/<repo>.git`;
+              const sshCloneCmd = serverSshPort === 22
+                ? `git clone git@${sshHost}:${targetUsername}/<repo>.git`
+                : `git clone ssh://git@${sshHost}:${serverSshPort}/${targetUsername}/<repo>.git`;
+
+              return (
+                <div className="text-xs sm:text-sm space-y-2">
+                  <p className="text-gray-500 dark:text-dark-muted text-xs font-medium">Clone via Smart HTTP:</p>
+                  <code className="block p-2 rounded-lg bg-gray-100 dark:bg-dark-bg font-mono text-xs text-gray-800 dark:text-emerald-300 break-all select-all">
+                    {httpCloneCmd}
+                  </code>
+                  <p className="text-gray-500 dark:text-dark-muted text-xs font-medium">Clone via Native SSH:</p>
+                  <code className="block p-2 rounded-lg bg-gray-100 dark:bg-dark-bg font-mono text-xs text-gray-800 dark:text-emerald-300 break-all select-all">
+                    {sshCloneCmd}
+                  </code>
+                </div>
+              );
+            })()}
           </div>
 
           {/* ProGit Features Card */}

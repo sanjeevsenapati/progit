@@ -19,6 +19,7 @@ import {
   Layers,
   Settings,
   HardDrive,
+  Edit3,
   X
 } from 'lucide-react';
 
@@ -37,6 +38,14 @@ export const AdminDashboard: React.FC = () => {
   const [newFullName, setNewFullName] = useState('');
   const [newIsAdmin, setNewIsAdmin] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
+
+  // Server configuration modal
+  const [showEditConfigModal, setShowEditConfigModal] = useState(false);
+  const [cfgAppName, setCfgAppName] = useState('');
+  const [cfgDomain, setCfgDomain] = useState('');
+  const [cfgRootUrl, setCfgRootUrl] = useState('');
+  const [cfgSshPort, setCfgSshPort] = useState(2222);
+  const [cfgLoading, setCfgLoading] = useState(false);
 
   // Status message
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -138,6 +147,36 @@ export const AdminDashboard: React.FC = () => {
       loadData();
     } catch (err: any) {
       setStatusMsg({ type: 'error', text: err.message || 'Failed to delete repository.' });
+    }
+  };
+
+  const handleOpenEditConfig = () => {
+    if (stats) {
+      setCfgAppName(stats.app_name || 'ProGit');
+      setCfgDomain(stats.domain || 'localhost');
+      setCfgRootUrl(stats.root_url || 'http://localhost:3000/');
+      setCfgSshPort(stats.ssh_port || 2222);
+    }
+    setShowEditConfigModal(true);
+  };
+
+  const handleSaveConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCfgLoading(true);
+    try {
+      const res = await api.updateAdminConfig({
+        app_name: cfgAppName,
+        domain: cfgDomain,
+        root_url: cfgRootUrl,
+        ssh_port: Number(cfgSshPort),
+      });
+      setShowEditConfigModal(false);
+      setStatusMsg({ type: 'success', text: res.message || 'Server configuration updated successfully.' });
+      loadData();
+    } catch (err: any) {
+      setStatusMsg({ type: 'error', text: err.message || 'Failed to update server configuration.' });
+    } finally {
+      setCfgLoading(false);
     }
   };
 
@@ -469,10 +508,20 @@ export const AdminDashboard: React.FC = () => {
       {/* Configuration Tab */}
       {activeTab === 'system' && stats && (
         <div className="p-6 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm space-y-4">
-          <h3 className="font-bold text-base text-gray-900 dark:text-white flex items-center space-x-2">
-            <Settings className="w-5 h-5 text-emerald-600" />
-            <span>Active Server Configuration</span>
-          </h3>
+          <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-dark-border">
+            <h3 className="font-bold text-base text-gray-900 dark:text-white flex items-center space-x-2">
+              <Settings className="w-5 h-5 text-emerald-600" />
+              <span>Active Server Configuration</span>
+            </h3>
+            <button
+              type="button"
+              onClick={handleOpenEditConfig}
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Edit Configuration</span>
+            </button>
+          </div>
           <div className="space-y-2 text-xs font-mono">
             <div className="p-3 rounded-lg bg-gray-50 dark:bg-dark-hover flex justify-between">
               <span className="text-gray-500">Application Name:</span>
@@ -596,6 +645,106 @@ export const AdminDashboard: React.FC = () => {
                   className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-colors disabled:opacity-50"
                 >
                   {modalLoading ? 'Creating...' : 'Create Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Server Configuration Modal */}
+      {showEditConfigModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm">
+          <div className="bg-white dark:bg-dark-surface rounded-xl max-w-lg w-full p-6 border border-gray-200 dark:border-dark-border shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-dark-border">
+              <h3 className="font-bold text-base text-gray-900 dark:text-white flex items-center space-x-2">
+                <Settings className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <span>Configure Server Base URLs</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowEditConfigModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveConfig} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                  Server Root / Base URL *
+                </label>
+                <input
+                  type="url"
+                  required
+                  placeholder="http://192.168.1.50:3000/ or https://git.company.com/"
+                  value={cfgRootUrl}
+                  onChange={e => setCfgRootUrl(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-xs"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-dark-muted">
+                  Used as the public base URL for Git HTTP clone commands and dashboard quick references.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                  Server Domain / Hostname *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="192.168.1.50 or git.company.com"
+                  value={cfgDomain}
+                  onChange={e => setCfgDomain(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-xs"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-dark-muted">
+                  Hostname used in Native SSH clone commands (e.g. <code>ssh://git@domain:port/</code>).
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                    Application Name
+                  </label>
+                  <input
+                    type="text"
+                    value={cfgAppName}
+                    onChange={e => setCfgAppName(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                    SSH Port
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="65535"
+                    value={cfgSshPort}
+                    onChange={e => setCfgSshPort(parseInt(e.target.value, 10) || 2222)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4 border-t border-gray-100 dark:border-dark-border">
+                <button
+                  type="button"
+                  onClick={() => setShowEditConfigModal(false)}
+                  className="px-4 py-2 rounded-lg text-xs font-semibold border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={cfgLoading}
+                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  {cfgLoading ? 'Saving...' : 'Save Configuration'}
                 </button>
               </div>
             </form>
