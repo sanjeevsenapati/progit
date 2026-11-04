@@ -21,15 +21,25 @@ ProGit persists all dynamic state within isolated volumes:
 
 ---
 
-## 3. Building the Container Image
+## 3. Container Images & Deployment
 
-### 3.1 Multi-Architecture Build (Recommended)
+### 3.1 Pull Official Image from GitHub Container Registry (GHCR)
+```bash
+# Pull Linux x86_64 (amd64) production image:
+podman pull ghcr.io/sanjeevsenapati/progit:1.1.0-linux-amd64
+
+# Pull multi-architecture release (auto-selects amd64 or arm64):
+podman pull ghcr.io/sanjeevsenapati/progit:1.1.0
+podman pull ghcr.io/sanjeevsenapati/progit:latest
+```
+
+### 3.2 Multi-Architecture Build (Optional)
 Builds images for both `linux/amd64` (standard Linux servers) and `linux/arm64` (Apple Silicon / AWS Graviton):
 ```bash
 ./podman/build.sh all
 ```
 
-### 3.2 Linux x86_64 (`linux/amd64`) for Production Servers
+### 3.3 Linux x86_64 (`linux/amd64`) for Production Servers
 If building on an Apple Silicon Mac to deploy on a Linux server:
 ```bash
 # Build amd64 and automatically package progit-linux-amd64.tar
@@ -41,7 +51,7 @@ podman load -i progit-linux-amd64.tar
 ./podman/deploy.sh
 ```
 
-### 3.3 Direct Podman CLI
+### 3.4 Direct Podman CLI
 ```bash
 # For Linux x86_64 servers
 podman build --platform linux/amd64 -t localhost/progit:linux-amd64 -f Containerfile .
