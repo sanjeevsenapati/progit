@@ -34,6 +34,7 @@ if podman run -d \
 else
     echo "==> Note: Direct binding to ports 443/80 requires root/sudo or 'sysctl net.ipv4.ip_unprivileged_port_start=80'."
     echo "==> Falling back to user ports 3443 (HTTPS), 3000 (HTTP), and 2222 (SSH)..."
+    podman rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
     podman run -d \
       --name "${CONTAINER_NAME}" \
       --restart=unless-stopped \
