@@ -243,6 +243,8 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("GET /api/v1/orgs", r.handleListOrgs)
 	r.mux.HandleFunc("GET /api/v1/user/orgs", r.handleListUserOrgs)
 	r.mux.HandleFunc("GET /api/v1/orgs/{org}", r.handleGetOrg)
+	r.mux.HandleFunc("PATCH /api/v1/orgs/{org}", r.handleUpdateOrg)
+	r.mux.HandleFunc("PUT /api/v1/orgs/{org}", r.handleUpdateOrg)
 	r.mux.HandleFunc("GET /api/v1/orgs/{org}/members", r.handleListOrgMembers)
 	r.mux.HandleFunc("POST /api/v1/orgs/{org}/members", r.handleAddOrgMember)
 	r.mux.HandleFunc("DELETE /api/v1/orgs/{org}/members/{username}", r.handleRemoveOrgMember)
@@ -4747,6 +4749,53 @@ func (r *Router) handleGetOrg(w http.ResponseWriter, req *http.Request) {
 		"organization": org,
 		"is_member":    isMember,
 		"is_admin":     isAdmin,
+	})
+}
+
+func (r *Router) handleUpdateOrg(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	orgName := req.PathValue("org")
+	org, err := database.GetOrgByName(orgName)
+	if err != nil || org == nil {
+		jsonError(w, http.StatusNotFound, "Organization not found")
+		return
+	}
+
+	// Only platform admin or organization admin can edit organization profile
+	if !user.IsAdmin && !database.IsOrgAdmin(org.ID, user.ID) {
+		jsonError(w, http.StatusForbidden, "Only organization administrators can update organization details")
+		return
+	}
+
+	var body struct {
+		FullName    string `json:"full_name"`
+		Description string `json:"description"`
+		Location    string `json:"location"`
+		Website     string `json:"website"`
+		AvatarURL   string `json:"avatar_url"`
+	}
+
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	updatedOrg, err := database.UpdateOrganization(org.ID, body.FullName, body.Description, body.Location, body.Website, body.AvatarURL)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to update organization: %v", err))
+		return
+	}
+
+	database.CreateActivity(user.ID, user.Username, nil, org.Name, "update_org", fmt.Sprintf("Updated organization profile for %s", org.Name))
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"organization": updatedOrg,
+		"message":      "Organization profile updated successfully",
 	})
 }
 

@@ -1073,6 +1073,13 @@ export const api = {
     return fetchJSON<{ organization: Organization; is_member: boolean; is_admin: boolean }>(`/api/v1/orgs/${name}`);
   },
 
+  async updateOrg(name: string, data: { full_name?: string; description?: string; location?: string; website?: string; avatar_url?: string }) {
+    return fetchJSON<{ organization: Organization; message: string }>(`/api/v1/orgs/${name}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
   async listOrgMembers(orgName: string) {
     return fetchJSON<OrgMember[]>(`/api/v1/orgs/${orgName}/members`);
   },

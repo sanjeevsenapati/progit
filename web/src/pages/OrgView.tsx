@@ -15,6 +15,7 @@ import {
   Trash2, 
   UserPlus, 
   Settings, 
+  Edit3,
   Check, 
   X 
 } from 'lucide-react';
@@ -30,8 +31,17 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
   const [repos, setRepos] = useState<Repository[]>([]);
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [activeTab, setActiveTab] = useState<'repos' | 'members' | 'teams'>('repos');
+  const [activeTab, setActiveTab] = useState<'repos' | 'members' | 'teams' | 'settings'>('repos');
   const [loading, setLoading] = useState(true);
+
+  // Edit organization state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editFullName, setEditFullName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editWebsite, setEditWebsite] = useState('');
+  const [editAvatarUrl, setEditAvatarUrl] = useState('');
+  const [savingOrg, setSavingOrg] = useState(false);
 
   // Add member modal
   const [newMemberUser, setNewMemberUser] = useState('');
@@ -58,6 +68,14 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
       setIsMember(res.is_member);
       setIsAdmin(res.is_admin);
 
+      if (res.organization) {
+        setEditFullName(res.organization.full_name || '');
+        setEditDesc(res.organization.description || '');
+        setEditLocation(res.organization.location || '');
+        setEditWebsite(res.organization.website || '');
+        setEditAvatarUrl(res.organization.avatar_url || '');
+      }
+
       const [rList, mList, tList] = await Promise.all([
         api.listOrgRepos(orgName),
         api.listOrgMembers(orgName),
@@ -70,6 +88,27 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateOrg = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSavingOrg(true);
+      const res = await api.updateOrg(orgName, {
+        full_name: editFullName.trim(),
+        description: editDesc.trim(),
+        location: editLocation.trim(),
+        website: editWebsite.trim(),
+        avatar_url: editAvatarUrl.trim(),
+      });
+      setOrg(res.organization);
+      setShowEditModal(false);
+      showToast('Organization profile updated successfully', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update organization', 'error');
+    } finally {
+      setSavingOrg(false);
     }
   };
 
@@ -195,6 +234,21 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
 
             {isAdmin && (
               <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditFullName(org.full_name || '');
+                    setEditDesc(org.description || '');
+                    setEditLocation(org.location || '');
+                    setEditWebsite(org.website || '');
+                    setEditAvatarUrl(org.avatar_url || '');
+                    setShowEditModal(true);
+                  }}
+                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover hover:bg-gray-50 dark:hover:bg-dark-border/60 text-gray-700 dark:text-dark-text font-semibold text-xs shadow-xs transition-colors cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-gray-500 dark:text-dark-muted" />
+                  <span>Edit Organization</span>
+                </button>
                 <a
                   href={`/new?owner=${org.name}`}
                   className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-sm transition-colors"
@@ -210,7 +264,7 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
           <div className="flex space-x-2 border-t border-gray-100 dark:border-dark-border/40 pt-2 text-xs font-semibold">
             <button
               onClick={() => setActiveTab('repos')}
-              className={`flex items-center space-x-1.5 py-2 px-3 rounded-lg transition-colors ${
+              className={`flex items-center space-x-1.5 py-2 px-3 rounded-lg transition-colors cursor-pointer ${
                 activeTab === 'repos'
                   ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-bold'
                   : 'text-gray-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-dark-hover'
@@ -225,7 +279,7 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
 
             <button
               onClick={() => setActiveTab('members')}
-              className={`flex items-center space-x-1.5 py-2 px-3 rounded-lg transition-colors ${
+              className={`flex items-center space-x-1.5 py-2 px-3 rounded-lg transition-colors cursor-pointer ${
                 activeTab === 'members'
                   ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-bold'
                   : 'text-gray-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-dark-hover'
@@ -240,7 +294,7 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
 
             <button
               onClick={() => setActiveTab('teams')}
-              className={`flex items-center space-x-1.5 py-2 px-3 rounded-lg transition-colors ${
+              className={`flex items-center space-x-1.5 py-2 px-3 rounded-lg transition-colors cursor-pointer ${
                 activeTab === 'teams'
                   ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-bold'
                   : 'text-gray-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-dark-hover'
@@ -252,6 +306,20 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
                 {teams.length}
               </span>
             </button>
+
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('settings')}
+                className={`flex items-center space-x-1.5 py-2 px-3 rounded-lg transition-colors cursor-pointer ${
+                  activeTab === 'settings'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-bold'
+                    : 'text-gray-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-dark-hover'
+                }`}
+              >
+                <Settings className="w-4 h-4" />
+                <span>Settings</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -469,7 +537,236 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
             </div>
           </div>
         )}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && isAdmin && (
+          <div className="max-w-3xl space-y-6">
+            <div className="p-6 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-xs space-y-6">
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                  Organization Profile Settings
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-dark-muted mt-1">
+                  Manage your organization's public brand, display name, description, location, and website.
+                </p>
+              </div>
+
+              <form onSubmit={handleUpdateOrg} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                    Organization Identifier
+                  </label>
+                  <input
+                    type="text"
+                    disabled
+                    value={org.name}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-dark-border/60 bg-gray-100 dark:bg-dark-bg/60 text-gray-500 font-mono cursor-not-allowed"
+                  />
+                  <p className="mt-1 text-[11px] text-gray-400">Unique organization slug used for routing and git namespaces.</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                    Display Name (Full Name)
+                  </label>
+                  <input
+                    type="text"
+                    value={editFullName}
+                    onChange={(e) => setEditFullName(e.target.value)}
+                    placeholder="e.g. Acme Corporation"
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                    Description / Bio
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={editDesc}
+                    onChange={(e) => setEditDesc(e.target.value)}
+                    placeholder="Short description of your organization's mission and projects"
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-y"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                      Location
+                    </label>
+                    <input
+                      type="text"
+                      value={editLocation}
+                      onChange={(e) => setEditLocation(e.target.value)}
+                      placeholder="e.g. San Francisco, CA"
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                      Website URL
+                    </label>
+                    <input
+                      type="url"
+                      value={editWebsite}
+                      onChange={(e) => setEditWebsite(e.target.value)}
+                      placeholder="https://example.com"
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                    Avatar URL (Optional)
+                  </label>
+                  <input
+                    type="url"
+                    value={editAvatarUrl}
+                    onChange={(e) => setEditAvatarUrl(e.target.value)}
+                    placeholder="https://example.com/logo.png"
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div className="pt-4 border-t border-gray-200 dark:border-dark-border flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={savingOrg}
+                    className="inline-flex items-center space-x-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>{savingOrg ? 'Saving Changes...' : 'Save Organization Profile'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Edit Organization Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="bg-white dark:bg-dark-surface rounded-2xl border border-gray-200 dark:border-dark-border w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-dark-border">
+              <div className="flex items-center space-x-2">
+                <Edit3 className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-bold text-base text-gray-900 dark:text-white">
+                  Edit Organization Profile
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateOrg} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                  Organization Name
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={org.name}
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-dark-border/60 bg-gray-100 dark:bg-dark-bg/60 text-gray-500 font-mono cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                  Display Name (Full Name)
+                </label>
+                <input
+                  type="text"
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  placeholder="e.g. Acme Corporation"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                  Description / Bio
+                </label>
+                <textarea
+                  rows={3}
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  placeholder="Short description of your organization"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-y"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                    Location
+                  </label>
+                  <input
+                    type="text"
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
+                    placeholder="e.g. San Francisco, CA"
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                    Website URL
+                  </label>
+                  <input
+                    type="url"
+                    value={editWebsite}
+                    onChange={(e) => setEditWebsite(e.target.value)}
+                    placeholder="https://example.com"
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+                  Avatar URL
+                </label>
+                <input
+                  type="url"
+                  value={editAvatarUrl}
+                  onChange={(e) => setEditAvatarUrl(e.target.value)}
+                  placeholder="https://example.com/logo.png"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-gray-200 dark:border-dark-border">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingOrg}
+                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  {savingOrg ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Create Team Modal */}
       {showTeamModal && (

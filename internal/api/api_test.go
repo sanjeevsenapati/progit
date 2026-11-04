@@ -464,6 +464,31 @@ func TestOrganizationsAndProjectsAPI(t *testing.T) {
 		t.Fatalf("expected 201 Created for org, got %d: %s", recOrg.Code, recOrg.Body.String())
 	}
 
+	// 1b. Update Organization via PATCH /api/v1/orgs/{org}
+	patchPayload := map[string]any{
+		"full_name":   "Google Open Source Initiative",
+		"description": "Updated description for Google Open Source",
+		"location":    "San Francisco, CA",
+		"website":     "https://opensource.google/about",
+	}
+	patchBytes, _ := json.Marshal(patchPayload)
+	reqPatch := httptest.NewRequest("PATCH", "/api/v1/orgs/google-open-source", bytes.NewReader(patchBytes))
+	reqPatch.Header.Set("Authorization", "Bearer pgt_org_creator_token_12345")
+	reqPatch.Header.Set("Content-Type", "application/json")
+	recPatch := httptest.NewRecorder()
+	router.ServeHTTP(recPatch, reqPatch)
+
+	if recPatch.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for patch org, got %d: %s", recPatch.Code, recPatch.Body.String())
+	}
+	var patchResp struct {
+		Organization database.Organization `json:"organization"`
+	}
+	_ = json.Unmarshal(recPatch.Body.Bytes(), &patchResp)
+	if patchResp.Organization.FullName != "Google Open Source Initiative" || patchResp.Organization.Location != "San Francisco, CA" {
+		t.Errorf("unexpected patched org fields: %+v", patchResp.Organization)
+	}
+
 	// 2. Create Project on a repo
 	repo, _ := database.CreateRepository(user.ID, "test-board-repo", "", false)
 	_ = repo

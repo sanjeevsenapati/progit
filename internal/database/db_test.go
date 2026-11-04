@@ -219,6 +219,20 @@ func TestSecurityCollaboratorsAndOrganizations(t *testing.T) {
 	if !CanUserAccessRepo(stranger, orgRepo, false) {
 		t.Errorf("org member should have read access to org repo")
 	}
+
+	// Test UpdateOrganization
+	updatedOrg, err := UpdateOrganization(org.ID, "Acme International", "Building global software", "New York", "https://acme.com", "https://acme.com/avatar.png")
+	if err != nil {
+		t.Fatalf("failed to update org: %v", err)
+	}
+	if updatedOrg.FullName != "Acme International" || updatedOrg.Description != "Building global software" || updatedOrg.Location != "New York" || updatedOrg.Website != "https://acme.com" {
+		t.Errorf("unexpected updated org fields: %+v", updatedOrg)
+	}
+	// Verify user stub sync
+	stubUser, err := GetUserByUsername("acme-corp")
+	if err != nil || stubUser.FullName != "Acme International" {
+		t.Errorf("expected user stub full_name to be synced to 'Acme International', got %v", stubUser)
+	}
 }
 
 func TestProjectsAndKanban(t *testing.T) {

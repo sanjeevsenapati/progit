@@ -1935,6 +1935,37 @@ func GetOrgByName(name string) (*Organization, error) {
 	return org, nil
 }
 
+func UpdateOrganization(orgID int64, fullName, description, location, website, avatarURL string) (*Organization, error) {
+	tx, err := DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var orgName string
+	if err := tx.QueryRow(`SELECT name FROM organizations WHERE id = ?`, orgID).Scan(&orgName); err != nil {
+		return nil, err
+	}
+
+	_, err = tx.Exec(`
+		UPDATE organizations
+		SET full_name = ?, description = ?, location = ?, website = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, strings.TrimSpace(fullName), strings.TrimSpace(description), strings.TrimSpace(location), strings.TrimSpace(website), strings.TrimSpace(avatarURL), orgID)
+	if err != nil {
+		return nil, fmt.Errorf("update organization: %w", err)
+	}
+
+	// Synchronize full_name in corresponding user account stub if present
+	_, _ = tx.Exec(`UPDATE users SET full_name = ? WHERE username = ? COLLATE NOCASE`, strings.TrimSpace(fullName), orgName)
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return GetOrgByID(orgID)
+}
+
 func ListUserOrganizations(userID int64) ([]Organization, error) {
 	rows, err := DB.Query(`
 		SELECT o.id, o.name, o.full_name, o.description, o.avatar_url, o.location, o.website, o.created_at, o.updated_at

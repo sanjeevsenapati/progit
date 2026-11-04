@@ -514,14 +514,14 @@ export const Dashboard: React.FC = () => {
                 if (serverRootUrl && serverRootUrl.trim()) {
                   return serverRootUrl.trim().replace(/\/+$/, '');
                 }
-                return window.location.origin;
+                return 'https://progit.local';
               };
 
               const getSshCloneHost = () => {
                 if (serverDomain && serverDomain.trim()) {
                   return serverDomain.trim();
                 }
-                return window.location.hostname;
+                return 'progit.local';
               };
 
               const httpBaseUrl = getHttpCloneBase();
