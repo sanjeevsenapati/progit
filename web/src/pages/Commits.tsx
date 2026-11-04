@@ -9,7 +9,7 @@ interface CommitsProps {
 }
 
 export const Commits: React.FC<CommitsProps> = ({ owner, repo: repoName }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
   const [commits, setCommits] = useState<Commit[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedSha, setCopiedSha] = useState('');
@@ -56,7 +56,12 @@ export const Commits: React.FC<CommitsProps> = ({ owner, repo: repoName }) => {
         </h2>
 
         <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-sm divide-y divide-gray-100 dark:divide-dark-border overflow-hidden">
-          {commits.length === 0 ? (
+          {loading ? (
+            <div className="p-12 text-center text-gray-400 flex items-center justify-center space-x-2">
+              <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+              <span>Loading commits...</span>
+            </div>
+          ) : commits.length === 0 ? (
             <div className="p-8 text-center text-sm text-gray-400">No commits found.</div>
           ) : (
             commits.map(c => (

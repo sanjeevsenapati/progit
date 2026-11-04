@@ -11,7 +11,7 @@ interface IssuesListProps {
 
 export const IssuesList: React.FC<IssuesListProps> = ({ owner, repo: repoName }) => {
   const { user } = useAuth();
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [assignees, setAssignees] = useState<User[]>([]);
   const [stateFilter, setStateFilter] = useState<'open' | 'closed'>('open');
@@ -121,7 +121,12 @@ export const IssuesList: React.FC<IssuesListProps> = ({ owner, repo: repoName })
 
         {/* Issues List Table */}
         <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-sm divide-y divide-gray-100 dark:divide-dark-border overflow-hidden">
-          {issues.length === 0 ? (
+          {loading ? (
+            <div className="p-12 text-center text-gray-400 flex items-center justify-center space-x-2">
+              <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+              <span>Loading issues...</span>
+            </div>
+          ) : issues.length === 0 ? (
             <div className="p-12 text-center text-gray-500 dark:text-dark-muted space-y-3">
               <CircleDot className="w-10 h-10 mx-auto text-gray-400" />
               <h3 className="font-bold text-gray-900 dark:text-white">

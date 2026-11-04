@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, Repository, Project, ProjectColumn, ProjectCard, Issue } from '../lib/api';
+import { navigate } from '../lib/router';
 import { RepoNav } from '../components/RepoNav';
 import { showToast, showModalConfirm } from '../components/ModalDialog';
 import { 
@@ -26,7 +27,7 @@ interface ProjectBoardProps {
 }
 
 export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoName, projectId }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
   const [project, setProject] = useState<Project | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
@@ -270,7 +271,7 @@ export const ProjectBoard: React.FC<ProjectBoardProps> = ({ owner, repo: repoNam
     try {
       await api.deleteProject(owner, repoName, projectId);
       showToast('Project deleted', 'info');
-      window.location.href = `/${owner}/${repoName}/projects`;
+      navigate(`/${owner}/${repoName}/projects`);
     } catch (err: any) {
       showToast(err.message || 'Failed to delete project', 'error');
     }

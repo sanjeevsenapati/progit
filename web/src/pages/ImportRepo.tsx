@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, Organization } from '../lib/api';
 import { useAuth } from '../lib/theme';
+import { navigate } from '../lib/router';
 import { 
   DownloadCloud, 
   GitBranch, 
@@ -97,7 +98,7 @@ export const ImportRepo: React.FC = () => {
         auth_password: requiresAuth ? authPassword.trim() : undefined,
       });
 
-      window.location.href = `/${repo.owner_name}/${repo.name}`;
+      navigate(`/${repo.owner_name}/${repo.name}`);
     } catch (err: any) {
       setError(err.message || 'Failed to import repository. Please check your URL and credentials.');
       setLoading(false);

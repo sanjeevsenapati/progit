@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api, Repository } from '../lib/api';
+import { navigate } from '../lib/router';
 import { RepoNav } from '../components/RepoNav';
 import { showToast } from '../components/ModalDialog';
 import { 
@@ -33,7 +34,7 @@ export const UploadFiles: React.FC<UploadFilesProps> = ({
   branch = 'main',
   initialPath = '',
 }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [commitMessage, setCommitMessage] = useState('Upload files');
@@ -163,7 +164,7 @@ export const UploadFiles: React.FC<UploadFilesProps> = ({
       // Redirect back to tree
       const targetBranch = res.branch || branch;
       const targetPath = initialPath ? `/${initialPath}` : '';
-      window.location.href = `/${owner}/${repoName}/tree/${targetBranch}${targetPath}`;
+      navigate(`/${owner}/${repoName}/tree/${targetBranch}${targetPath}`);
     } catch (err: any) {
       setError(err.message || 'Failed to upload files');
     } finally {

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, Repository, Activity, Organization } from '../lib/api';
 import { useAuth } from '../lib/theme';
+import { navigate } from '../lib/router';
 import { 
   GitBranch, 
   Plus, 
@@ -27,11 +28,12 @@ import {
 
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();
-  const [repos, setRepos] = useState<Repository[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [starred, setStarred] = useState<Repository[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cached = api.getCachedDashboard();
+  const [repos, setRepos] = useState<Repository[]>(() => cached?.repositories || []);
+  const [activities, setActivities] = useState<Activity[]>(() => cached?.activities || []);
+  const [organizations, setOrganizations] = useState<Organization[]>(() => cached?.organizations || []);
+  const [starred, setStarred] = useState<Repository[]>(() => cached?.starred || []);
+  const [loading, setLoading] = useState(() => !cached);
   const [filter, setFilter] = useState('');
   const [feedFilter, setFeedFilter] = useState<'all' | 'commits' | 'issues'>('all');
 
@@ -42,9 +44,9 @@ export const Dashboard: React.FC = () => {
   const [repoPage, setRepoPage] = useState(1);
   const repoPageSize = 6;
 
-  const [serverRootUrl, setServerRootUrl] = useState('');
-  const [serverDomain, setServerDomain] = useState('');
-  const [serverSshPort, setServerSshPort] = useState(2222);
+  const [serverRootUrl, setServerRootUrl] = useState(() => cached?.root_url || '');
+  const [serverDomain, setServerDomain] = useState(() => cached?.domain || '');
+  const [serverSshPort, setServerSshPort] = useState(() => cached?.ssh_port || 2222);
 
   useEffect(() => {
     async function load() {
@@ -136,7 +138,7 @@ export const Dashboard: React.FC = () => {
                 onChange={e => handleRepoFilterChange(e.target.value)}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && filter.trim()) {
-                    window.location.href = `/explore?q=${encodeURIComponent(filter.trim())}`;
+                    navigate(`/explore?q=${encodeURIComponent(filter.trim())}`);
                   }
                 }}
                 className="w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-xs"

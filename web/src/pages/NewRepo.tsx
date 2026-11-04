@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, Organization } from '../lib/api';
 import { useAuth } from '../lib/theme';
+import { navigate } from '../lib/router';
 import { GitBranch, Lock, Globe, AlertCircle, Building2 } from 'lucide-react';
 
 export const NewRepo: React.FC = () => {
@@ -45,7 +46,7 @@ export const NewRepo: React.FC = () => {
         private: isPrivate,
         auto_init: autoInit,
       });
-      window.location.href = `/${repo.owner_name}/${repo.name}`;
+      navigate(`/${repo.owner_name}/${repo.name}`);
     } catch (err: any) {
       setError(err.message || 'Failed to create repository');
     } finally {

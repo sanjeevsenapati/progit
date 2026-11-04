@@ -65,7 +65,7 @@ function parseDiffPatch(patch: string): ParsedDiffLine[] {
 
 export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, index }) => {
   const { user } = useAuth();
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
   const [pull, setPull] = useState<PullRequest | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [reviews, setReviews] = useState<PullReview[]>([]);
@@ -129,9 +129,7 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
     try {
       const res = await api.mergePull(owner, repoName, index, mergeStyle);
       showToast(`Pull request merged successfully (commit ${res.merge_commit_sha.substring(0, 7)})`, 'success');
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      loadData();
     } catch (err: any) {
       showToast(`Merge failed: ${err.message}`, 'error');
     } finally {

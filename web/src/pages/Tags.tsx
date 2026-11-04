@@ -9,8 +9,9 @@ interface TagsProps {
 }
 
 export const Tags: React.FC<TagsProps> = ({ owner, repo: repoName }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(null);
-  const [tags, setTags] = useState<string[]>([]);
+  const cachedRepo = api.getCachedRepo(owner, repoName);
+  const [repoData, setRepoData] = useState<Repository | null>(() => cachedRepo?.repository || null);
+  const [tags, setTags] = useState<string[]>(() => cachedRepo?.tags || []);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

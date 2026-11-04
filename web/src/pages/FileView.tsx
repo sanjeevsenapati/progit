@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, Repository } from '../lib/api';
+import { navigate } from '../lib/router';
 import { RepoNav } from '../components/RepoNav';
 import { MarkdownViewer } from '../components/MarkdownViewer';
 import { showToast } from '../components/ModalDialog';
@@ -33,7 +34,7 @@ interface FileViewProps {
 }
 
 export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branch, filePath }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
   const [content, setContent] = useState('');
   const [size, setSize] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -86,7 +87,7 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
       // Redirect back to parent directory or tree
       const parentDir = filePath.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/')) : '';
       const targetUrl = parentDir ? `/${owner}/${repoName}/tree/${branch}/${parentDir}` : `/${owner}/${repoName}/tree/${branch}`;
-      window.location.href = targetUrl;
+      navigate(targetUrl);
     } catch (err: any) {
       showToast(err.message || 'Failed to delete file', 'error');
     } finally {

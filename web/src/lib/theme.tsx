@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, api } from './api';
+import { navigate } from './router';
 
 type Theme = 'light' | 'dark';
 
@@ -57,16 +58,37 @@ const AuthContext = createContext<AuthContextType>({
   refresh: async () => {},
 });
 
+const AUTH_CACHE_KEY = 'progit_auth_user';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const cached = localStorage.getItem(AUTH_CACHE_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState<boolean>(() => {
+    try {
+      return !localStorage.getItem(AUTH_CACHE_KEY);
+    } catch {
+      return true;
+    }
+  });
 
   const refresh = async () => {
     try {
       const u = await api.me();
       setUser(u);
+      try {
+        localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(u));
+      } catch {}
     } catch {
       setUser(null);
+      try {
+        localStorage.removeItem(AUTH_CACHE_KEY);
+      } catch {}
     } finally {
       setLoading(false);
     }
@@ -81,7 +103,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await api.logout();
     } finally {
       setUser(null);
-      window.location.href = '/login';
+      try {
+        localStorage.removeItem(AUTH_CACHE_KEY);
+      } catch {}
+      navigate('/login');
     }
   };
 

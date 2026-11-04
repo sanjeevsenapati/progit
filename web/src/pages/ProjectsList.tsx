@@ -19,11 +19,12 @@ interface ProjectsListProps {
 }
 
 export const ProjectsList: React.FC<ProjectsListProps> = ({ owner, repo: repoName }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const cachedRepo = api.getCachedRepo(owner, repoName);
+  const [repoData, setRepoData] = useState<Repository | null>(() => cachedRepo?.repository || null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'open' | 'closed'>('open');
-  const [canWrite, setCanWrite] = useState(false);
+  const [canWrite, setCanWrite] = useState(() => Boolean(cachedRepo?.can_write || cachedRepo?.permissions?.write));
 
   // New Project modal
   const [showModal, setShowModal] = useState(false);

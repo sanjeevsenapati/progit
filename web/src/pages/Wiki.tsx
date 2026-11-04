@@ -27,7 +27,7 @@ interface WikiProps {
 }
 
 export const Wiki: React.FC<WikiProps> = ({ owner, repo: repoName, initialSlug = 'Home' }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
   const [pages, setPages] = useState<WikiPageMeta[]>([]);
   const [currentPage, setCurrentPage] = useState<WikiPage | null>(null);
   const [selectedSlug, setSelectedSlug] = useState<string>(initialSlug);

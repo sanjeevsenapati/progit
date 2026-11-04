@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/theme';
+import { navigate } from '../lib/router';
 import { GitBranch, Lock, User, Mail, AlertCircle, Check } from 'lucide-react';
 
 export const Register: React.FC = () => {
@@ -20,7 +21,7 @@ export const Register: React.FC = () => {
     try {
       const res = await api.register({ username, email, password, full_name: fullName });
       setUser(res.user);
-      window.location.href = '/dashboard';
+      navigate('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Registration failed.');
     } finally {

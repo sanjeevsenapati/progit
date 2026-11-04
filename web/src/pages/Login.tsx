@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/theme';
+import { navigate } from '../lib/router';
 import { GitBranch, Lock, User, AlertCircle } from 'lucide-react';
 
 export const Login: React.FC = () => {
@@ -18,7 +19,7 @@ export const Login: React.FC = () => {
     try {
       const res = await api.login({ username, password });
       setUser(res.user);
-      window.location.href = '/dashboard';
+      navigate('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {

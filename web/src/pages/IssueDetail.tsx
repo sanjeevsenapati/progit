@@ -13,7 +13,7 @@ interface IssueDetailProps {
 
 export const IssueDetail: React.FC<IssueDetailProps> = ({ owner, repo: repoName, index }) => {
   const { user } = useAuth();
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
   const [issue, setIssue] = useState<Issue | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [assignees, setAssignees] = useState<User[]>([]);

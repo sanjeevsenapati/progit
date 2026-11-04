@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, Repository, User } from '../lib/api';
+import { navigate } from '../lib/router';
 import { RepoNav } from '../components/RepoNav';
 import { CircleDot, AlertCircle } from 'lucide-react';
 
@@ -9,7 +10,7 @@ interface NewIssueProps {
 }
 
 export const NewIssue: React.FC<NewIssueProps> = ({ owner, repo: repoName }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
   const [assignees, setAssignees] = useState<User[]>([]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -43,7 +44,7 @@ export const NewIssue: React.FC<NewIssueProps> = ({ owner, repo: repoName }) => 
         content,
         assignee: assignee.trim() || undefined
       });
-      window.location.href = `/${owner}/${repoName}/issues/${issue.index_number}`;
+      navigate(`/${owner}/${repoName}/issues/${issue.index_number}`);
     } catch (err: any) {
       setError(err.message || 'Failed to create issue');
     } finally {

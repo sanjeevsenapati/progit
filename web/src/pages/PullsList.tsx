@@ -9,7 +9,7 @@ interface PullsListProps {
 }
 
 export const PullsList: React.FC<PullsListProps> = ({ owner, repo: repoName }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
   const [pulls, setPulls] = useState<PullRequest[]>([]);
   const [stateFilter, setStateFilter] = useState<'open' | 'closed'>('open');
   const [loading, setLoading] = useState(true);
@@ -80,7 +80,12 @@ export const PullsList: React.FC<PullsListProps> = ({ owner, repo: repoName }) =
         </div>
 
         <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-sm divide-y divide-gray-100 dark:divide-dark-border overflow-hidden">
-          {pulls.length === 0 ? (
+          {loading ? (
+            <div className="p-12 text-center text-gray-400 flex items-center justify-center space-x-2">
+              <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+              <span>Loading pull requests...</span>
+            </div>
+          ) : pulls.length === 0 ? (
             <div className="p-12 text-center text-gray-500 dark:text-dark-muted space-y-3">
               <GitPullRequest className="w-10 h-10 mx-auto text-gray-400" />
               <h3 className="font-bold text-gray-900 dark:text-white">No {stateFilter} pull requests</h3>

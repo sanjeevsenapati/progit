@@ -21,7 +21,7 @@ interface PagesSettingsProps {
 }
 
 export const PagesSettings: React.FC<PagesSettingsProps> = ({ owner, repo: repoName }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
   const [pagesConfig, setPagesConfig] = useState<PagesConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

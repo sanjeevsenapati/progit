@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../lib/api';
+import { navigate } from '../lib/router';
 import { Building2, ArrowRight } from 'lucide-react';
 
 export const NewOrg: React.FC = () => {
@@ -25,7 +26,7 @@ export const NewOrg: React.FC = () => {
         location: location.trim(),
         website: website.trim(),
       });
-      window.location.href = `/org/${org.name}`;
+      navigate(`/org/${org.name}`);
     } catch (err: any) {
       setError(err.message || 'Failed to create organization');
     } finally {

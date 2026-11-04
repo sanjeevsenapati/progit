@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/theme';
+import { navigate } from '../lib/router';
 import { GitBranch, Shield, Server, Database, Lock, Mail, User, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export const Install: React.FC = () => {
@@ -105,7 +106,7 @@ export const Install: React.FC = () => {
       setSuccess(true);
       setUser(res.user);
       setTimeout(() => {
-        window.location.href = '/admin';
+        navigate('/admin');
       }, 1500);
     } catch (err: any) {
       setError(err.message || 'Installation failed.');

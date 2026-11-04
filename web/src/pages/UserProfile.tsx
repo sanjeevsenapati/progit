@@ -53,12 +53,13 @@ function guessLanguage(name: string, desc: string): string {
 
 export const UserProfile: React.FC<UserProfileProps> = ({ username }) => {
   const { user: currentUser } = useAuth();
-  const [profile, setProfile] = useState<User | null>(null);
+  const isSelf = currentUser && currentUser.username === username;
+  const [profile, setProfile] = useState<User | null>(() => (isSelf ? currentUser : null));
   const [repos, setRepos] = useState<Repository[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [starred, setStarred] = useState<Repository[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !isSelf);
   
   const [activeTab, setActiveTab] = useState<'overview' | 'repositories' | 'starred' | 'organizations'>('overview');
   const [repoSearch, setRepoSearch] = useState('');
@@ -82,7 +83,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username }) => {
     load();
   }, [username]);
 
-  if (loading) {
+  if (loading && !profile) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center text-sm text-gray-400">
         <div className="flex flex-col items-center space-y-3">

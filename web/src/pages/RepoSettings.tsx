@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, Repository, CollaboratorUser, Webhook, WebhookDelivery } from '../lib/api';
 import { useAuth } from '../lib/theme';
+import { navigate } from '../lib/router';
 import { RepoNav } from '../components/RepoNav';
 import { showToast, showModalConfirm } from '../components/ModalDialog';
 import { 
@@ -41,7 +42,7 @@ interface RepoSettingsProps {
 
 export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoName }) => {
   const { user } = useAuth();
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
   const [canAdmin, setCanAdmin] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -351,7 +352,7 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
       const res = await api.transferRepo(owner, repoName, transferTarget.trim());
       showToast(`Repository successfully transferred to ${res.new_owner}`);
       setTimeout(() => {
-        window.location.href = res.redirect_url || `/${res.new_owner}/${repoName}`;
+        navigate(res.redirect_url || `/${res.new_owner}/${repoName}`);
       }, 1000);
     } catch (err: any) {
       showToast(err.message || 'Failed to transfer repository', 'error');
@@ -403,7 +404,7 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
       await api.deleteRepo(owner, repoName);
       showToast('Repository deleted successfully');
       setTimeout(() => {
-        window.location.href = '/dashboard';
+        navigate('/dashboard');
       }, 500);
     } catch (err: any) {
       showToast(err.message || 'Failed to delete repository', 'error');

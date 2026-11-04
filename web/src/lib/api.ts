@@ -344,6 +344,36 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export interface RepoResponse {
+  repository: Repository;
+  is_starred: boolean;
+  can_write?: boolean;
+  permissions?: { admin: boolean; write: boolean; read: boolean };
+  branches: string[];
+  tags: string[];
+  clone_url_http: string;
+  clone_url_ssh: string;
+  wiki_clone_url_http?: string;
+  wiki_clone_url_ssh?: string;
+  pages_url?: string;
+}
+
+export interface DashboardResponse {
+  user: User;
+  repositories: Repository[];
+  activities: Activity[];
+  organizations?: Organization[];
+  starred?: Repository[];
+  root_url?: string;
+  domain?: string;
+  ssh_port?: number;
+  ssh_enabled?: boolean;
+}
+
+// In-memory UI cache for sub-second tab switching & back-navigation
+const repoCache = new Map<string, { data: RepoResponse; timestamp: number }>();
+let dashboardCache: { data: DashboardResponse; timestamp: number } | null = null;
+
 export const api = {
   // Auth
   async register(data: { username: string; email: string; password: string; full_name?: string }) {
@@ -369,18 +399,14 @@ export const api = {
   },
 
   // Dashboard & Explore
+  getCachedDashboard(): DashboardResponse | null {
+    return dashboardCache?.data || null;
+  },
+
   async getDashboard() {
-    return fetchJSON<{
-      user: User;
-      repositories: Repository[];
-      activities: Activity[];
-      organizations?: Organization[];
-      starred?: Repository[];
-      root_url?: string;
-      domain?: string;
-      ssh_port?: number;
-      ssh_enabled?: boolean;
-    }>('/api/v1/user/dashboard');
+    const data = await fetchJSON<DashboardResponse>('/api/v1/user/dashboard');
+    dashboardCache = { data, timestamp: Date.now() };
+    return data;
   },
 
   async explore(query?: string, page = 1, limit = 12) {
@@ -438,28 +464,43 @@ export const api = {
     });
   },
 
+  getCachedRepo(owner: string, repo: string): RepoResponse | null {
+    const key = `${owner.toLowerCase()}/${repo.toLowerCase()}`;
+    const item = repoCache.get(key);
+    return item ? item.data : null;
+  },
+
   async getRepo(owner: string, repo: string) {
-    return fetchJSON<{
-      repository: Repository;
-      is_starred: boolean;
-      can_write?: boolean;
-      permissions?: { admin: boolean; write: boolean; read: boolean };
-      branches: string[];
-      tags: string[];
-      clone_url_http: string;
-      clone_url_ssh: string;
-      wiki_clone_url_http?: string;
-      wiki_clone_url_ssh?: string;
-      pages_url?: string;
-    }>(`/api/v1/repos/${owner}/${repo}`);
+    const key = `${owner.toLowerCase()}/${repo.toLowerCase()}`;
+    const res = await fetchJSON<RepoResponse>(`/api/v1/repos/${owner}/${repo}`);
+    repoCache.set(key, { data: res, timestamp: Date.now() });
+    return res;
+  },
+
+  clearRepoCache(owner?: string, repo?: string) {
+    if (owner && repo) {
+      repoCache.delete(`${owner.toLowerCase()}/${repo.toLowerCase()}`);
+    } else {
+      repoCache.clear();
+    }
   },
 
   async deleteRepo(owner: string, repo: string) {
-    return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}`, { method: 'DELETE' });
+    const res = await fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}`, { method: 'DELETE' });
+    this.clearRepoCache(owner, repo);
+    dashboardCache = null;
+    return res;
   },
 
   async toggleStar(owner: string, repo: string) {
-    return fetchJSON<{ starred: boolean; num_stars: number }>(`/api/v1/repos/${owner}/${repo}/star`, { method: 'POST' });
+    const res = await fetchJSON<{ starred: boolean; num_stars: number }>(`/api/v1/repos/${owner}/${repo}/star`, { method: 'POST' });
+    const key = `${owner.toLowerCase()}/${repo.toLowerCase()}`;
+    const cached = repoCache.get(key);
+    if (cached) {
+      cached.data.is_starred = res.starred;
+      cached.data.repository.num_stars = res.num_stars;
+    }
+    return res;
   },
 
   async forkRepo(owner: string, repo: string, data?: { organization?: string; name?: string }) {

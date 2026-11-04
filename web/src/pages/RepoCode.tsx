@@ -50,21 +50,22 @@ function formatRelativeTime(dateInput: string | Date | number): string {
 }
 
 export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initialPath = '' }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(null);
-  const [isStarred, setIsStarred] = useState(false);
-  const [branches, setBranches] = useState<string[]>([]);
-  const [currentBranch, setCurrentBranch] = useState('main');
+  const cachedRepo = api.getCachedRepo(owner, repoName);
+  const [repoData, setRepoData] = useState<Repository | null>(() => cachedRepo?.repository || null);
+  const [isStarred, setIsStarred] = useState(() => cachedRepo?.is_starred || false);
+  const [branches, setBranches] = useState<string[]>(() => cachedRepo?.branches || ['main']);
+  const [currentBranch, setCurrentBranch] = useState(() => cachedRepo?.branches?.[0] || 'main');
   const [entries, setEntries] = useState<TreeEntry[]>([]);
   const [readme, setReadme] = useState<string | null>(null);
   const [latestCommit, setLatestCommit] = useState<Commit | null>(null);
   const [totalCommits, setTotalCommits] = useState<number>(0);
   const [copiedSha, setCopiedSha] = useState(false);
-  const [cloneHTTP, setCloneHTTP] = useState('');
-  const [cloneSSH, setCloneSSH] = useState('');
+  const [cloneHTTP, setCloneHTTP] = useState(() => cachedRepo?.clone_url_http || '');
+  const [cloneSSH, setCloneSSH] = useState(() => cachedRepo?.clone_url_ssh || '');
   const [cloneTab, setCloneTab] = useState<'http' | 'ssh'>('http');
   const [showCloneModal, setShowCloneModal] = useState(false);
   const [showAddFileModal, setShowAddFileModal] = useState(false);
-  const [canWrite, setCanWrite] = useState(false);
+  const [canWrite, setCanWrite] = useState(() => Boolean(cachedRepo?.can_write || cachedRepo?.permissions?.write));
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
@@ -75,7 +76,7 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
   const [copiedBlock2, setCopiedBlock2] = useState(false);
 
   const selectedCloneUrl = cloneTab === 'ssh' && cloneSSH ? cloneSSH : (cloneHTTP || `${window.location.origin}/${owner}/${repoName}.git`);
-  const isEmptyRepo = !initialPath && entries.length === 0 && !latestCommit;
+  const isEmptyRepo = !loading && !initialPath && entries.length === 0 && !latestCommit;
 
   const block1Commands = `echo "# ${repoName}" >> README.md\ngit init\ngit add README.md\ngit commit -m "first commit"\ngit branch -M ${currentBranch || 'main'}\ngit remote add origin ${selectedCloneUrl}\ngit push -u origin ${currentBranch || 'main'}`;
 
@@ -676,7 +677,12 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
                 </a>
               )}
 
-              {entries.length === 0 ? (
+              {loading && entries.length === 0 ? (
+                <div className="p-8 text-center text-sm text-gray-400 flex items-center justify-center space-x-2">
+                  <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                  <span>Loading files...</span>
+                </div>
+              ) : entries.length === 0 ? (
                 <div className="p-8 text-center text-sm text-gray-400">
                   This repository is empty. Push commits or initialize with a README.
                 </div>

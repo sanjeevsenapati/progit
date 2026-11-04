@@ -36,17 +36,36 @@ import { OrgView } from './pages/OrgView';
 import { Messages } from './pages/Messages';
 import { ImportRepo } from './pages/ImportRepo';
 import { GlobalDialogProvider } from './components/ModalDialog';
+import { initLinkInterceptor, onNavigate, onProgress } from './lib/router';
 
 export const App: React.FC = () => {
   const { user, loading } = useAuth();
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [currentSearch, setCurrentSearch] = useState(window.location.search);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   useEffect(() => {
+    initLinkInterceptor();
+
     const onLocationChange = () => {
       setCurrentPath(window.location.pathname);
+      setCurrentSearch(window.location.search);
     };
+
     window.addEventListener('popstate', onLocationChange);
-    return () => window.removeEventListener('popstate', onLocationChange);
+    const unsubNavigate = onNavigate((path, search) => {
+      setCurrentPath(path);
+      setCurrentSearch(search);
+    });
+    const unsubProgress = onProgress(active => {
+      setIsNavigating(active);
+    });
+
+    return () => {
+      window.removeEventListener('popstate', onLocationChange);
+      unsubNavigate();
+      unsubProgress();
+    };
   }, []);
 
   if (loading) {
@@ -70,11 +89,11 @@ export const App: React.FC = () => {
     if (path === '/register') return <Register />;
     if (path === '/forgot-password') return <ForgotPassword />;
     if (path === '/dashboard') return <Dashboard />;
-    if (path === '/explore') return <Explore />;
-    if (path === '/new/import' || path === '/import') return <ImportRepo />;
-    if (path === '/new') return <NewRepo />;
+    if (path === '/explore') return <Explore key={currentPath + currentSearch} />;
+    if (path === '/new/import' || path === '/import') return <ImportRepo key={currentPath + currentSearch} />;
+    if (path === '/new') return <NewRepo key={currentPath + currentSearch} />;
     if (path === '/settings') return <UserSettings />;
-    if (path === '/messages') return <Messages />;
+    if (path === '/messages') return <Messages key={currentPath + currentSearch} />;
     if (path === '/admin') return <AdminDashboard />;
     if (path === '/install') return <Install />;
     if (path === '/org/new') return <NewOrg />;
@@ -218,6 +237,13 @@ export const App: React.FC = () => {
   return (
     <GlobalDialogProvider>
       <div className="min-h-screen bg-gray-50 dark:bg-dark-bg text-gray-900 dark:text-dark-text flex flex-col">
+        {/* Top Slim Loading Progress Bar */}
+        <div
+          aria-hidden="true"
+          className={`fixed top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600 z-[9999] pointer-events-none transition-all duration-300 ease-out ${
+            isNavigating ? 'opacity-100 w-full' : 'opacity-0 w-0'
+          }`}
+        />
         <Navbar />
         <main className="flex-1">{renderRoute()}</main>
       </div>

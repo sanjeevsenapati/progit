@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Repository, Organization, api } from '../lib/api';
 import { useAuth } from '../lib/theme';
+import { navigate } from '../lib/router';
 import { 
   Code, 
   CircleDot, 
@@ -48,7 +49,7 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar,
 
   const handleForkClick = () => {
     if (!user) {
-      window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+      navigate(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
       return;
     }
     setForkError(null);
@@ -71,7 +72,7 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar,
       });
 
       // Redirect to newly forked repository
-      window.location.href = `/${res.owner_name}/${res.name}`;
+      navigate(`/${res.owner_name}/${res.name}`);
     } catch (err: any) {
       setForkError(err.message || 'Failed to fork repository');
       setForking(false);

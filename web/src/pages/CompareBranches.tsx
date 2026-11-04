@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, Repository, Commit, FileDiff } from '../lib/api';
+import { navigate } from '../lib/router';
 import { RepoNav } from '../components/RepoNav';
 import { showToast } from '../components/ModalDialog';
 import { GitPullRequest, ArrowRight, GitCommit, FileText, CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -10,7 +11,7 @@ interface CompareBranchesProps {
 }
 
 export const CompareBranches: React.FC<CompareBranchesProps> = ({ owner, repo: repoName }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
   const [branches, setBranches] = useState<string[]>([]);
   const [baseBranch, setBaseBranch] = useState('main');
   const [headBranch, setHeadBranch] = useState('');
@@ -85,7 +86,7 @@ export const CompareBranches: React.FC<CompareBranchesProps> = ({ owner, repo: r
         head_branch: headBranch,
         base_branch: baseBranch,
       });
-      window.location.href = `/${owner}/${repoName}/pulls/${pr.issue?.index_number || pr.id}`;
+      navigate(`/${owner}/${repoName}/pulls/${pr.issue?.index_number || pr.id}`);
     } catch (err: any) {
       showToast(err.message, 'error');
     }

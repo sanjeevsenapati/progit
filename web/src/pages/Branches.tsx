@@ -23,12 +23,13 @@ interface BranchesProps {
 }
 
 export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const cachedRepo = api.getCachedRepo(owner, repoName);
+  const [repoData, setRepoData] = useState<Repository | null>(() => cachedRepo?.repository || null);
   const [branchDetails, setBranchDetails] = useState<BranchDetail[]>([]);
   const [filterQuery, setFilterQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'all'>('overview');
   const [loading, setLoading] = useState(true);
-  const [canWrite, setCanWrite] = useState(false);
+  const [canWrite, setCanWrite] = useState(() => Boolean(cachedRepo?.can_write || cachedRepo?.permissions?.write));
 
   // Create branch modal
   const [showCreateModal, setShowCreateModal] = useState(false);

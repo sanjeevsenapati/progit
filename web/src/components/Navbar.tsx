@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth, useTheme } from '../lib/theme';
 import { api, Repository } from '../lib/api';
+import { navigate } from '../lib/router';
 import { 
   GitBranch, 
   Search, 
@@ -128,14 +129,10 @@ export const Navbar: React.FC = () => {
       if (selectedIndex >= 0 && selectedIndex < searchResults.length) {
         const target = searchResults[selectedIndex];
         setSearchOpen(false);
-        window.location.href = `/${target.owner_name}/${target.name}`;
+        navigate(`/${target.owner_name}/${target.name}`);
       } else if (searchQuery.trim()) {
         setSearchOpen(false);
-        if (window.location.pathname === '/explore') {
-          window.location.search = `?q=${encodeURIComponent(searchQuery.trim())}`;
-        } else {
-          window.location.href = `/explore?q=${encodeURIComponent(searchQuery.trim())}`;
-        }
+        navigate(`/explore?q=${encodeURIComponent(searchQuery.trim())}`);
       }
     }
   };
@@ -268,7 +265,7 @@ export const Navbar: React.FC = () => {
                         onClick={(e) => {
                           e.preventDefault();
                           setSearchOpen(false);
-                          window.location.href = `/${repo.owner_name}/${repo.name}`;
+                          navigate(`/${repo.owner_name}/${repo.name}`);
                         }}
                       >
                         <div className="flex items-start space-x-2.5 min-w-0 pr-2">
@@ -311,11 +308,7 @@ export const Navbar: React.FC = () => {
                   onClick={(e) => {
                     e.preventDefault();
                     setSearchOpen(false);
-                    if (window.location.pathname === '/explore') {
-                      window.location.search = `?q=${encodeURIComponent(searchQuery.trim())}`;
-                    } else {
-                      window.location.href = `/explore?q=${encodeURIComponent(searchQuery.trim())}`;
-                    }
+                    navigate(`/explore?q=${encodeURIComponent(searchQuery.trim())}`);
                   }}
                 >
                   {searchQuery.trim() ? `Search all repositories for "${searchQuery}" \u2192` : 'Explore all repositories \u2192'}

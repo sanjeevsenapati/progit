@@ -10,7 +10,7 @@ interface CommitDetailProps {
 }
 
 export const CommitDetail: React.FC<CommitDetailProps> = ({ owner, repo: repoName, sha }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
   const [diff, setDiff] = useState<CommitDiff | null>(null);
   const [loading, setLoading] = useState(true);
 

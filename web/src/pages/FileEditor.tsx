@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { api, Repository } from '../lib/api';
+import { navigate } from '../lib/router';
 import { RepoNav } from '../components/RepoNav';
 import { MarkdownViewer } from '../components/MarkdownViewer';
 import { showToast } from '../components/ModalDialog';
@@ -42,7 +43,7 @@ export const FileEditor: React.FC<FileEditorProps> = ({
   initialDirectory = '',
   mode,
 }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(null);
+  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
   const [pathInput, setPathInput] = useState(
     mode === 'edit'
       ? filePath
@@ -163,7 +164,7 @@ export const FileEditor: React.FC<FileEditorProps> = ({
 
       // Redirect back to blob view
       const targetBranch = res.branch || branch;
-      window.location.href = `/${owner}/${repoName}/blob/${targetBranch}/${cleanPath}`;
+      navigate(`/${owner}/${repoName}/blob/${targetBranch}/${cleanPath}`);
     } catch (err: any) {
       setError(err.message || 'Failed to commit changes');
     } finally {
