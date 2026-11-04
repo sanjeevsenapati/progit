@@ -44,8 +44,8 @@ export const Dashboard: React.FC = () => {
   const [repoPage, setRepoPage] = useState(1);
   const repoPageSize = 6;
 
-  const [serverRootUrl, setServerRootUrl] = useState(() => cached?.root_url || '');
-  const [serverDomain, setServerDomain] = useState(() => cached?.domain || '');
+  const [serverRootUrl, setServerRootUrl] = useState(() => cached?.root_url || 'https://progit.local/');
+  const [serverDomain, setServerDomain] = useState(() => cached?.domain || 'progit.local');
   const [serverSshPort, setServerSshPort] = useState(() => cached?.ssh_port || 2222);
 
   useEffect(() => {
@@ -512,24 +512,14 @@ export const Dashboard: React.FC = () => {
             {(() => {
               const getHttpCloneBase = () => {
                 if (serverRootUrl && serverRootUrl.trim()) {
-                  const cleanRoot = serverRootUrl.trim().replace(/\/+$/, '');
-                  const isLocalRoot = cleanRoot.includes('localhost') || cleanRoot.includes('127.0.0.1');
-                  const isBrowserLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-                  if (!isLocalRoot || isBrowserLocal) {
-                    return cleanRoot;
-                  }
+                  return serverRootUrl.trim().replace(/\/+$/, '');
                 }
                 return window.location.origin;
               };
 
               const getSshCloneHost = () => {
                 if (serverDomain && serverDomain.trim()) {
-                  const cleanDomain = serverDomain.trim();
-                  const isLocalDomain = cleanDomain === 'localhost' || cleanDomain === '127.0.0.1';
-                  const isBrowserLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-                  if (!isLocalDomain || isBrowserLocal) {
-                    return cleanDomain;
-                  }
+                  return serverDomain.trim();
                 }
                 return window.location.hostname;
               };

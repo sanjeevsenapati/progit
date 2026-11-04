@@ -179,8 +179,7 @@ func runWeb(args []string) {
 			if err != nil {
 				log.Fatalf("[ProGit] HTTPS listener failed on %s: %v", httpsListenAddr, err)
 			}
-			tlsListener := tls.NewListener(ln, tlsConfig)
-			if err := server.Serve(tlsListener); err != nil && err != http.ErrServerClosed {
+			if err := server.ServeTLS(ln, "", ""); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("[ProGit] HTTPS server listen failed: %v", err)
 			}
 		}()
@@ -190,7 +189,7 @@ func runWeb(args []string) {
 			httpPort := cfg.Server.HTTPPort
 			httpListenAddr := fmt.Sprintf("0.0.0.0:%d", httpPort)
 
-			var redirectHandler http.Handler = https.HTTPToHTTPSRedirectHandler(httpsPort, cfg.Server.Domain)
+			var redirectHandler http.Handler = https.HTTPToHTTPSRedirectHandler(httpsPort, cfg.Server.Domain, cfg.Server.RootURL)
 			if autocertMgr != nil {
 				redirectHandler = autocertMgr.HTTPHandler(redirectHandler)
 			}

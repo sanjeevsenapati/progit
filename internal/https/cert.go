@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -55,10 +56,13 @@ func GenerateSelfSignedCert(certPath, keyPath, domain string, extraHosts ...stri
 		BasicConstraintsValid: true,
 	}
 
-	// Build SAN lists
+	// Build SAN lists with primary domain, progit.local, localhost, and local IPs
 	dnsMap := map[string]bool{
-		domain:      true,
-		"localhost": true,
+		domain:           true,
+		"progit.local":   true,
+		"*.progit.local": true,
+		"localhost":      true,
+		"*.localhost":    true,
 	}
 	ipMap := map[string]net.IP{
 		"127.0.0.1": net.ParseIP("127.0.0.1"),
@@ -142,7 +146,35 @@ func LoadOrGenerateCert(certPath, keyPath, domain string, autoGenerate bool, ext
 	keyExists := fileExists(keyPath)
 
 	if certExists && keyExists {
-		return tls.LoadX509KeyPair(certPath, keyPath)
+		// Verify existing certificate validity and domain inclusion
+		if certBytes, err := os.ReadFile(certPath); err == nil {
+			if block, _ := pem.Decode(certBytes); block != nil && block.Type == "CERTIFICATE" {
+				if parsedCert, err := x509.ParseCertificate(block.Bytes); err == nil {
+					targetDomain := strings.ToLower(strings.TrimSpace(domain))
+					hasDomain := false
+					if targetDomain == "" || strings.ToLower(parsedCert.Subject.CommonName) == targetDomain {
+						hasDomain = true
+					} else {
+						for _, dns := range parsedCert.DNSNames {
+							if strings.ToLower(dns) == targetDomain {
+								hasDomain = true
+								break
+							}
+						}
+					}
+					// If certificate is still valid and covers the target domain, use it
+					if hasDomain && time.Now().Before(parsedCert.NotAfter) {
+						return tls.LoadX509KeyPair(certPath, keyPath)
+					}
+					// If missing domain or expired, and autoGenerate is true, regenerate
+					if !autoGenerate {
+						return tls.LoadX509KeyPair(certPath, keyPath)
+					}
+				}
+			}
+		} else {
+			return tls.LoadX509KeyPair(certPath, keyPath)
+		}
 	}
 
 	if !autoGenerate {
@@ -205,8 +237,21 @@ func MakeACMETLSConfig(acmeDir, acmeEmail string, domains ...string) (*tls.Confi
 
 // HTTPToHTTPSRedirectHandler returns an HTTP handler that redirects all incoming
 // HTTP requests to their HTTPS equivalent.
-func HTTPToHTTPSRedirectHandler(httpsPort int, fallbackDomain string) http.Handler {
+func HTTPToHTTPSRedirectHandler(httpsPort int, fallbackDomain string, rootURLs ...string) http.Handler {
+	var configuredRootURL string
+	if len(rootURLs) > 0 {
+		configuredRootURL = strings.TrimSpace(rootURLs[0])
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Health check endpoint responds directly on HTTP listener with 200 OK
+		if r.URL.Path == "/api/health" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"status":"ok","https_redirect":true}`))
+			return
+		}
+
 		host := r.Host
 		if h, _, err := net.SplitHostPort(host); err == nil {
 			host = h
@@ -215,14 +260,26 @@ func HTTPToHTTPSRedirectHandler(httpsPort int, fallbackDomain string) http.Handl
 			host = fallbackDomain
 		}
 		if host == "" {
-			host = "localhost"
+			host = "progit.local"
 		}
 
-		target := fmt.Sprintf("https://%s", host)
-		if httpsPort != 443 && httpsPort > 0 {
-			target = fmt.Sprintf("https://%s:%d", host, httpsPort)
+		target := ""
+		if configuredRootURL != "" {
+			if u, err := url.Parse(configuredRootURL); err == nil && u.Scheme != "" && u.Host != "" {
+				rootHost := u.Hostname()
+				if strings.EqualFold(host, rootHost) || (host == "localhost" && rootHost == "progit.local") {
+					target = strings.TrimRight(configuredRootURL, "/") + r.URL.RequestURI()
+				}
+			}
 		}
-		target += r.URL.RequestURI()
+
+		if target == "" {
+			target = fmt.Sprintf("https://%s", host)
+			if httpsPort != 443 && httpsPort > 0 {
+				target = fmt.Sprintf("https://%s:%d", host, httpsPort)
+			}
+			target += r.URL.RequestURI()
+		}
 
 		http.Redirect(w, r, target, http.StatusMovedPermanently)
 	})

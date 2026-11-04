@@ -153,8 +153,8 @@ export const AdminDashboard: React.FC = () => {
   const handleOpenEditConfig = () => {
     if (stats) {
       setCfgAppName(stats.app_name || 'ProGit');
-      setCfgDomain(stats.domain || 'localhost');
-      setCfgRootUrl(stats.root_url || 'http://localhost:3000/');
+      setCfgDomain(stats.domain || 'progit.local');
+      setCfgRootUrl(stats.root_url || 'https://progit.local/');
       setCfgSshPort(stats.ssh_port || 2222);
     }
     setShowEditConfigModal(true);

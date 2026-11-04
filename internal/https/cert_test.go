@@ -136,3 +136,75 @@ func TestHTTPToHTTPSRedirect(t *testing.T) {
 	}
 }
 
+func TestHTTPToHTTPSRedirectWithRootURL(t *testing.T) {
+	handler := HTTPToHTTPSRedirectHandler(3443, "progit.local", "https://progit.local/")
+
+	// Request with progit.local:80 or progit.local
+	req := httptest.NewRequest("GET", "/explore", nil)
+	req.Host = "progit.local"
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMovedPermanently {
+		t.Errorf("expected 301 Moved Permanently, got %d", rec.Code)
+	}
+
+	expectedLoc := "https://progit.local/explore"
+	if loc := rec.Header().Get("Location"); loc != expectedLoc {
+		t.Errorf("expected Location %s, got %s", expectedLoc, loc)
+	}
+}
+
+func TestHTTPRedirectHealthCheckBypass(t *testing.T) {
+	handler := HTTPToHTTPSRedirectHandler(3443, "progit.local", "https://progit.local/")
+
+	req := httptest.NewRequest("GET", "/api/health", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200 OK for /api/health, got %d", rec.Code)
+	}
+
+	body := rec.Body.String()
+	if body != `{"status":"ok","https_redirect":true}` {
+		t.Errorf("unexpected body for /api/health: %s", body)
+	}
+}
+
+func TestCertRegenerationOnDomainChange(t *testing.T) {
+	tmpDir := t.TempDir()
+	certPath := filepath.Join(tmpDir, "cert.pem")
+	keyPath := filepath.Join(tmpDir, "key.pem")
+
+	// 1. Initial generation with old domain (localhost)
+	_, err := LoadOrGenerateCert(certPath, keyPath, "localhost", true)
+	if err != nil {
+		t.Fatalf("failed initial cert generation: %v", err)
+	}
+
+	// 2. Load with new domain (progit.local) -> should auto regenerate
+	cert, err := LoadOrGenerateCert(certPath, keyPath, "progit.local", true)
+	if err != nil {
+		t.Fatalf("failed cert reload with domain change: %v", err)
+	}
+
+	x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		t.Fatalf("failed to parse reloaded cert: %v", err)
+	}
+
+	hasProgitLocal := false
+	for _, dns := range x509Cert.DNSNames {
+		if dns == "progit.local" {
+			hasProgitLocal = true
+			break
+		}
+	}
+	if !hasProgitLocal {
+		t.Errorf("expected DNSNames to contain progit.local after regeneration, got %v", x509Cert.DNSNames)
+	}
+}
+

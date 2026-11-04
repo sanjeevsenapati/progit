@@ -72,17 +72,24 @@ var App *Config
 
 // DefaultConfig returns safe production-ready defaults
 func DefaultConfig() *Config {
+	certFile := "custom/https/cert.pem"
+	keyFile := "custom/https/key.pem"
+	if _, err := os.Stat("/data/config"); err == nil {
+		certFile = "/data/config/https/cert.pem"
+		keyFile = "/data/config/https/key.pem"
+	}
+
 	return &Config{
 		Server: ServerConfig{
 			AppName:           "ProGit",
-			Domain:            "localhost",
+			Domain:            "progit.local",
 			HTTPPort:          3000,
 			HTTPSPort:         3443,
-			RootURL:           "http://localhost:3000/",
-			Protocol:          "http",
+			RootURL:           "https://progit.local/",
+			Protocol:          "https",
 			OfflineMode:       false,
-			CertFile:          "custom/https/cert.pem",
-			KeyFile:           "custom/https/key.pem",
+			CertFile:          certFile,
+			KeyFile:           keyFile,
 			GenerateLocalCert: true,
 			EnableACME:        false,
 			ACMEDomain:        "",
@@ -203,11 +210,17 @@ func Load(configPath string) (*Config, error) {
 	}
 	if val := os.Getenv("PROGIT_ROOT_URL"); val != "" {
 		cfg.Server.RootURL = val
-	} else if cfg.Server.Protocol == "https" && cfg.Server.RootURL == "http://localhost:3000/" {
-		if cfg.Server.HTTPSPort == 443 {
+	} else if cfg.Server.Protocol == "https" && (cfg.Server.RootURL == "" || strings.HasPrefix(cfg.Server.RootURL, "http://localhost")) {
+		if cfg.Server.HTTPSPort == 443 || cfg.Server.HTTPSPort == 3443 {
 			cfg.Server.RootURL = fmt.Sprintf("https://%s/", cfg.Server.Domain)
 		} else {
 			cfg.Server.RootURL = fmt.Sprintf("https://%s:%d/", cfg.Server.Domain, cfg.Server.HTTPSPort)
+		}
+	} else if cfg.Server.Protocol == "http" && strings.HasPrefix(cfg.Server.RootURL, "https://") {
+		if cfg.Server.HTTPPort == 80 {
+			cfg.Server.RootURL = fmt.Sprintf("http://%s/", cfg.Server.Domain)
+		} else {
+			cfg.Server.RootURL = fmt.Sprintf("http://%s:%d/", cfg.Server.Domain, cfg.Server.HTTPPort)
 		}
 	}
 	if val := os.Getenv("PROGIT_DB_PATH"); val != "" {

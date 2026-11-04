@@ -7,11 +7,11 @@ import { GitBranch, Shield, Server, Database, Lock, Mail, User, AlertCircle, Che
 export const Install: React.FC = () => {
   const { setUser } = useAuth();
   const [appName, setAppName] = useState('ProGit');
-  const [domain, setDomain] = useState('localhost');
-  const [protocol, setProtocol] = useState<'http' | 'https'>('http');
+  const [domain, setDomain] = useState('progit.local');
+  const [protocol, setProtocol] = useState<'http' | 'https'>('https');
   const [httpPort, setHttpPort] = useState(3000);
   const [httpsPort, setHttpsPort] = useState(3443);
-  const [rootUrl, setRootUrl] = useState('http://localhost:3000/');
+  const [rootUrl, setRootUrl] = useState('https://progit.local/');
   const [adminUsername, setAdminUsername] = useState('admin');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
