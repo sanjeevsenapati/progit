@@ -1,5 +1,7 @@
 # ProGit System Architecture
 
+Official Documentation Portal: [https://progit.co.in](https://progit.co.in)
+
 ## 1. Overview & Vision
 
 **ProGit** is a modern, lightweight, self-hosted Git collaboration platform designed to deliver the polished, developer-friendly experience of modern platforms (such as GitHub) with the minimalist footprint and simplicity of Gogs.
@@ -7,50 +9,52 @@
 ProGit is built as a **modular monolith** in Go, backed by an embedded pure-Go SQLite storage engine and native Git CLI integration. The frontend is a high-performance Single Page Application (SPA) built with React 19, TypeScript, Vite, Tailwind CSS, and Lucide icons, embedded into the Go binary via Go's `embed.FS` for zero-dependency single-binary deployment.
 
 ```
-+-----------------------------------------------------------------------+
-|                              CLIENTS                                  |
-|   +------------------------+   +----------------+   +---------------+ |
-|   | Modern Web SPA (React) |   | Git CLI (HTTP) |   | Git CLI (SSH) | |
-|   +------------------------+   +----------------+   +---------------+ |
-+---------------+------------------------+--------------------+---------+
-                |                        |                    |
-                | HTTP :3000             | HTTP :3000         | SSH :2222
-+---------------v------------------------v--------------------v---------+
-|                                PROGIT                                 |
-|                                                                       |
-|  +-----------------------------------------------------------------+  |
-|  |                 Routing & Middleware Layer                      |  |
-|  |   - Auth / Session Handler         - CORS & Security Headers    |  |
-|  |   - Request Logger & Recovery      - Rate Limiter & Protections |  |
-|  +-------------------+-----------------------------+---------------+  |
-|                      |                             |                  |
-|  +-------------------v---------------+ +-----------v---------------+  |
-|  |           REST API v1             | |   Native Git Smart HTTP   |  |
-|  |  - Users & Auth    - Repositories | |   - info/refs             |  |
-|  |  - Issues & Labels - Pull Requests| |   - git-upload-pack (pull)|  |
-|  |  - Orgs & Teams   - Admin & Health| |   - git-receive-pack(push)|  |
-|  +-------------------+---------------+ +-----------+---------------+  |
-|                      |                             |                  |
-|  +-------------------v-----------------------------v---------------+  |
-|  |                    Core Business Services                       |  |
-|  |  - Auth & Token Service       - Repository Management           |  |
-|  |  - Issue & Milestone Engine   - PR Diff & Real Git Merge Engine |  |
-|  |  - Organization Service       - Webhook Dispatcher Worker       |  |
-|  |  - Built-in SSH Server (Port 2222, crypto/ssh)                  |  |
-|  +-------------------+-----------------------------+---------------+  |
-|                      |                             |                  |
-|  +-------------------v---------------+ +-----------v---------------+  |
-|  |   Data Access Layer (Repository)  | |   Native Git CLI Engine   |  |
-|  |   - SQLite (modernc.org/sqlite)   | |   - Git bare repositories |  |
-|  |   - WAL mode, busy timeouts       | |   - Objects, branches,    |  |
-|  |   - Migrations & Transactions     | |     tags, commits, diffs  |  |
-|  +-------------------+---------------+ +-----------+---------------+  |
-+----------------------|-----------------------------|------------------+
-                       |                             |
-       +---------------v---------------+     +-------v----------------+
-       | Persistent SQLite DB (data/db)|     | Bare Repositories      |
-       +-------------------------------+     | (data/repositories)    |
-                                             +------------------------+
++-----------------------------------------------------------------------------------+
+|                                     CLIENTS                                       |
+|   +----------------------------+   +--------------------+   +-------------------+ |
+|   | Fast SPA Web Client (React)|   | Git CLI (Smart HTTP|   | Git CLI (SSH)     | |
+|   +----------------------------+   +--------------------+   +-------------------+ |
++-----------------+----------------------------+------------------------+-----------+
+                  |                            |                        |
+                  | HTTPS :3443 / :443         | HTTPS :3443 / :443     | SSH :2222
+                  | (Auto HTTP->HTTPS :3000)   | (Auto HTTP->HTTPS :3000|
++-----------------v----------------------------v------------------------v-----------+
+|                                     PROGIT                                        |
+|                                                                                   |
+|  +-----------------------------------------------------------------------------+  |
+|  |                         Routing & Middleware Layer                          |  |
+|  |   - Auth / Session Handler              - TLS / ACME Manager & SAN Certs    |  |
+|  |   - Request Logger & Recovery           - CORS & Security Headers (HSTS)    |  |
+|  |   - Rate Limiter & Protections          - Health Probe Filter (/api/health) |  |
+|  +-----------------------+---------------------------------+-------------------+  |
+|                          |                                 |                      |
+|  +-----------------------v-------------------+ +-----------v-------------------+  |
+|  |                REST API v1                | |     Native Git Smart HTTP     |  |
+|  |  - Users & Auth        - Repositories     | |   - info/refs                 |  |
+|  |  - Issues & Labels     - Pull Requests    | |   - git-upload-pack (fetch)   |  |
+|  |  - Orgs & Teams        - Admin & Health   | |   - git-receive-pack (push)   |  |
+|  +-----------------------+-------------------+ +-----------+-------------------+  |
+|                          |                                 |                      |
+|  +-----------------------v---------------------------------v-------------------+  |
+|  |                        Core Business Services                               |  |
+|  |  - Auth & Token Service           - Repository Management                   |  |
+|  |  - Issue & Milestone Engine       - PR Diff & Real Git Merge Engine         |  |
+|  |  - Organization Service           - Webhook Dispatcher Worker               |  |
+|  |  - Native SSH Server (Port 2222)  - Dynamic Base URL & SAN Manager          |  |
+|  +-----------------------+---------------------------------+-------------------+  |
+|                          |                                 |                      |
+|  +-----------------------v-------------------+ +-----------v-------------------+  |
+|  |       Data Access Layer (Database)        | |     Native Git CLI Engine     |  |
+|  |   - SQLite (modernc.org/sqlite, pure Go)  | |   - Git bare repositories     |  |
+|  |   - WAL mode, busy timeouts               | |   - Objects, branches,        |  |
+|  |   - Schema Migrations & Integrity Checks  | |     tags, commits, diffs      |  |
+|  +-----------------------+-------------------+ +-----------+-------------------+  |
++--------------------------|---------------------------------|----------------------+
+                           |                                 |
+           +---------------v---------------+         +-------v----------------+
+           | Persistent SQLite DB (data/db)|         | Bare Repositories      |
+           +-------------------------------+         | (data/repositories)    |
+                                                     +------------------------+
 ```
 
 ---

@@ -1,22 +1,28 @@
 # ProGit User Guide
 
-Welcome to **ProGit** — a modern, self-hosted Git collaboration platform.
+Welcome to **ProGit** — a modern, lightweight, self-hosted Git collaboration platform with full HTTPS encryption, zero-reload SPA performance, and built-in SSH.
+
+Official Documentation Portal: [https://progit.co.in](https://progit.co.in)
 
 ---
 
 ## 1. Getting Started
 
-### 1.1 Installation & Super Administrator Setup
-1. If this is a fresh instance, navigate to `http://localhost:3000/install`.
-2. Configure application parameters and specify the **Super Administrator** username, email, and password.
-3. Once completed, the Super Admin account is initialized with full management privileges and access to the **Administration Panel** (`/admin`).
-4. Subsequent users can register at `/register` or be created directly by an administrator.
+### 1.1 Local Domain & Installation
+1. Add `progit.local` to your client machine's `/etc/hosts`:
+   ```bash
+   echo "127.0.0.1 progit.local" | sudo tee -a /etc/hosts
+   ```
+2. If this is a fresh instance, navigate to `https://progit.local` (or `https://progit.local:3443`).
+3. Configure application parameters and specify the **Super Administrator** username, email, and password.
+4. Once completed, the Super Admin account is initialized with full management privileges and access to the **Administration Panel** (`/admin`).
+5. Subsequent users can register at `/register` or be created directly by an administrator.
 
-### 1.2 Accessing the Dashboard
-The dashboard displays:
-- Your repositories and starred projects.
-- Recent push, issue, and pull request activity.
-- Quick navigation shortcuts.
+### 1.2 Accessing the Dashboard & Fast SPA Navigation
+ProGit is built as a zero-page reload single-page application (SPA):
+- Clicking any link, tab, branch, or repository navigates **instantly without full page flushes**.
+- Dashboard telemetry and repository details are cached in memory for sub-millisecond tab switching.
+- User authentication is persisted in `localStorage` eliminating flash-of-loading screens on page refreshes.
 
 ---
 
@@ -31,17 +37,19 @@ The dashboard displays:
 6. Click **Create Repository**.
 
 ### 2.2 Cloning a Repository
-From the repository overview, copy the clone URL:
+From the repository overview or the Git CLI Quick Reference card, copy the clone URL:
 
-- **HTTP / HTTPS**:
+- **Smart HTTP / HTTPS**:
   ```bash
-  git clone http://localhost:3000/<username>/<reponame>.git
+  git clone https://progit.local/<username>/<reponame>.git
+  # Or with custom port:
+  git clone https://progit.local:3443/<username>/<reponame>.git
   ```
   Authenticate with your ProGit username and password, or a Personal Access Token.
 
-- **SSH**:
+- **Native SSH**:
   ```bash
-  git clone ssh://git@localhost:2222/<username>/<reponame>.git
+  git clone ssh://git@progit.local:2222/<username>/<reponame>.git
   ```
   Ensure your public SSH key is uploaded to your ProGit user settings.
 

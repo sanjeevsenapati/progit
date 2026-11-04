@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ProGit Documentation — Lightweight, High-Performance Git Service</title>
   <meta name="description" content="Official documentation for ProGit: a lightweight, ultra-fast self-hosted Git platform built on pure Go and SQLite with zero CGO dependencies.">
+  <link rel="canonical" href="https://progit.co.in">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='18' cy='18' r='3'/><circle cx='6' cy='6' r='3'/><path d='M6 9v12'/><path d='M18 9a9 9 0 0 0-9 9'/></svg>">
   <style>
     :root {
@@ -701,7 +702,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
         </div>
         <span class="brand-title">ProGit</span>
-        <span class="version-pill">v1.0.0</span>
+        <span class="version-pill">v1.1.0</span>
       </a>
     </div>
 
@@ -883,8 +884,11 @@
         <h1 class="page-title">5-Minute Quickstart Guide</h1>
         <p class="page-subtitle">Get your own private ProGit instance running with Podman or Docker in less than five minutes.</p>
 
-        <h2>Step 1: Launch Container</h2>
-        <p>Run the following command in your terminal to start ProGit with persistent volumes:</p>
+        <h2>Step 1: Configure Local Domain &amp; Launch Container</h2>
+        <p>Add <code>progit.local</code> to your hosts file and run the official multi-arch image from GitHub Container Registry:</p>
+
+        <pre><code># 1. Map local domain
+echo "127.0.0.1 progit.local" | sudo tee -a /etc/hosts</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
         <div class="tabs-container">
           <div class="tabs-header">
@@ -893,23 +897,35 @@
           </div>
           <div class="tab-content active" id="tab-podman-quick">
             <pre><code>podman run -d --name progit \
-  -p 3000:3000 -p 3443:3443 -p 2222:2222 \
-  -v progit-data:/data \
-  localhost/progit:latest</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+  --restart=unless-stopped \
+  -p 443:3443 -p 80:3000 \
+  -p 3443:3443 -p 3000:3000 \
+  -p 2222:2222 \
+  -v progit-data:/data/db:Z \
+  -v progit-repositories:/data/repositories:Z \
+  -v progit-config:/data/config:Z \
+  -v progit-logs:/data/logs:Z \
+  ghcr.io/sanjeevsenapati/progit:latest</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
           </div>
           <div class="tab-content" id="tab-docker-quick">
             <pre><code>docker run -d --name progit \
-  -p 3000:3000 -p 3443:3443 -p 2222:2222 \
-  -v progit-data:/data \
-  progit/progit:latest</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+  --restart=unless-stopped \
+  -p 443:3443 -p 80:3000 \
+  -p 3443:3443 -p 3000:3000 \
+  -p 2222:2222 \
+  -v progit-data:/data/db \
+  -v progit-repositories:/data/repositories \
+  -v progit-config:/data/config \
+  -v progit-logs:/data/logs \
+  ghcr.io/sanjeevsenapati/progit:latest</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
           </div>
         </div>
 
         <h2>Step 2: Complete Setup Wizard</h2>
         <ol>
-          <li>Open your browser and navigate to <a href="http://localhost:3000" target="_blank"><code>http://localhost:3000</code></a>.</li>
+          <li>Open your browser and navigate to <a href="https://progit.local" target="_blank"><code>https://progit.local</code></a> (or <code>https://progit.local:3443</code>).</li>
           <li>Fill in your desired <strong>Super Administrator</strong> username, email, and password.</li>
-          <li>Click <strong>Complete Installation &amp; Create Super Admin</strong>. ProGit will lock the setup and redirect you to the main dashboard.</li>
+          <li>Click <strong>Complete Installation &amp; Create Super Admin</strong>. ProGit locks the setup and takes you immediately to the dashboard.</li>
         </ol>
 
         <h2>Step 3: Create &amp; Push to Your First Repository</h2>
@@ -920,13 +936,13 @@ echo "# Hello ProGit" > README.md
 git add README.md
 git commit -m "Initial commit"
 
-# Push over Smart HTTP
-git remote add origin http://localhost:3000/&lt;your-username&gt;/my-project.git
+# Push over Smart HTTP (HTTPS)
+git remote add origin https://progit.local/&lt;your-username&gt;/my-project.git
 git push -u origin main</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
         <div class="callout callout-info">
           <div class="callout-title">SSH Support Out of the Box</div>
-          <div>You can also push over SSH at <code>ssh://git@localhost:2222/&lt;your-username&gt;/my-project.git</code> once you add your public key in <strong>User Settings &gt; SSH Keys</strong>.</div>
+          <div>You can also push over native SSH at <code>ssh://git@progit.local:2222/&lt;your-username&gt;/my-project.git</code> once you add your public key in <strong>User Settings &gt; SSH Keys</strong>.</div>
         </div>
 
         <div class="page-nav-buttons">
@@ -1036,15 +1052,22 @@ git push -u origin main</code><button class="copy-btn" onclick="copyCode(this)">
         <p>ProGit publishes official multi-architecture container images to GitHub Container Registry (<code>ghcr.io</code>), verified for <strong>Linux x86_64</strong> (AMD64) and <strong>ARM64</strong> (Apple Silicon &amp; AWS Graviton):</p>
         <pre><code># Pull the official multi-architecture image (auto-selects amd64 or arm64)
 podman pull ghcr.io/sanjeevsenapati/progit:latest
+podman pull ghcr.io/sanjeevsenapati/progit:1.1.0
 
 # Or pull platform-specific tags
-podman pull ghcr.io/sanjeevsenapati/progit:linux-amd64
-podman pull ghcr.io/sanjeevsenapati/progit:linux-arm64
+podman pull ghcr.io/sanjeevsenapati/progit:1.1.0-linux-amd64
+podman pull ghcr.io/sanjeevsenapati/progit:1.1.0-linux-arm64
 
-# Run immediately with persistent storage
+# Run immediately with persistent storage and standard HTTPS / SSH ports
 podman run -d --name progit \
-  -p 3000:3000 -p 2222:2222 \
-  -v progit-data:/data \
+  --restart=unless-stopped \
+  -p 443:3443 -p 80:3000 \
+  -p 3443:3443 -p 3000:3000 \
+  -p 2222:2222 \
+  -v progit-data:/data/db:Z \
+  -v progit-repositories:/data/repositories:Z \
+  -v progit-config:/data/config:Z \
+  -v progit-logs:/data/logs:Z \
   ghcr.io/sanjeevsenapati/progit:latest</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
         <h2>Automated Multi-Arch Build Scripts</h2>
@@ -1263,19 +1286,30 @@ CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o progit ./cmd/progit
         <h1 class="page-title">HTTPS &amp; TLS Configuration</h1>
         <p class="page-subtitle">Securing Git traffic with automatic TLS, HSTS, and custom certificates.</p>
 
-        <h2>Built-in HTTPS Server</h2>
-        <p>ProGit features a native HTTPS engine that runs simultaneously alongside HTTP. To activate TLS directly in <code>conf/app.ini</code>:</p>
+        <h2>Built-in HTTPS Server (Default in v1.1.0)</h2>
+        <p>ProGit features a native, pure-Go HTTPS engine that runs out of the box with zero external dependencies. In <code>conf/app.ini</code> or container environment:</p>
         <pre><code>[server]
 PROTOCOL = https
-DOMAIN = git.example.com
-ROOT_URL = https://git.example.com:3443/
+DOMAIN = progit.local
+ROOT_URL = https://progit.local/
 HTTP_PORT = 3000
 HTTPS_PORT = 3443
+REDIRECT_OTHER_PORT = true
 CERT_FILE = /data/config/https/cert.pem
 KEY_FILE = /data/config/https/key.pem</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
-        <h2>Automatic Self-Signed Certificates</h2>
-        <p>If <code>CERT_FILE</code> or <code>KEY_FILE</code> are not specified when <code>PROTOCOL = https</code>, ProGit automatically generates an ECDSA P-256 self-signed certificate on boot, ensuring immediate encryption without configuration.</p>
+        <h2>Automatic Self-Signed Certificates &amp; SANs</h2>
+        <p>ProGit automatically generates an ECDSA P-256 self-signed certificate on initial boot if no certificate exists. The certificate includes full <strong>Subject Alternative Names (SANs)</strong> for:</p>
+        <ul>
+          <li><code>progit.local</code> &amp; <code>*.progit.local</code></li>
+          <li><code>localhost</code> &amp; <code>*.localhost</code></li>
+          <li><code>127.0.0.1</code> &amp; <code>::1</code></li>
+          <li>Local machine hostnames and discovered interface IPs</li>
+        </ul>
+        <p>Certificates are saved persistently in <code>/data/config/https/cert.pem</code> and automatically renewed if the domain name changes in the Admin Settings.</p>
+
+        <h2>Seamless HTTP to HTTPS Redirection</h2>
+        <p>When <code>REDIRECT_OTHER_PORT = true</code>, ProGit starts an HTTP redirect listener on port <code>3000</code> (or <code>80</code>) that automatically redirects all incoming browser traffic with <code>301 Moved Permanently</code> directly to <code>https://progit.local/</code>. Health check probes to <code>/api/health</code> respond with <code>200 OK</code> immediately on both ports without redirection latency.</p>
 
         <div class="page-nav-buttons">
           <a href="#install-wizard" class="nav-btn" onclick="navigate('install-wizard')">
@@ -3587,9 +3621,10 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
       <strong>Supported by <a href="https://prodevans.com" target="_blank" rel="noopener noreferrer">Prodevans</a> and created by <a href="https://github.com/sanjeevsenapati" target="_blank" rel="noopener noreferrer">Sanjeev Senapati</a>.</strong>
     </p>
     <p style="margin-bottom: 8px;">
-      Built on top of the Gogs source code. Released under the MIT License.
+      Built on top of the Gogs source code. Released under the MIT License. Official documentation portal: <a href="https://progit.co.in">progit.co.in</a>.
     </p>
     <p>
+      <a href="https://progit.co.in">Documentation</a> &bull;
       <a href="https://github.com/sanjeevsenapati/progit" target="_blank" rel="noopener noreferrer">GitHub Repository</a> &bull;
       <a href="#quickstart" onclick="navigate('quickstart')">Quickstart</a> &bull;
       <a href="#config-cheatsheet" onclick="navigate('config-cheatsheet')">Configuration</a> &bull;
