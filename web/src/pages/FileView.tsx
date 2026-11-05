@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository } from '../lib/api';
+import { api, Repository, Commit } from '../lib/api';
 import { navigate } from '../lib/router';
+import { useTheme } from '../lib/theme';
 import { RepoNav } from '../components/RepoNav';
+import { FileExplorerSidebar } from '../components/FileExplorerSidebar';
 import { MarkdownViewer } from '../components/MarkdownViewer';
 import { showToast } from '../components/ModalDialog';
 import { 
   detectLanguage, 
   highlightCode, 
-  PRETTIER_THEMES, 
   PrettierTheme 
 } from '../lib/codeEditor';
 import { 
@@ -20,10 +21,11 @@ import {
   Trash2, 
   X, 
   AlertTriangle,
-  Palette,
-  Sparkles,
   BookOpen,
-  Code
+  Code,
+  PanelLeft,
+  Clock,
+  History
 } from 'lucide-react';
 
 interface FileViewProps {
@@ -34,13 +36,18 @@ interface FileViewProps {
 }
 
 export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branch, filePath }) => {
+  const { theme } = useTheme();
+  const autoEditorTheme: PrettierTheme = theme === 'dark' ? 'prettier-dark' : 'prettier-light';
+
   const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
+  const [branches, setBranches] = useState<string[]>([]);
   const [content, setContent] = useState('');
   const [size, setSize] = useState(0);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [canWrite, setCanWrite] = useState(false);
-  const [prettierTheme, setPrettierTheme] = useState<PrettierTheme>('prettier-dark');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [latestCommit, setLatestCommit] = useState<Commit | null>(null);
 
   // Delete modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -54,13 +61,24 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
   useEffect(() => {
     async function load() {
       try {
-        const r = await api.getRepo(owner, repoName);
+        setLoading(true);
+        const [r, b] = await Promise.all([
+          api.getRepo(owner, repoName),
+          api.getBlob(owner, repoName, branch, filePath),
+        ]);
         setRepoData(r.repository);
+        setBranches(r.branches || [branch]);
         setCanWrite(Boolean(r.can_write || r.permissions?.write));
-
-        const b = await api.getBlob(owner, repoName, branch, filePath);
         setContent(b.content);
         setSize(b.size);
+
+        // Fetch commit details for this path
+        try {
+          const commits = await api.getCommits(owner, repoName, branch);
+          if (commits && commits.length > 0) {
+            setLatestCommit(commits[0]);
+          }
+        } catch {}
       } catch (err) {
         console.error(err);
       } finally {
@@ -84,7 +102,6 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
         branch,
         message: deleteMessage.trim() || `Delete ${filePath}`,
       });
-      // Redirect back to parent directory or tree
       const parentDir = filePath.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/')) : '';
       const targetUrl = parentDir ? `/${owner}/${repoName}/tree/${branch}/${parentDir}` : `/${owner}/${repoName}/tree/${branch}`;
       navigate(targetUrl);
@@ -96,7 +113,12 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
   };
 
   if (loading && !repoData) {
-    return <div className="py-20 text-center text-sm text-gray-400">Loading file...</div>;
+    return (
+      <div className="py-20 text-center text-sm text-gray-400">
+        <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+        Loading file...
+      </div>
+    );
   }
 
   if (!repoData) {
@@ -112,10 +134,22 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
     <div>
       <RepoNav repo={repoData} activeTab="code" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
-        {/* Breadcrumb Path & Navigation */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-5 space-y-4">
+        {/* Top Header: Sidebar toggle & Breadcrumbs */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-dark-surface p-3.5 rounded-xl border border-gray-200 dark:border-dark-border shadow-xs">
           <div className="flex items-center space-x-1.5 text-sm font-semibold text-gray-600 dark:text-dark-muted flex-wrap">
+            {!isSidebarOpen && (
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-1.5 mr-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-gray-50 dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-100 transition-colors cursor-pointer flex items-center space-x-1"
+                title="Show file tree"
+              >
+                <PanelLeft className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-xs font-bold">Files</span>
+              </button>
+            )}
+
             <a href={`/${owner}/${repoName}`} className="text-emerald-600 dark:text-emerald-400 hover:underline">
               {repoName}
             </a>
@@ -126,11 +160,11 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
                 <React.Fragment key={sub}>
                   <ChevronRight className="w-4 h-4 text-gray-400" />
                   {isLast ? (
-                    <span className="text-gray-900 dark:text-white font-bold">{part}</span>
+                    <span className="text-gray-900 dark:text-white font-bold font-mono">{part}</span>
                   ) : (
                     <a
                       href={`/${owner}/${repoName}/tree/${branch}/${sub}`}
-                      className="text-emerald-600 dark:text-emerald-400 hover:underline"
+                      className="text-emerald-600 dark:text-emerald-400 hover:underline font-mono"
                     >
                       {part}
                     </a>
@@ -140,15 +174,15 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
             })}
           </div>
 
-          {/* If Markdown, Render vs Source switcher */}
+          {/* Right Header: Render / Source Switcher for Markdown */}
           {isMarkdown && (
             <div className="flex space-x-1 p-1 rounded-lg bg-gray-100 dark:bg-dark-hover border border-gray-200 dark:border-dark-border text-xs font-semibold self-start sm:self-auto">
               <button
                 type="button"
                 onClick={() => setViewMode('rendered')}
-                className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-colors ${
+                className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
                   viewMode === 'rendered'
-                    ? 'bg-white dark:bg-dark-surface shadow-sm text-emerald-600 dark:text-emerald-400 font-bold'
+                    ? 'bg-white dark:bg-dark-surface shadow-xs text-emerald-600 dark:text-emerald-400 font-bold'
                     : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
                 }`}
               >
@@ -158,9 +192,9 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
               <button
                 type="button"
                 onClick={() => setViewMode('source')}
-                className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-colors ${
+                className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
                   viewMode === 'source'
-                    ? 'bg-white dark:bg-dark-surface shadow-sm text-emerald-600 dark:text-emerald-400 font-bold'
+                    ? 'bg-white dark:bg-dark-surface shadow-xs text-emerald-600 dark:text-emerald-400 font-bold'
                     : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
                 }`}
               >
@@ -171,130 +205,154 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
           )}
         </div>
 
-        {/* File Viewer Box */}
-        <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-md overflow-hidden">
-          {/* Header */}
-          <div className="px-4 py-2.5 bg-gray-50 dark:bg-[#14161f] border-b border-gray-200 dark:border-dark-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-gray-600 dark:text-dark-muted">
-            <div className="flex items-center space-x-2 font-mono">
-              <FileText className="w-4 h-4 text-gray-400" />
-              <span className="font-bold text-gray-900 dark:text-white">{fileName}</span>
-              <span>•</span>
-              <span>{lines.length} lines</span>
-              <span>•</span>
-              <span>{(size / 1024).toFixed(1)} KB</span>
-              <span>•</span>
-              <span className="capitalize">{language}</span>
-            </div>
+        {/* Main Content: File Explorer Sidebar + File Content Viewer */}
+        <div className="flex flex-col lg:flex-row gap-4 items-start">
+          {/* File Explorer Sidebar */}
+          <FileExplorerSidebar
+            owner={owner}
+            repo={repoName}
+            branch={branch}
+            currentPath={filePath}
+            branches={branches}
+            isOpen={isSidebarOpen}
+            onToggleOpen={() => setIsSidebarOpen(false)}
+            onSelectFile={(selectedPath) => {
+              navigate(`/${owner}/${repoName}/blob/${branch}/${selectedPath}`);
+            }}
+            onBranchChange={(newBranch) => {
+              navigate(`/${owner}/${repoName}/blob/${newBranch}/${filePath}`);
+            }}
+            onNewFile={() => {
+              navigate(`/${owner}/${repoName}/new/${branch}`);
+            }}
+          />
 
-            <div className="flex items-center space-x-2.5">
-              {/* Prettier Theme Picker */}
-              <div className="flex items-center space-x-1.5 border-r border-gray-200 dark:border-dark-border pr-2.5">
-                <Palette className="w-3.5 h-3.5 text-gray-400" />
-                <select
-                  value={prettierTheme}
-                  onChange={(e) => setPrettierTheme(e.target.value as PrettierTheme)}
-                  className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
-                >
-                  {PRETTIER_THEMES.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
+          {/* Right: File Viewer Area */}
+          <div className="flex-1 min-w-0 space-y-4 w-full">
+            {/* Latest Commit Bar (GitHub Style) */}
+            {latestCommit && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-xs shadow-xs">
+                <div className="flex items-center space-x-2 truncate">
+                  <div className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[10px] shrink-0">
+                    {latestCommit.author ? latestCommit.author.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                  <span className="font-semibold text-gray-900 dark:text-white truncate">
+                    {latestCommit.author}
+                  </span>
+                  <span className="text-gray-600 dark:text-dark-muted truncate">
+                    {latestCommit.message}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-3 text-gray-500 dark:text-dark-muted shrink-0 text-[11px] font-mono">
+                  <span className="bg-gray-100 dark:bg-dark-hover px-1.5 py-0.5 rounded">
+                    {latestCommit.short_sha || latestCommit.sha?.substring(0, 7)}
+                  </span>
+                  <a
+                    href={`/${owner}/${repoName}/commits/${branch}`}
+                    className="inline-flex items-center space-x-1 hover:text-emerald-600 dark:hover:text-emerald-400 font-sans"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    <span>History</span>
+                  </a>
+                </div>
               </div>
+            )}
 
-              {/* Edit file online (restricted to users with write access) */}
-              {canWrite && (
-                <a
-                  href={`/${owner}/${repoName}/edit/${branch}/${filePath}`}
-                  className="inline-flex items-center space-x-1 px-2.5 py-1 rounded border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text shadow-sm"
-                  title="Edit this file online with Prettier Editor"
-                >
-                  <Edit2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>Edit</span>
-                </a>
-              )}
-
-              {/* Copy Raw */}
-              <button
-                onClick={handleCopy}
-                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text"
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? 'Copied' : 'Copy'}</span>
-              </button>
-
-              {/* Raw Download */}
-              <a
-                href={`/api/v1/repos/${owner}/${repoName}/raw?ref=${branch}&path=${filePath}`}
-                download={fileName}
-                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Raw</span>
-              </a>
-
-              {/* Delete file (restricted to users with write access) */}
-              {canWrite && (
-                <button
-                  onClick={() => setShowDeleteModal(true)}
-                  className="inline-flex items-center space-x-1 px-2 py-1 rounded border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/20 hover:bg-red-100 text-red-600 dark:text-red-400"
-                  title="Delete this file"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* File Content Rendering */}
-          {isMarkdown && viewMode === 'rendered' ? (
-            <div className="p-6">
-              <MarkdownViewer content={content || '*Empty file*'} />
-            </div>
-          ) : (
-            <div className={`overflow-x-auto text-xs font-mono transition-colors ${prettierTheme}`}>
-              <div className="flex py-2">
-                {/* Line Numbers */}
-                <div
-                  className={`select-none py-2 px-3 text-right border-r ${
-                    prettierTheme === 'prettier-light'
-                      ? 'border-gray-200 text-gray-400 bg-gray-50'
-                      : 'border-white/10 text-gray-500 bg-black/20'
-                  }`}
-                  style={{ minWidth: '3.5rem' }}
-                >
-                  {lines.map((_, idx) => (
-                    <div key={idx} className="leading-6">
-                      {idx + 1}
-                    </div>
-                  ))}
+            {/* File Content Box */}
+            <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-xs overflow-hidden">
+              {/* Box Sub-header */}
+              <div className="px-4 py-2.5 bg-gray-50 dark:bg-[#14161f] border-b border-gray-200 dark:border-dark-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-gray-600 dark:text-dark-muted">
+                <div className="flex items-center space-x-2 font-mono">
+                  <FileText className="w-4 h-4 text-sky-500" />
+                  <span className="font-bold text-gray-900 dark:text-white">{fileName}</span>
+                  <span>•</span>
+                  <span>{lines.length} lines</span>
+                  <span>•</span>
+                  <span>{(size / 1024).toFixed(1)} KB</span>
+                  <span>•</span>
+                  <span className="capitalize">{language}</span>
                 </div>
 
-                {/* Prettier Syntax Highlighted Code */}
-                <pre className="py-2 px-4 leading-6 flex-1 overflow-x-auto bg-transparent">
-                  <code
-                    dangerouslySetInnerHTML={{
-                      __html: highlightCode(content || '', language),
-                    }}
-                  />
-                </pre>
-              </div>
-            </div>
-          )}
+                <div className="flex items-center space-x-2">
+                  {/* Edit file online */}
+                  {canWrite && (
+                    <a
+                      href={`/${owner}/${repoName}/edit/${branch}/${filePath}`}
+                      className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text shadow-2xs font-semibold"
+                      title="Edit this file online"
+                    >
+                      <Edit2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>Edit</span>
+                    </a>
+                  )}
 
-          {/* Footer Bar */}
-          <div className="px-4 py-1.5 bg-gray-50 dark:bg-[#14161f] border-t border-gray-200 dark:border-dark-border flex items-center justify-between text-[11px] text-gray-500 dark:text-dark-muted font-mono">
-            <div className="flex items-center space-x-3">
-              <span>{lines.length} lines</span>
-              <span>•</span>
-              <span>{(size / 1024).toFixed(1)} KB</span>
-            </div>
-            <div className="flex items-center space-x-3">
-              <span className="inline-flex items-center space-x-1 text-emerald-600 dark:text-emerald-400 font-semibold">
-                <Sparkles className="w-3 h-3" />
-                <span>Prettier Theme</span>
-              </span>
+                  {/* Copy Raw */}
+                  <button
+                    type="button"
+                    onClick={handleCopy}
+                    className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text cursor-pointer"
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copied ? 'Copied' : 'Copy'}</span>
+                  </button>
+
+                  {/* Raw Download */}
+                  <a
+                    href={`/api/v1/repos/${owner}/${repoName}/raw?ref=${branch}&path=${filePath}`}
+                    download={fileName}
+                    className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Raw</span>
+                  </a>
+
+                  {/* Delete file */}
+                  {canWrite && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteModal(true)}
+                      className="inline-flex items-center space-x-1 p-1 rounded-lg border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/20 hover:bg-red-100 text-red-600 dark:text-red-400 cursor-pointer"
+                      title="Delete this file"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* File Content Body */}
+              {isMarkdown && viewMode === 'rendered' ? (
+                <div className="p-6">
+                  <MarkdownViewer content={content || '*Empty markdown file*'} />
+                </div>
+              ) : (
+                <div className={`overflow-x-auto text-xs font-mono transition-colors ${autoEditorTheme}`}>
+                  <table className="w-full border-collapse">
+                    <tbody>
+                      {lines.map((line, idx) => (
+                        <tr key={idx} className="hover:bg-emerald-500/5 group">
+                          <td
+                            className={`select-none text-right pr-4 pl-4 py-0.5 border-r w-12 text-gray-400 font-mono text-[11px] ${
+                              autoEditorTheme === 'prettier-light'
+                                ? 'border-gray-200 bg-gray-50/70 text-gray-400'
+                                : 'border-white/10 bg-black/20 text-gray-500'
+                            }`}
+                          >
+                            {idx + 1}
+                          </td>
+                          <td className="pl-4 pr-4 py-0.5 whitespace-pre overflow-x-auto">
+                            <span
+                              dangerouslySetInnerHTML={{
+                                __html: highlightCode(line || ' ', language),
+                              }}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -302,26 +360,27 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm">
-          <div className="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl max-w-md w-full shadow-2xl overflow-hidden p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-200 dark:border-dark-border pb-3">
-              <div className="flex items-center space-x-2 text-red-600 dark:text-red-400 font-bold text-sm">
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-dark-border">
+              <div className="flex items-center space-x-2 text-red-600 dark:text-red-400">
                 <AlertTriangle className="w-5 h-5" />
-                <span>Delete file</span>
+                <h3 className="font-bold text-base text-gray-900 dark:text-white">Delete file</h3>
               </div>
               <button
+                type="button"
                 onClick={() => setShowDeleteModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text p-1"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text p-1 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-gray-600 dark:text-dark-text leading-relaxed">
-              Are you sure you want to delete <span className="font-mono font-bold text-gray-900 dark:text-white">{filePath}</span> from branch <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">{branch}</span>?
+            <p className="text-xs text-gray-600 dark:text-dark-muted">
+              Are you sure you want to delete <span className="font-mono font-bold text-gray-900 dark:text-white">{filePath}</span> from branch <span className="font-mono font-bold text-emerald-600">{branch}</span>? This action creates a commit removing the file.
             </p>
 
-            <form onSubmit={handleDelete} className="space-y-4 pt-1">
+            <form onSubmit={handleDelete} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
                   Commit message
@@ -335,11 +394,11 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
                 />
               </div>
 
-              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-gray-200 dark:border-dark-border">
+              <div className="flex justify-end space-x-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowDeleteModal(false)}
-                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors"
+                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -348,7 +407,7 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
                   disabled={deleting}
                   className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
                 >
-                  {deleting ? 'Deleting...' : 'Commit deletion'}
+                  {deleting ? 'Deleting...' : 'Commit Deletion'}
                 </button>
               </div>
             </form>

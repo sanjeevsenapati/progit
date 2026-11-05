@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { api, Repository, TreeEntry } from '../lib/api';
+import { api, Repository, Commit } from '../lib/api';
 import { navigate } from '../lib/router';
 import { useTheme } from '../lib/theme';
 import { RepoNav } from '../components/RepoNav';
+import { FileExplorerSidebar } from '../components/FileExplorerSidebar';
 import { MarkdownViewer } from '../components/MarkdownViewer';
 import { showToast } from '../components/ModalDialog';
 import { 
@@ -14,25 +15,18 @@ import {
 import { 
   FileCode, 
   FileText,
-  FilePlus,
-  Folder,
-  FolderOpen,
   Eye, 
   Code, 
   GitCommit, 
   GitBranch, 
-  ChevronRight, 
-  ChevronDown,
   AlertCircle,
   ArrowLeft,
   Sparkles,
-  PanelLeftClose,
   PanelLeft,
-  FolderTree,
-  Search,
-  RefreshCw,
-  Loader2,
-  Check
+  Copy,
+  Check,
+  History,
+  Clock
 } from 'lucide-react';
 
 interface FileEditorProps {
@@ -44,103 +38,6 @@ interface FileEditorProps {
   mode: 'new' | 'edit';
 }
 
-interface FileTreeItemProps {
-  entry: TreeEntry;
-  depth: number;
-  activePath: string;
-  expandedFolders: Set<string>;
-  folderChildren: Record<string, TreeEntry[]>;
-  onToggleFolder: (path: string) => void;
-  onSelectFile: (path: string) => void;
-}
-
-const FileTreeItem: React.FC<FileTreeItemProps> = ({
-  entry,
-  depth,
-  activePath,
-  expandedFolders,
-  folderChildren,
-  onToggleFolder,
-  onSelectFile,
-}) => {
-  const isTree = entry.type === 'tree';
-  const isExpanded = expandedFolders.has(entry.path);
-  const isActive = entry.path === activePath;
-  const children = folderChildren[entry.path] || [];
-
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => {
-          if (isTree) {
-            onToggleFolder(entry.path);
-          } else {
-            onSelectFile(entry.path);
-          }
-        }}
-        style={{ paddingLeft: `${Math.max(6, depth * 14 + 6)}px` }}
-        className={`w-full text-left py-1 px-2 flex items-center space-x-1.5 text-xs font-mono transition-colors rounded-md group cursor-pointer ${
-          isActive
-            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border-l-2 border-emerald-500'
-            : 'text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover/70'
-        }`}
-      >
-        {isTree ? (
-          <>
-            <ChevronRight
-              className={`w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-150 ${
-                isExpanded ? 'rotate-90 text-emerald-500' : ''
-              }`}
-            />
-            {isExpanded ? (
-              <FolderOpen className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-            ) : (
-              <Folder className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-            )}
-          </>
-        ) : (
-          <>
-            <span className="w-3.5 shrink-0" />
-            {entry.name.endsWith('.md') ? (
-              <FileText className="w-3.5 h-3.5 text-sky-500 shrink-0" />
-            ) : (
-              <FileCode className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            )}
-          </>
-        )}
-        <span className="truncate flex-1">{entry.name}</span>
-      </button>
-
-      {isTree && isExpanded && (
-        <div className="space-y-0.5">
-          {children.length === 0 ? (
-            <div
-              style={{ paddingLeft: `${(depth + 1) * 14 + 16}px` }}
-              className="py-0.5 text-[11px] text-gray-400 italic"
-            >
-              Empty directory
-            </div>
-          ) : (
-            children.map((child) => (
-              <FileTreeItem
-                key={child.path}
-                entry={child}
-                depth={depth + 1}
-                activePath={activePath}
-                expandedFolders={expandedFolders}
-                folderChildren={folderChildren}
-                onToggleFolder={onToggleFolder}
-                onSelectFile={onSelectFile}
-              />
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
 export const FileEditor: React.FC<FileEditorProps> = ({
   owner,
   repo: repoName,
@@ -150,10 +47,12 @@ export const FileEditor: React.FC<FileEditorProps> = ({
   mode,
 }) => {
   const { theme } = useTheme();
-  // Auto Theme: automatically adapt to global light or dark theme
+  // Auto Theme: automatically adapts to global light or dark theme with zero user config
   const autoEditorTheme: PrettierTheme = theme === 'dark' ? 'prettier-dark' : 'prettier-light';
 
   const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
+  const [branches, setBranches] = useState<string[]>([]);
+  const [currentBranch, setCurrentBranch] = useState(branch);
   const [currentMode, setCurrentMode] = useState<'new' | 'edit'>(mode);
   const [pathInput, setPathInput] = useState(
     mode === 'edit'
@@ -174,130 +73,106 @@ export const FileEditor: React.FC<FileEditorProps> = ({
   const [saving, setSaving] = useState(false);
   const [canWrite, setCanWrite] = useState(true);
   const [error, setError] = useState('');
+  const [copiedPath, setCopiedPath] = useState(false);
+  const [latestCommit, setLatestCommit] = useState<Commit | null>(null);
 
-  // Explorer Tree State
+  // Explorer Sidebar State (Default open, matching GitHub)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [treeEntries, setTreeEntries] = useState<TreeEntry[]>([]);
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
-  const [folderChildren, setFolderChildren] = useState<Record<string, TreeEntry[]>>({});
-  const [loadingTree, setLoadingTree] = useState(false);
-  const [fileFilter, setFileFilter] = useState('');
 
   // Editor Settings
   const [tabSize, setTabSize] = useState<number>(2);
   const [formatNotice, setFormatNotice] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load repository tree
-  const loadTree = useCallback(async () => {
-    try {
-      setLoadingTree(true);
-      const res = await api.getTree(owner, repoName, branch, '');
-      setTreeEntries(res.entries || []);
-
-      // If editing a file in a subfolder, automatically expand parent folders
-      if (filePath && filePath.includes('/')) {
-        const parts = filePath.split('/');
-        parts.pop(); // remove filename
-        const newExpanded = new Set<string>();
-        let currentAcc = '';
-        for (const p of parts) {
-          currentAcc = currentAcc ? `${currentAcc}/${p}` : p;
-          newExpanded.add(currentAcc);
-          try {
-            const subRes = await api.getTree(owner, repoName, branch, currentAcc);
-            setFolderChildren((prev) => ({ ...prev, [currentAcc]: subRes.entries || [] }));
-          } catch {}
-        }
-        setExpandedFolders(newExpanded);
-      }
-    } catch (err) {
-      console.error('Failed to load explorer tree:', err);
-    } finally {
-      setLoadingTree(false);
-    }
-  }, [owner, repoName, branch, filePath]);
-
   useEffect(() => {
-    async function init() {
+    async function load() {
       try {
         setLoading(true);
         const r = await api.getRepo(owner, repoName);
         setRepoData(r.repository);
+        setBranches(r.branches || [currentBranch]);
         const hasAccess = Boolean(r.can_write || r.permissions?.write);
         setCanWrite(hasAccess);
         if (!hasAccess) {
-          setError('You do not have write permissions to this repository.');
+          setError('You do not have write permissions to this repository. You must have edit access to commit changes.');
         }
 
         if (mode === 'edit' && filePath) {
-          const b = await api.getBlob(owner, repoName, branch, filePath);
+          const b = await api.getBlob(owner, repoName, currentBranch, filePath);
           setContent(b.content);
           setCommitMessage(`Update ${filePath}`);
-        }
 
-        await loadTree();
+          try {
+            const commits = await api.getCommits(owner, repoName, currentBranch);
+            if (commits && commits.length > 0) {
+              setLatestCommit(commits[0]);
+            }
+          } catch {}
+        }
       } catch (err: any) {
         setError(err.message || 'Failed to load file');
       } finally {
         setLoading(false);
       }
     }
-    init();
-  }, [owner, repoName, branch, filePath, mode, loadTree]);
+    load();
+  }, [owner, repoName, currentBranch, filePath, mode]);
 
-  // Handle folder expand / collapse
-  const handleToggleFolder = async (folderPath: string) => {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(folderPath)) {
-        next.delete(folderPath);
-      } else {
-        next.add(folderPath);
-      }
-      return next;
-    });
-
-    if (!folderChildren[folderPath]) {
-      try {
-        const res = await api.getTree(owner, repoName, branch, folderPath);
-        setFolderChildren((prev) => ({ ...prev, [folderPath]: res.entries || [] }));
-      } catch (err) {
-        console.error(`Failed to load directory ${folderPath}:`, err);
-      }
-    }
-  };
-
-  // Switch to editing selected file from explorer
-  const handleSelectFile = async (selectedPath: string) => {
+  // Switch to another file from the explorer sidebar
+  const handleSelectFileFromSidebar = async (selectedPath: string) => {
     if (selectedPath === pathInput && currentMode === 'edit') return;
 
     try {
       setLoading(true);
       setError('');
-      const b = await api.getBlob(owner, repoName, branch, selectedPath);
+      const b = await api.getBlob(owner, repoName, currentBranch, selectedPath);
       setPathInput(selectedPath);
       setContent(b.content);
       setCurrentMode('edit');
       setCommitMessage(`Update ${selectedPath}`);
-      window.history.pushState(null, '', `/${owner}/${repoName}/edit/${branch}/${selectedPath}`);
+      window.history.pushState(null, '', `/${owner}/${repoName}/edit/${currentBranch}/${selectedPath}`);
+
+      try {
+        const commits = await api.getCommits(owner, repoName, currentBranch);
+        if (commits && commits.length > 0) {
+          setLatestCommit(commits[0]);
+        }
+      } catch {}
     } catch (err: any) {
-      showToast(err.message || 'Failed to load file', 'error');
+      showToast(err.message || 'Failed to open file', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  // Start new file from explorer
+  // Branch switcher
+  const handleBranchChange = (newBranch: string) => {
+    setCurrentBranch(newBranch);
+    if (filePath) {
+      navigate(`/${owner}/${repoName}/edit/${newBranch}/${filePath}`);
+    } else {
+      navigate(`/${owner}/${repoName}/new/${newBranch}`);
+    }
+  };
+
+  // Create new file from explorer sidebar
   const handleCreateNewFile = () => {
     setPathInput('');
     setContent('');
     setCurrentMode('new');
     setCommitMessage('Create new file');
-    window.history.pushState(null, '', `/${owner}/${repoName}/new/${branch}`);
+    window.history.pushState(null, '', `/${owner}/${repoName}/new/${currentBranch}`);
   };
 
-  // Format code with Prettier
+  // Copy current file path
+  const handleCopyPath = () => {
+    if (!pathInput) return;
+    navigator.clipboard.writeText(pathInput);
+    setCopiedPath(true);
+    setTimeout(() => setCopiedPath(false), 2000);
+  };
+
+  // Prettier Formatting
   const handleFormatCode = () => {
     const lang = detectLanguage(pathInput);
     const { formatted, changed, error: formatErr } = formatWithPrettier(content, lang, tabSize);
@@ -358,13 +233,13 @@ export const FileEditor: React.FC<FileEditorProps> = ({
       const newBranch = commitTarget === 'new-branch' ? newBranchName.trim() : undefined;
 
       const res = await api.saveFile(owner, repoName, cleanPath, {
-        branch,
+        branch: currentBranch,
         new_branch: newBranch,
         content,
         message: fullMessage || (currentMode === 'edit' ? `Update ${cleanPath}` : `Create ${cleanPath}`),
       });
 
-      const targetBranch = res.branch || branch;
+      const targetBranch = res.branch || currentBranch;
       navigate(`/${owner}/${repoName}/blob/${targetBranch}/${cleanPath}`);
     } catch (err: any) {
       setError(err.message || 'Failed to commit changes');
@@ -389,40 +264,30 @@ export const FileEditor: React.FC<FileEditorProps> = ({
   const isMarkdown = pathInput.toLowerCase().endsWith('.md');
   const language = detectLanguage(pathInput);
   const lines = content.split('\n');
-
-  // Filtered files for explorer search
-  const filteredTreeEntries = fileFilter.trim()
-    ? treeEntries.filter((e) => e.name.toLowerCase().includes(fileFilter.toLowerCase()))
-    : treeEntries;
+  const approxSize = new Blob([content]).size;
 
   return (
     <div>
       <RepoNav repo={repoData} activeTab="code" />
 
       <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-5 space-y-4">
-        {/* Top Header: Breadcrumbs & Path Input */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white dark:bg-dark-surface p-3.5 rounded-xl border border-gray-200 dark:border-dark-border shadow-xs">
+        {/* Top Header: Sidebar toggle & Editable Breadcrumb Path */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-dark-surface p-3.5 rounded-xl border border-gray-200 dark:border-dark-border shadow-xs">
           <div className="flex items-center space-x-2 text-sm font-semibold flex-wrap">
-            <button
-              type="button"
-              onClick={() => setIsSidebarOpen((prev) => !prev)}
-              className={`p-1.5 rounded-lg border text-xs flex items-center space-x-1.5 transition-colors cursor-pointer mr-1 ${
-                isSidebarOpen
-                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
-                  : 'bg-gray-100 dark:bg-dark-hover border-gray-300 dark:border-dark-border text-gray-700 dark:text-dark-text hover:bg-gray-200'
-              }`}
-              title={isSidebarOpen ? 'Hide file tree explorer' : 'Show file tree explorer'}
-            >
-              {isSidebarOpen ? (
-                <PanelLeftClose className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              ) : (
-                <PanelLeft className="w-4 h-4 text-gray-600 dark:text-dark-muted" />
-              )}
-              <span className="text-[11px] font-bold hidden sm:inline">Explorer</span>
-            </button>
+            {!isSidebarOpen && (
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-1.5 mr-1 rounded-lg border border-gray-300 dark:border-dark-border bg-gray-50 dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-100 transition-colors cursor-pointer flex items-center space-x-1"
+                title="Show file tree"
+              >
+                <PanelLeft className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-xs font-bold">Files</span>
+              </button>
+            )}
 
             <a
-              href={`/${owner}/${repoName}/tree/${branch}`}
+              href={`/${owner}/${repoName}/tree/${currentBranch}`}
               className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center"
             >
               <ArrowLeft className="w-3.5 h-3.5 mr-1" />
@@ -431,12 +296,12 @@ export const FileEditor: React.FC<FileEditorProps> = ({
             <span className="text-gray-400">/</span>
             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-gray-100 dark:bg-dark-hover text-gray-700 dark:text-dark-text">
               <GitBranch className="w-3 h-3 mr-1 text-emerald-600" />
-              {branch}
+              {currentBranch}
             </span>
             <span className="text-gray-400">/</span>
 
-            {/* Path Input */}
-            <div className="flex items-center">
+            {/* Editable Path Input (GitHub Style) */}
+            <div className="flex items-center space-x-1">
               <input
                 type="text"
                 required
@@ -445,37 +310,45 @@ export const FileEditor: React.FC<FileEditorProps> = ({
                 placeholder="filename or path (e.g. src/app.tsx)"
                 className="px-3 py-1 text-xs font-mono rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 min-w-[200px] sm:min-w-[320px]"
               />
+              {pathInput && (
+                <button
+                  type="button"
+                  onClick={handleCopyPath}
+                  className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-dark-text rounded hover:bg-gray-100 dark:hover:bg-dark-hover transition-colors cursor-pointer"
+                  title="Copy path"
+                >
+                  {copiedPath ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              )}
             </div>
           </div>
 
           {/* Edit / Preview Tabs */}
-          <div className="flex items-center space-x-2">
-            <div className="flex space-x-1 p-1 rounded-lg bg-gray-100 dark:bg-dark-hover border border-gray-200 dark:border-dark-border text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setActiveTab('edit')}
-                className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
-                  activeTab === 'edit'
-                    ? 'bg-white dark:bg-dark-surface shadow-xs text-emerald-600 dark:text-emerald-400 font-bold'
-                    : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
-                }`}
-              >
-                <Code className="w-3.5 h-3.5" />
-                <span>Edit</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('preview')}
-                className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
-                  activeTab === 'preview'
-                    ? 'bg-white dark:bg-dark-surface shadow-xs text-emerald-600 dark:text-emerald-400 font-bold'
-                    : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
-                }`}
-              >
-                <Eye className="w-3.5 h-3.5" />
-                <span>Preview</span>
-              </button>
-            </div>
+          <div className="flex space-x-1 p-1 rounded-lg bg-gray-100 dark:bg-dark-hover border border-gray-200 dark:border-dark-border text-xs font-semibold self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setActiveTab('edit')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
+                activeTab === 'edit'
+                  ? 'bg-white dark:bg-dark-surface shadow-xs text-emerald-600 dark:text-emerald-400 font-bold'
+                  : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
+              }`}
+            >
+              <Code className="w-3.5 h-3.5" />
+              <span>Edit</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('preview')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
+                activeTab === 'preview'
+                  ? 'bg-white dark:bg-dark-surface shadow-xs text-emerald-600 dark:text-emerald-400 font-bold'
+                  : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
+              }`}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Preview</span>
+            </button>
           </div>
         </div>
 
@@ -486,95 +359,66 @@ export const FileEditor: React.FC<FileEditorProps> = ({
           </div>
         )}
 
-        {/* Main Split Layout: File Explorer Sidebar + Code Editor */}
+        {/* Split Layout: GitHub Explorer Sidebar on Left + Editor on Right */}
         <div className="flex flex-col lg:flex-row gap-4 items-start">
-          {/* GitHub-Style File Tree Explorer Sidebar */}
-          {isSidebarOpen && (
-            <div className="w-full lg:w-64 xl:w-72 shrink-0 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm overflow-hidden flex flex-col">
-              {/* Explorer Header */}
-              <div className="px-3 py-2.5 bg-gray-50 dark:bg-dark-hover/60 border-b border-gray-200 dark:border-dark-border flex items-center justify-between">
-                <div className="flex items-center space-x-1.5 text-xs font-bold text-gray-800 dark:text-white uppercase tracking-wider">
-                  <FolderTree className="w-4 h-4 text-emerald-600" />
-                  <span>Files</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <button
-                    type="button"
-                    onClick={handleCreateNewFile}
-                    className="p-1 rounded text-gray-500 hover:text-emerald-600 hover:bg-gray-200 dark:hover:bg-dark-hover transition-colors cursor-pointer"
-                    title="New file"
-                  >
-                    <FilePlus className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={loadTree}
-                    className="p-1 rounded text-gray-500 hover:text-emerald-600 hover:bg-gray-200 dark:hover:bg-dark-hover transition-colors cursor-pointer"
-                    title="Refresh file tree"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${loadingTree ? 'animate-spin' : ''}`} />
-                  </button>
-                </div>
-              </div>
+          {/* File Explorer Sidebar */}
+          <FileExplorerSidebar
+            owner={owner}
+            repo={repoName}
+            branch={currentBranch}
+            currentPath={pathInput}
+            branches={branches}
+            isOpen={isSidebarOpen}
+            onToggleOpen={() => setIsSidebarOpen(false)}
+            onSelectFile={handleSelectFileFromSidebar}
+            onBranchChange={handleBranchChange}
+            onNewFile={handleCreateNewFile}
+          />
 
-              {/* Filter search in file tree */}
-              <div className="p-2 border-b border-gray-100 dark:border-dark-border/40">
-                <div className="relative">
-                  <Search className="w-3 h-3 text-gray-400 absolute left-2.5 top-2 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={fileFilter}
-                    onChange={(e) => setFileFilter(e.target.value)}
-                    placeholder="Filter files..."
-                    className="w-full pl-7 pr-2 py-1 text-[11px] rounded-md border border-gray-200 dark:border-dark-border/60 bg-gray-50 dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
-
-              {/* Tree Items List */}
-              <div className="p-2 max-h-[560px] overflow-y-auto space-y-0.5">
-                {loadingTree && treeEntries.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-gray-400 space-y-1">
-                    <Loader2 className="w-4 h-4 animate-spin mx-auto text-emerald-500" />
-                    <span>Loading repository tree...</span>
-                  </div>
-                ) : filteredTreeEntries.length === 0 ? (
-                  <div className="py-6 text-center text-xs text-gray-400">
-                    No matching files found
-                  </div>
-                ) : (
-                  filteredTreeEntries.map((entry) => (
-                    <FileTreeItem
-                      key={entry.path}
-                      entry={entry}
-                      depth={0}
-                      activePath={pathInput}
-                      expandedFolders={expandedFolders}
-                      folderChildren={folderChildren}
-                      onToggleFolder={handleToggleFolder}
-                      onSelectFile={handleSelectFile}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Editor & Commit Pane */}
+          {/* Right: Code Editor & Commit Pane */}
           <div className="flex-1 min-w-0 space-y-4 w-full">
+            {/* Latest Commit Bar (if editing existing file) */}
+            {latestCommit && currentMode === 'edit' && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-xs shadow-xs">
+                <div className="flex items-center space-x-2 truncate">
+                  <div className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[10px] shrink-0">
+                    {latestCommit.author ? latestCommit.author.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                  <span className="font-semibold text-gray-900 dark:text-white truncate">
+                    {latestCommit.author}
+                  </span>
+                  <span className="text-gray-600 dark:text-dark-muted truncate">
+                    {latestCommit.message}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-3 text-gray-500 dark:text-dark-muted shrink-0 text-[11px] font-mono">
+                  <span className="bg-gray-100 dark:bg-dark-hover px-1.5 py-0.5 rounded">
+                    {latestCommit.short_sha || latestCommit.sha?.substring(0, 7)}
+                  </span>
+                  <a
+                    href={`/${owner}/${repoName}/commits/${currentBranch}`}
+                    className="inline-flex items-center space-x-1 hover:text-emerald-600 dark:hover:text-emerald-400 font-sans"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    <span>History</span>
+                  </a>
+                </div>
+              </div>
+            )}
+
             {/* Editor Box */}
-            <div className="rounded-xl border border-gray-200 dark:border-dark-border shadow-sm overflow-hidden bg-white dark:bg-dark-surface">
+            <div className="rounded-xl border border-gray-200 dark:border-dark-border shadow-xs overflow-hidden bg-white dark:bg-dark-surface">
               {/* Editor Sub-toolbar */}
               <div className="px-4 py-2 bg-gray-50 dark:bg-[#14161f] border-b border-gray-200 dark:border-dark-border flex flex-wrap items-center justify-between gap-3 text-xs">
-                {/* Left: Auto Theme & File Info */}
-                <div className="flex items-center space-x-3">
-                  <div className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
-                    <Sparkles className="w-3 h-3 text-emerald-500" />
-                    <span>Auto Theme: {theme === 'dark' ? 'Dark' : 'Light'}</span>
-                  </div>
+                {/* Left: File info & Indent Size */}
+                <div className="flex items-center space-x-3 text-xs text-gray-600 dark:text-dark-muted font-mono">
+                  <span className="font-bold text-gray-900 dark:text-white">{pathInput.split('/').pop() || 'Untitled'}</span>
+                  <span>•</span>
+                  <span>{lines.length} lines</span>
+                  <span>•</span>
+                  <span>{(approxSize / 1024).toFixed(1)} KB</span>
 
-                  {/* Indent Tab Size */}
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-1 pl-2 font-sans">
                     <span className="text-gray-500 dark:text-dark-muted font-medium">Indent:</span>
                     <button
                       type="button"
@@ -586,7 +430,7 @@ export const FileEditor: React.FC<FileEditorProps> = ({
                   </div>
                 </div>
 
-                {/* Right: Prettier Format Button & Status */}
+                {/* Right: Prettier Format Button (Notice: No Theme Selector!) */}
                 <div className="flex items-center space-x-3">
                   {formatNotice && (
                     <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 animate-pulse">
@@ -597,7 +441,7 @@ export const FileEditor: React.FC<FileEditorProps> = ({
                   <button
                     type="button"
                     onClick={handleFormatCode}
-                    className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition-all hover:scale-105 cursor-pointer"
+                    className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xs transition-all hover:scale-105 cursor-pointer"
                     title="Automatically format code with Prettier"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
@@ -686,7 +530,7 @@ export const FileEditor: React.FC<FileEditorProps> = ({
               </div>
             </div>
 
-            {/* Commit Changes Box */}
+            {/* Commit Changes Box (GitHub Style) */}
             <form onSubmit={handleCommit} className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-xs p-6 space-y-4">
               <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center space-x-2">
                 <GitCommit className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
@@ -731,7 +575,7 @@ export const FileEditor: React.FC<FileEditorProps> = ({
                       className="text-emerald-600 focus:ring-emerald-500"
                     />
                     <span className="text-gray-800 dark:text-white font-medium">
-                      Commit directly to the <span className="font-mono font-bold text-emerald-600">{branch}</span> branch
+                      Commit directly to the <span className="font-mono font-bold text-emerald-600">{currentBranch}</span> branch
                     </span>
                   </label>
 
@@ -765,8 +609,8 @@ export const FileEditor: React.FC<FileEditorProps> = ({
 
               <div className="flex items-center justify-end space-x-3 pt-3 border-t border-gray-100 dark:border-dark-border/40">
                 <a
-                  href={`/${owner}/${repoName}/tree/${branch}`}
-                  className="px-4 py-2 text-xs font-semibold text-gray-700 dark:text-dark-text bg-gray-100 dark:bg-dark-hover rounded-lg hover:bg-gray-200 transition-colors"
+                  href={`/${owner}/${repoName}/tree/${currentBranch}`}
+                  className="px-4 py-2 text-xs font-semibold text-gray-700 dark:text-dark-text bg-gray-100 dark:bg-dark-hover rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
                 >
                   Cancel
                 </a>
