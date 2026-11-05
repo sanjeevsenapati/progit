@@ -1089,8 +1089,8 @@
         </div>
         <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
       </div>
-      <h2 class="slide-title">Interactive TCO & ROI Calculator</h2>
-      <p class="slide-subtitle">Adjust team size and compare annual savings against GitHub Enterprise and GitLab Ultimate.</p>
+      <h2 class="slide-title">Interactive 3-Year TCO &amp; ROI Calculator</h2>
+      <p class="slide-subtitle">Compare recurring SaaS per-seat costs against ProGit's standalone one-time implementation and minimal patch model.</p>
 
       <div class="slide-body">
         <div class="calc-container">
@@ -1098,29 +1098,24 @@
             <div class="slider-group">
               <div class="slider-header">
                 <span>Engineering Team Size</span>
-                <span class="slider-val" id="teamSizeVal">100 Developers</span>
+                <span class="slider-val" id="teamSizeVal">50 Developers</span>
               </div>
-              <input type="range" id="teamSizeSlider" min="20" max="1000" step="10" value="100">
+              <input type="range" id="teamSizeSlider" min="10" max="300" step="5" value="50">
             </div>
 
             <div class="slider-group">
               <div class="slider-header">
-                <span>Staging / CI/CD Test Clusters</span>
-                <span class="slider-val" id="clusterVal">3 Clusters</span>
+                <span>Comparison SaaS Provider</span>
               </div>
-              <input type="range" id="clusterSlider" min="1" max="10" step="1" value="3">
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Comparison Baseline</span>
-              </div>
-              <div style="display: flex; gap: 10px;">
-                <label style="flex: 1; display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; background: var(--bg-surface); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);">
-                  <input type="radio" name="baseline" value="github" checked> GitHub Enterprise ($21/mo)
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; background: var(--bg-surface); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);">
+                  <input type="radio" name="baseline" value="github_ent" checked> GitHub Enterprise (~₹21,000 / $252 / user / yr)
                 </label>
-                <label style="flex: 1; display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; background: var(--bg-surface); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);">
-                  <input type="radio" name="baseline" value="gitlab"> GitLab Ultimate ($99/mo)
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; background: var(--bg-surface); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);">
+                  <input type="radio" name="baseline" value="gitlab_prem"> GitLab Premium / Ultimate (~₹29,000 / $348 / user / yr)
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; background: var(--bg-surface); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);">
+                  <input type="radio" name="baseline" value="github_team"> GitHub Team (~₹4,000 / $48 / user / yr)
                 </label>
               </div>
             </div>
@@ -1128,23 +1123,23 @@
 
           <div class="calc-results">
             <div class="savings-hero">
-              <div style="font-size: 12px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); margin-bottom: 4px;">Projected Annual Savings</div>
-              <div class="savings-amount" id="savingsAmount">$12,000</div>
-              <span class="savings-pct" id="savingsPct">40% Cost Reduction</span>
+              <div style="font-size: 12px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); margin-bottom: 4px;">Net 3-Year Capital Savings</div>
+              <div class="savings-amount" id="savingsAmount">₹25.5 Lakhs</div>
+              <span class="savings-pct" id="savingsPct">81% Capital Saved Over 3 Years</span>
             </div>
 
             <div class="cost-breakdown">
               <div class="cost-item">
-                <span style="color: var(--text-muted); font-size: 12px;">Competitor Annual</span>
-                <span class="cost-num" id="competitorTotal">$32,400</span>
+                <span style="color: var(--text-muted); font-size: 12px;">SaaS 3-Year Total</span>
+                <span class="cost-num" id="competitorTotal">₹31.5 Lakhs</span>
               </div>
               <div class="cost-item">
-                <span style="color: var(--accent); font-size: 12px; font-weight: 600;">ProGit Enterprise</span>
-                <span class="cost-num" id="progitTotal" style="color: var(--accent);">$20,400</span>
+                <span style="color: var(--accent); font-size: 12px; font-weight: 600;">ProGit 3-Year Total</span>
+                <span class="cost-num" id="progitTotal" style="color: var(--accent);">₹6.0 Lakhs</span>
               </div>
               <div class="cost-item">
-                <span style="color: var(--text-muted); font-size: 12px;">3-Year Cumulative</span>
-                <span class="cost-num" id="threeYearSavings" style="color: #3b82f6;">$36,000</span>
+                <span style="color: var(--text-muted); font-size: 12px;">Capital Breakeven</span>
+                <span class="cost-num" id="breakevenVal" style="color: #10b981;">6 Months</span>
               </div>
             </div>
           </div>
@@ -1152,68 +1147,68 @@
       </div>
     </section>
 
-    <!-- SLIDE 9: Commercial Licensing & Packaging -->
-    <section class="slide" data-index="9" data-category="Licensing & Packaging">
+    <!-- SLIDE 9: Standalone Self-Hosted Commercial Model -->
+    <section class="slide" data-index="9" data-category="Commercial Model">
       <div class="slide-meta">
         <div class="slide-category">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-          <span>Commercial Packaging</span>
+          <span>Commercial Model</span>
         </div>
         <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
       </div>
-      <h2 class="slide-title">Transparent Commercial Tiers</h2>
-      <p class="slide-subtitle">Predictable pricing designed for scale, with specialized options for enterprise staging and QA enclaves.</p>
+      <h2 class="slide-title">Standalone Self-Hosted Commercial Model</h2>
+      <p class="slide-subtitle">We are not a SaaS rental. We deliver a permanent standalone Git platform on your private infrastructure with turnkey installation, training, and formal IT handover.</p>
 
       <div class="slide-body">
-        <div class="grid-4">
-          <div class="pricing-card">
-            <div style="font-weight: 700; font-size: 15px; color: var(--text-bright);">Community</div>
-            <div style="font-size: 12px; color: var(--text-muted);">Self-hosted open source</div>
-            <div class="tier-price">$0</div>
-            <ul class="tier-features">
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Single-node deployment</li>
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Unlimited repos & users</li>
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Pure-Go SQLite engine</li>
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Git HTTP & SSH daemon</li>
+        <div class="grid-2" style="margin-bottom: 20px;">
+          <!-- 5 Lakhs Package -->
+          <div class="card" style="border: 2px solid var(--accent); background: var(--bg-surface); padding: 26px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
+              <span style="font-size: 13px; font-weight: 700; color: var(--accent); text-transform: uppercase;">One-Time Implementation</span>
+              <span style="font-size: 28px; font-weight: 900; font-family: var(--font-mono); color: var(--text-bright);">₹5,00,000 <span style="font-size: 13px; font-weight: 500; color: var(--text-muted); font-family: var(--font-sans);">one-time</span></span>
+            </div>
+            <div style="font-size: 14px; font-weight: 600; color: var(--text-bright); margin-bottom: 8px;">What's Included in the ₹5 Lakhs Package:</div>
+            <ul style="list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: var(--text);">
+              <li style="display: flex; align-items: flex-start; gap: 8px;">
+                <svg style="color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span><strong>Turnkey On-Premise Installation:</strong> Production container deployment on your private bare-metal, VM, or cloud infrastructure with SSL/TLS auto-renewal and volume storage configuration.</span>
+              </li>
+              <li style="display: flex; align-items: flex-start; gap: 8px;">
+                <svg style="color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span><strong>Developer &amp; Team Training:</strong> Hands-on training sessions for developers covering Git Smart HTTP, native SSH, PR reviews, wikis, and Kanban project workflows.</span>
+              </li>
+              <li style="display: flex; align-items: flex-start; gap: 8px;">
+                <svg style="color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span><strong>Formal IT Team Handover:</strong> Comprehensive system architecture runbooks, automated SQLite WAL backup schedules, and operations training empowering your IT team with 100% autonomy.</span>
+              </li>
+              <li style="display: flex; align-items: flex-start; gap: 8px;">
+                <svg style="color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span><strong>Unlimited Scale Forever:</strong> Unlimited developers, unlimited repositories, and unlimited projects with zero monthly or annual per-seat licensing fees.</span>
+              </li>
             </ul>
           </div>
 
-          <div class="pricing-card">
-            <div style="font-weight: 700; font-size: 15px; color: var(--text-bright);">Team Edition</div>
-            <div style="font-size: 12px; color: var(--text-muted);">Growing IT firms (10-50 dev)</div>
-            <div class="tier-price">$6 <span>/ user / mo</span></div>
-            <ul class="tier-features">
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Google & GitHub OAuth SSO</li>
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>LDAP / Active Directory</li>
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Automated S3 / GCS backup</li>
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>8x5 Business SLA Support</li>
-            </ul>
-          </div>
-
-          <div class="pricing-card featured">
-            <span class="tier-badge">Most Popular</span>
-            <div style="font-weight: 700; font-size: 15px; color: var(--text-bright);">Enterprise HA</div>
-            <div style="font-size: 12px; color: var(--text-muted);">Scale & regulated (50+ dev)</div>
-            <div class="tier-price" style="color: var(--accent);">$15 <span>/ user / mo</span></div>
-            <ul class="tier-features">
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg><strong>Multi-Node HA Clustering</strong></li>
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>PostgreSQL HA backend</li>
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>SAML 2.0 / Okta / SCIM</li>
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>CEF/JSON Audit Streaming</li>
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg><strong>24x7x365 Priority Support</strong></li>
-            </ul>
-          </div>
-
-          <div class="pricing-card">
-            <div style="font-weight: 700; font-size: 15px; color: var(--text-bright);">QA Enclave License</div>
-            <div style="font-size: 12px; color: var(--text-muted);">Dedicated test environments</div>
-            <div class="tier-price">$4,999 <span>/ cluster / yr</span></div>
-            <ul class="tier-features">
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg><strong>Unlimited Users & Bots</strong></li>
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Independent Staging clusters</li>
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Zero phone-home telemetry</li>
-              <li><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Air-gapped verification</li>
-            </ul>
+          <!-- Ops & Maintenance -->
+          <div class="card" style="padding: 26px;">
+            <div style="font-size: 13px; font-weight: 700; color: #3b82f6; text-transform: uppercase; margin-bottom: 6px;">Ongoing Operations &amp; Patches</div>
+            <div style="font-size: 22px; font-weight: 800; color: var(--text-bright); margin-bottom: 12px;">Minimal Cost per Update</div>
+            <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6; margin-bottom: 16px;">
+              Because your IT team owns the running instance after handover, your routine operational overhead is virtually zero. Updates are delivered with minimal, transparent pricing:
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="background: var(--bg-surface); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border);">
+                <div style="font-size: 13.5px; font-weight: 700; color: var(--text-bright);">Security Patches &amp; CVE Fixes</div>
+                <div style="font-size: 12.5px; color: var(--text-muted);">Critical upstream security fixes and vulnerability patches delivered at minimal cost.</div>
+              </div>
+              <div style="background: var(--bg-surface); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border);">
+                <div style="font-size: 13.5px; font-weight: 700; color: var(--text-bright);">Feature Enhancements</div>
+                <div style="font-size: 12.5px; color: var(--text-muted);">Major UI improvements and Git engine updates available as optional minimal-cost releases.</div>
+              </div>
+              <div style="background: var(--bg-surface); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border);">
+                <div style="font-size: 13.5px; font-weight: 700; color: var(--text-bright);">Permanent Asset Ownership</div>
+                <div style="font-size: 12.5px; color: var(--text-muted);">Your platform never gets disabled if an annual renewal is delayed. You permanently own your installation.</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1511,56 +1506,64 @@ podman run -d \
 
     // Interactive TCO Calculator Logic
     const teamSizeSlider = document.getElementById('teamSizeSlider');
-    const clusterSlider = document.getElementById('clusterSlider');
     const teamSizeVal = document.getElementById('teamSizeVal');
-    const clusterVal = document.getElementById('clusterVal');
     const savingsAmount = document.getElementById('savingsAmount');
     const savingsPct = document.getElementById('savingsPct');
     const competitorTotal = document.getElementById('competitorTotal');
     const progitTotal = document.getElementById('progitTotal');
-    const threeYearSavings = document.getElementById('threeYearSavings');
+    const breakevenVal = document.getElementById('breakevenVal');
+
+    function fmtINR(val) {
+      if (val >= 10000000) {
+        return '₹' + (val / 10000000).toFixed(2) + ' Cr';
+      }
+      if (val >= 100000) {
+        return '₹' + (val / 100000).toFixed(1) + ' Lakhs';
+      }
+      return '₹' + val.toLocaleString('en-IN');
+    }
 
     function calculateTCO() {
       const teamSize = parseInt(teamSizeSlider.value, 10);
-      const clusters = parseInt(clusterSlider.value, 10);
-      const isGitLab = document.querySelector('input[name="baseline"]:checked')?.value === 'gitlab';
+      const baseline = document.querySelector('input[name="baseline"]:checked')?.value || 'github_ent';
 
       teamSizeVal.textContent = `${teamSize} Developers`;
-      clusterVal.textContent = `${clusters} ${clusters === 1 ? 'Cluster' : 'Clusters'}`;
 
-      // Pricing baselines:
-      // GitHub Enterprise: $21/user/mo = $252/user/yr
-      // GitLab Ultimate: $99/user/mo = $1,188/user/yr
-      // ProGit Enterprise HA: $15/user/mo = $180/user/yr
-      // Infrastructure: Competitor ~$7,200/yr heavy VM; ProGit ~$2,400/yr light containers
-      // QA Enclaves: Competitor requires extra seat fees (~$252 * 20 seats per cluster); ProGit Flat $4,999/cluster/yr
-      const competitorSeatRate = isGitLab ? 1188 : 252;
-      const competitorInfra = isGitLab ? 9600 : 7200;
-      const competitorQACost = clusters * (competitorSeatRate * 15); // 15 test bots/seats per cluster
+      // Annual per-seat rates in INR (~$1 = ₹84):
+      // github_ent: $21/mo * 12 * ~84 INR = ~₹21,000/seat/yr
+      // gitlab_prem: $29/mo * 12 * ~84 INR = ~₹29,000/seat/yr
+      // github_team: $4/mo * 12 * ~84 INR = ~₹4,000/seat/yr
+      let annualSeatRate = 21000;
+      if (baseline === 'gitlab_prem') annualSeatRate = 29000;
+      if (baseline === 'github_team') annualSeatRate = 4000;
 
-      const compAnnual = (teamSize * competitorSeatRate) + competitorInfra + competitorQACost;
+      const competitorAnnual = teamSize * annualSeatRate;
+      const competitor3Year = competitorAnnual * 3;
 
-      const progitSeatRate = 180;
-      const progitInfra = 2400;
-      const progitEnclaveCost = clusters * 4999;
+      // ProGit Standalone Self-Hosted Model:
+      // Year 1: ₹5,00,000 one-time implementation, training & IT handover
+      // Year 2 & 3: Minimal patch / enhancement updates (~₹50,000/yr)
+      const progitOneTime = 500000;
+      const progitAnnualPatch = 50000;
+      const progit3Year = progitOneTime + (progitAnnualPatch * 2);
 
-      const progitAnnual = (teamSize * progitSeatRate) + progitInfra + progitEnclaveCost;
+      const netSavings = Math.max(0, competitor3Year - progit3Year);
+      const percentSavings = competitor3Year > 0 ? Math.round((netSavings / competitor3Year) * 100) : 0;
 
-      const annualSavings = Math.max(0, compAnnual - progitAnnual);
-      const percentSavings = Math.round((annualSavings / compAnnual) * 100);
-      const threeYear = annualSavings * 3;
+      // Breakeven time in months
+      const monthlyCompetitor = competitorAnnual / 12;
+      const breakevenMonths = monthlyCompetitor > 0 ? Math.ceil(progitOneTime / monthlyCompetitor) : 0;
 
-      const fmt = (n) => '$' + n.toLocaleString();
-
-      savingsAmount.textContent = fmt(annualSavings);
-      savingsPct.textContent = `${percentSavings}% Cost Reduction`;
-      competitorTotal.textContent = fmt(compAnnual);
-      progitTotal.textContent = fmt(progitAnnual);
-      threeYearSavings.textContent = fmt(threeYear);
+      savingsAmount.textContent = fmtINR(netSavings);
+      savingsPct.textContent = `${percentSavings}% Capital Saved Over 3 Years`;
+      competitorTotal.textContent = fmtINR(competitor3Year);
+      progitTotal.textContent = fmtINR(progit3Year);
+      if (breakevenVal) {
+        breakevenVal.textContent = breakevenMonths > 0 ? `${breakevenMonths} Months` : 'Instant';
+      }
     }
 
     teamSizeSlider.addEventListener('input', calculateTCO);
-    clusterSlider.addEventListener('input', calculateTCO);
     document.querySelectorAll('input[name="baseline"]').forEach(r => r.addEventListener('change', calculateTCO));
     calculateTCO();
 

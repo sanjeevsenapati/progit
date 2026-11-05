@@ -3484,76 +3484,71 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
         </div>
 
         <h2>Target Market Personas &amp; Competitive Analysis</h2>
-        <h3>Persona 1: Mid-Market IT Companies (20 to 500 Engineers)</h3>
-        <p>SaaS bills for GitHub ($21/user/mo) and GitLab ($99/user/mo) cost $12,000 to $120,000+ annually. Self-managed GitLab is notoriously resource-heavy (demands 16 GB RAM minimum). ProGit provides an ultra-lightweight alternative (&lt; 250 MB RAM per node) with GitHub-standard UX and 60&ndash;70% cost savings.</p>
+        <h3>Persona 1: Small &amp; Midsize Enterprises (SMEs) &amp; Software Agencies</h3>
+        <p>SaaS bills for GitHub ($21/user/mo) and GitLab ($99/user/mo) cost ₹10 Lakhs to ₹50+ Lakhs annually in perpetual per-seat rent. Self-managed GitLab is notoriously resource-heavy (demands 16 GB RAM minimum). ProGit provides an ultra-lightweight standalone alternative (&lt; 200 MB RAM) with GitHub-standard UX, one-time turnkey implementation, and 75&ndash;85% 3-year cost savings.</p>
 
         <h3>Persona 2: Enterprise Dev, QA &amp; Ephemeral Test Enclaves</h3>
-        <p>Large enterprises cannot afford per-seat licensing for ephemeral staging environments, CI/CD runners, and test bot accounts. ProGit's <strong>Flat-Instance Enclave License</strong> enables unlimited test accounts and air-gapped staging clusters.</p>
+        <p>Fast-growing engineering teams cannot afford per-seat licensing for ephemeral test environments, CI/CD runners, and bot accounts. ProGit's standalone platform provides unlimited users and repositories with zero per-seat taxes.</p>
 
         <div class="table-container">
           <table>
             <thead>
-              <tr><th>Feature / Metric</th><th>ProGit Enterprise</th><th>GitHub Enterprise Server</th><th>GitLab Self-Managed</th><th>Gitea / Forgejo</th></tr>
+              <tr><th>Feature / Metric</th><th>ProGit Standalone</th><th>GitHub Enterprise Server</th><th>GitLab Self-Managed</th><th>Gitea / Forgejo</th></tr>
             </thead>
             <tbody>
               <tr><td><strong>Resource Footprint</strong></td><td><strong>Ultra-Low (&lt; 200 MB)</strong></td><td>Heavy (32 GB RAM min)</td><td>Heavy (16 GB RAM min)</td><td>Low (&lt; 500 MB)</td></tr>
               <tr><td><strong>Startup / Boot Time</strong></td><td><strong>&lt; 2 Seconds</strong></td><td>10–15 Minutes</td><td>5–10 Minutes</td><td>&lt; 5 Seconds</td></tr>
               <tr><td><strong>Single-Binary Simplicity</strong></td><td><strong>Yes (Pure Go + React)</strong></td><td>No (Multi-VM Appliance)</td><td>No (Omnibus / 20+ services)</td><td>Yes</td></tr>
-              <tr><td><strong>Multi-Node HA Mode</strong></td><td><strong>Yes (Compute + DB + FS)</strong></td><td>Yes (High Tier)</td><td>Yes (Premium/Ultimate)</td><td>Limited / Complex</td></tr>
+              <tr><td><strong>Multi-Node HA Mode</strong></td><td><strong>Stateless Compute + SQLite WAL / DB</strong></td><td>Yes (High Tier)</td><td>Yes (Premium/Ultimate)</td><td>Limited / Complex</td></tr>
               <tr><td><strong>Air-Gapped Deployment</strong></td><td><strong>100% Native</strong></td><td>Supported</td><td>Supported</td><td>Supported</td></tr>
-              <tr><td><strong>Test Enclave License</strong></td><td><strong>Flat Instance (Unlimited Seats)</strong></td><td>Per-Seat Only ($21/seat)</td><td>Per-Seat Only ($29–$99/seat)</td><td>Free / Community</td></tr>
-              <tr><td><strong>Commercial 24/7 SLA</strong></td><td><strong>Turnkey Enterprise Support</strong></td><td>Expensive Enterprise Tier</td><td>Premium Tier Required</td><td>Third-party / Community</td></tr>
+              <tr><td><strong>Licensing Model</strong></td><td><strong>₹5L One-Time Standalone (Unlimited Seats)</strong></td><td>Per-Seat SaaS ($21/seat/mo)</td><td>Per-Seat SaaS ($29–$99/seat/mo)</td><td>Free / Community</td></tr>
+              <tr><td><strong>Installation &amp; Handover</strong></td><td><strong>Turnkey Setup + Training + Handover</strong></td><td>DIY / Extra Consultant Cost</td><td>DIY Omnibus / Complex</td><td>DIY Forum Support</td></tr>
             </tbody>
           </table>
         </div>
 
-        <h2>Commercial &amp; Payment Model Strategy</h2>
-        <p>ProGit operates on a transparent, developer-first commercial licensing model:</p>
+        <h2>Commercial &amp; Operating Model Strategy</h2>
+        <p>ProGit operates on a <strong>100% Standalone Self-Hosted Delivery Model</strong> &mdash; never a SaaS rental. Customers maintain permanent ownership of their code, infrastructure, and running platform without ongoing per-seat licenses:</p>
         <div class="table-container">
           <table>
             <thead>
-              <tr><th>Edition</th><th>Pricing</th><th>Deployment</th><th>Target Audience &amp; Capabilities</th></tr>
+              <tr><th>Package</th><th>Pricing</th><th>Scope &amp; Deliverables</th><th>Target Audience &amp; Value</th></tr>
             </thead>
             <tbody>
               <tr>
                 <td><strong>Community Edition</strong></td>
                 <td>Free / Open Source (MIT)</td>
-                <td>Single Node</td>
+                <td>Self-managed single-node container or binary.</td>
                 <td>Solopreneurs &amp; Open Source. Embedded SQLite WAL, Smart HTTP/SSH, Wikis, Issues, Releases.</td>
               </tr>
               <tr>
-                <td><strong>ProGit Team</strong></td>
-                <td>$6 / user / month</td>
-                <td>Single Node</td>
-                <td>Growing Startups (10–50 devs). SSO (Google, Entra ID, GitHub), LDAP / AD, branch protection, automated cloud backups.</td>
+                <td><strong>Standalone Turnkey Implementation</strong></td>
+                <td><strong>₹5 Lakhs (₹5,00,000)</strong><br><small style="color: var(--text-muted);">One-time turnkey fee</small></td>
+                <td>Full on-prem / cloud installation, developer training, operations runbooks &amp; formal IT handover.</td>
+                <td>Small &amp; Midsize Enterprises (SMEs) and high-security IT departments. <strong>Unlimited developers, unlimited repositories, zero seat tax</strong> forever.</td>
               </tr>
               <tr>
-                <td><strong>ProGit Enterprise HA</strong></td>
-                <td>$15 / user / month</td>
-                <td>Multi-Node Clustered</td>
-                <td>Mid-market &amp; Regulated IT (50–2,000+ devs). Multi-Node HA, PostgreSQL clustering, SAML 2.0 / SCIM, audit logs, 24/7 1-hour SLA.</td>
-              </tr>
-              <tr>
-                <td><strong>Dev/QA Enclave</strong></td>
-                <td>$4,999 / instance / year</td>
-                <td>Single or Clustered</td>
-                <td>Enterprise QA departments &amp; staging sandboxes. <strong>Unlimited users &amp; CI/CD bots</strong>, air-gapped offline licensing.</td>
+                <td><strong>Security Patches &amp; Enhancements</strong></td>
+                <td><strong>Minimal Cost per Update</strong><br><small style="color: var(--text-muted);">On-demand / periodic</small></td>
+                <td>Critical CVE hotfixes, security patches, Go / React engine upgrades, and platform enhancements.</td>
+                <td>Production teams needing vendor-maintained stability while retaining complete IT autonomy and local control.</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <h2>Total Cost of Ownership (TCO) Comparison (100 Engineers)</h2>
+        <h2>3-Year Total Cost of Ownership (TCO) Comparison (50 Engineers)</h2>
         <div class="table-container">
           <table>
             <thead>
-              <tr><th>Expense Item</th><th>GitHub Enterprise Server</th><th>GitLab Ultimate</th><th>ProGit Enterprise HA</th></tr>
+              <tr><th>Cost Component</th><th>GitHub Enterprise Cloud / Server</th><th>GitLab Premium</th><th>ProGit Standalone Self-Hosted</th></tr>
             </thead>
             <tbody>
-              <tr><td>Annual Seat Licenses</td><td>$25,200 ($21/user/mo)</td><td>$118,800 ($99/user/mo)</td><td><strong>$18,000 ($15/user/mo)</strong></td></tr>
-              <tr><td>Infrastructure Hosting (Cloud VMs)</td><td>~$7,200/yr (32 GB RAM VMs)</td><td>~$9,600/yr (Heavy multi-node)</td><td><strong>$2,400/yr (Lightweight Go containers)</strong></td></tr>
-              <tr><td>Staging/QA Lab Overhead</td><td>Extra per-seat fees or skipped</td><td>Extra per-seat fees or skipped</td><td><strong>Included / Flat Enclave</strong></td></tr>
-              <tr><td><strong>Estimated Annual Total</strong></td><td><strong>$32,400</strong></td><td><strong>$128,400</strong></td><td><strong>$20,400 (~37% to 84% Savings)</strong></td></tr>
+              <tr><td>Year 1: Licensing / Implementation</td><td>₹10.5 Lakhs (~$12,600 recurring)</td><td>₹14.5 Lakhs (~$17,400 recurring)</td><td><strong>₹5.0 Lakhs (Turnkey Setup + Handover)</strong></td></tr>
+              <tr><td>Year 2: Seat Renewal / Operations</td><td>₹10.5 Lakhs</td><td>₹14.5 Lakhs</td><td><strong>~₹0.5 Lakhs (Minimal Security Patches)</strong></td></tr>
+              <tr><td>Year 3: Seat Renewal / Operations</td><td>₹10.5 Lakhs</td><td>₹14.5 Lakhs</td><td><strong>~₹0.5 Lakhs (Minimal Security Patches)</strong></td></tr>
+              <tr><td><strong>3-Year Cumulative Total</strong></td><td><strong>₹31.5 Lakhs</strong></td><td><strong>₹43.5 Lakhs</strong></td><td><strong>₹6.0 Lakhs (~81% to 86% Savings)</strong></td></tr>
+              <tr><td><strong>Capital Breakeven Period</strong></td><td>Never (Perpetual SaaS drain)</td><td>Never (Perpetual SaaS drain)</td><td><strong>~6 Months</strong></td></tr>
             </tbody>
           </table>
         </div>
@@ -3566,12 +3561,11 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
         <pre><code>{
   "customer_id": "cust_enterprise_88291",
   "company_name": "Acme Defense Technologies",
-  "edition": "enterprise_ha",
-  "max_seats": 250,
-  "cluster_mode": true,
-  "valid_from": "2026-11-01T00:00:00Z",
-  "valid_until": "2027-11-01T00:00:00Z",
-  "features": ["ha", "saml", "audit_log", "postgres", "ldap"],
+  "edition": "standalone_enterprise",
+  "max_seats": -1,
+  "cluster_mode": false,
+  "handover_date": "2026-11-01T00:00:00Z",
+  "features": ["smart_http", "ssh", "sqlite_wal", "oauth", "audit_log", "unlimited_seats"],
   "signature": "MEQCIF6x9k1rPq9Z5vY3..."
 }</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
         <p>The ProGit binary embeds only the public verification key, performing local validation on startup and once every 24 hours with a 30-day grace period.</p>
