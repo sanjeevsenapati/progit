@@ -65,5 +65,5 @@ Access your instance at **[`https://progit.local`](https://progit.local)** (or `
 
 ## 📜 Attribution & Credits
 
-Supported by **Prodevans** and created by **Sanjeev Senapati**.  
+Supported by **PDIH** and created by **ProGit Team and Sanjeev**.  
 Built on top of the Gogs source code. Released under the open-source MIT License.
