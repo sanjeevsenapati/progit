@@ -720,6 +720,10 @@
       <nav class="header-links">
         <a href="#overview" onclick="navigate('overview')">Docs</a>
         <a href="#quickstart" onclick="navigate('quickstart')">Quickstart</a>
+        <a href="presentation.html" target="_blank" style="color: var(--accent); font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Executive Deck
+        </a>
         <a href="#config-cheatsheet" onclick="navigate('config-cheatsheet')">Cheat Sheet</a>
         <a href="#api-overview" onclick="navigate('api-overview')">REST API</a>
         <a href="https://github.com/sanjeevsenapati/progit" target="_blank" rel="noopener noreferrer">GitHub</a>
@@ -831,6 +835,7 @@
         <div class="sidebar-heading">Enterprise &amp; Architecture</div>
         <ul class="sidebar-nav">
           <li><a href="#enterprise-ha" data-target="enterprise-ha" onclick="navigate('enterprise-ha')">Multi-Node HA &amp; Business Model</a></li>
+          <li><a href="presentation.html" target="_blank" style="color: var(--accent); font-weight: 600;">Executive &amp; Sales Deck &nearr;</a></li>
         </ul>
       </div>
     </aside>
@@ -3639,6 +3644,7 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
   <script>
     // Search Index
     const searchIndex = [
+      { id: 'presentation', title: 'Executive & Sales Deck', section: 'Enterprise', desc: 'Interactive pitch presentation, ROI calculator, and commercial tiers for executives and sales.' },
       { id: 'overview', title: 'What is ProGit? (Overview & Philosophy)', section: 'Getting Started', desc: 'Ultra-fast, single binary, pure Go self-hosted Git platform.' },
       { id: 'quickstart', title: '5-Minute Quickstart', section: 'Getting Started', desc: 'Launch ProGit with Podman or Docker and push your first repository.' },
       { id: 'architecture', title: 'Architecture & Zero CGO', section: 'Getting Started', desc: 'Pure Go engine, modernc.org/sqlite, Write-Ahead Logging (WAL).' },
@@ -3696,6 +3702,11 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
     function navigate(pageId) {
       if (!pageId) pageId = "overview";
       pageId = pageId.replace(/^#/, "").trim();
+
+      if (pageId === "presentation") {
+        window.location.href = "presentation.html";
+        return;
+      }
 
       const targetArticle = document.getElementById("page-" + pageId);
       if (!targetArticle) {
