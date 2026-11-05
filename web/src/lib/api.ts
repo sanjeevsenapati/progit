@@ -758,6 +758,8 @@ export const api = {
       activities?: Activity[];
       organizations?: Organization[];
       starred?: Repository[];
+      is_org?: boolean;
+      organization?: Organization;
     }>(`/api/v1/users/${username}`);
   },
 
@@ -1227,5 +1229,116 @@ export const api = {
   async listDevelopers(limit = 100) {
     return fetchJSON<User[]>(`/api/v1/developers?limit=${limit}`);
   },
+
+  // P0 & P1 & P2 & P3 Features
+  async getRecentPushes(owner: string, repo: string) {
+    return fetchJSON<{ recent_pushes: RecentPush[] }>(`/api/v1/repos/${owner}/${repo}/recent-pushes`);
+  },
+
+  async getBlame(owner: string, repo: string, branch: string, path: string) {
+    return fetchJSON<{ branch: string; path: string; lines: BlameLine[] }>(
+      `/api/v1/repos/${owner}/${repo}/blame?branch=${encodeURIComponent(branch)}&path=${encodeURIComponent(path)}`
+    );
+  },
+
+  async searchRepoCode(owner: string, repo: string, query: string, branch?: string) {
+    const b = branch ? `&branch=${encodeURIComponent(branch)}` : '';
+    return fetchJSON<{ query: string; branch: string; matches: CodeMatch[] }>(
+      `/api/v1/repos/${owner}/${repo}/code-search?q=${encodeURIComponent(query)}${b}`
+    );
+  },
+
+  async listBranchProtections(owner: string, repo: string) {
+    return fetchJSON<BranchProtection[]>(`/api/v1/repos/${owner}/${repo}/branch-protections`);
+  },
+
+  async setBranchProtection(owner: string, repo: string, data: { branch_name: string; require_pr: boolean; required_approvals?: number; prevent_force_push: boolean }) {
+    return fetchJSON<BranchProtection>(`/api/v1/repos/${owner}/${repo}/branch-protections`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteBranchProtection(owner: string, repo: string, branch: string) {
+    return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}/branch-protections/${encodeURIComponent(branch)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async listReleases(owner: string, repo: string) {
+    return fetchJSON<Release[]>(`/api/v1/repos/${owner}/${repo}/releases`);
+  },
+
+  async createRelease(owner: string, repo: string, data: { tag_name: string; title: string; note: string; is_draft?: boolean; is_prerelease?: boolean }) {
+    return fetchJSON<Release>(`/api/v1/repos/${owner}/${repo}/releases`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteRelease(owner: string, repo: string, id: number) {
+    return fetchJSON<{ message: string }>(`/api/v1/repos/${owner}/${repo}/releases/${id}`, {
+      method: 'DELETE',
+    });
+  },
 };
+
+export interface RecentPush {
+  branch: string;
+  time_ago: string;
+  commit_sha: string;
+  commit_msg: string;
+}
+
+export interface BlameLine {
+  line_number: number;
+  commit_sha: string;
+  short_sha: string;
+  author: string;
+  author_mail: string;
+  timestamp: string;
+  summary: string;
+  content: string;
+}
+
+export interface CodeMatch {
+  path: string;
+  line_number: number;
+  content: string;
+}
+
+export interface BranchProtection {
+  id: number;
+  repo_id: number;
+  branch_name: string;
+  require_pr: boolean;
+  required_approvals: number;
+  prevent_force_push: boolean;
+  created_at: string;
+}
+
+export interface ReleaseAsset {
+  id: number;
+  release_id: number;
+  name: string;
+  size_bytes: number;
+  download_count: number;
+  content_type: string;
+  created_at: string;
+}
+
+export interface Release {
+  id: number;
+  repo_id: number;
+  publisher_id: number;
+  publisher_name: string;
+  tag_name: string;
+  title: string;
+  note: string;
+  is_draft: boolean;
+  is_prerelease: boolean;
+  created_at: string;
+  published_at?: string;
+  assets: ReleaseAsset[];
+}
 

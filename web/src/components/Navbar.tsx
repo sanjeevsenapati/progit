@@ -401,6 +401,10 @@ export const Navbar: React.FC = () => {
                           <UserIcon className="w-4 h-4 mr-2.5 text-gray-400" />
                           <span>Your Profile</span>
                         </a>
+                        <a href={`/user/${user.username}?tab=organizations`} className="flex items-center px-4 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+                          <Building2 className="w-4 h-4 mr-2.5 text-gray-400" />
+                          <span>Your Organizations</span>
+                        </a>
                         <a href="/messages" className="flex items-center justify-between px-4 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
                           <div className="flex items-center">
                             <Mail className="w-4 h-4 mr-2.5 text-gray-400" />

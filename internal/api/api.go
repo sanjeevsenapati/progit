@@ -133,6 +133,7 @@ func (r *Router) registerRoutes() {
 	// Health and Readiness
 	r.mux.HandleFunc("GET /api/health", r.handleHealth)
 	r.mux.HandleFunc("GET /api/ready", r.handleReady)
+	r.mux.HandleFunc("GET /api/v1/server/cert", r.handleDownloadCert)
 
 	// Auth Endpoints
 	r.mux.HandleFunc("POST /api/v1/auth/register", r.handleRegister)
@@ -175,6 +176,21 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/tree", r.handleGetTree)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/blob", r.handleGetBlob)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/raw", r.handleGetRaw)
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/blame", r.handleGetBlame)
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/recent-pushes", r.handleGetRecentPushes)
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/code-search", r.handleSearchRepoCode)
+
+	// Branch Protections (P3)
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/branch-protections", r.handleListBranchProtections)
+	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/branch-protections", r.handleSetBranchProtection)
+	r.mux.HandleFunc("DELETE /api/v1/repos/{owner}/{repo}/branch-protections/{branch...}", r.handleDeleteBranchProtection)
+
+	// Releases & Assets (P3)
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/releases", r.handleListReleases)
+	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/releases", r.handleCreateRelease)
+	r.mux.HandleFunc("DELETE /api/v1/repos/{owner}/{repo}/releases/{id}", r.handleDeleteRelease)
+	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/releases/{id}/assets", r.handleUploadReleaseAsset)
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/releases/{id}/assets/{asset_id}/download", r.handleDownloadReleaseAsset)
 
 	// Online File Operations (Create, Edit, Delete, Upload)
 	r.mux.HandleFunc("POST /api/v1/repos/{owner}/{repo}/contents/{path...}", r.handleSaveFile)
@@ -838,12 +854,21 @@ func (r *Router) handleGetUserProfile(w http.ResponseWriter, req *http.Request) 
 		starred = []*database.Repository{}
 	}
 
+	isOrg := false
+	var orgData *database.Organization
+	if org, err := database.GetOrgByName(username); err == nil && org != nil {
+		isOrg = true
+		orgData = org
+	}
+
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"user":          targetUser,
 		"repositories":  repos,
 		"activities":    activities,
 		"organizations": orgs,
 		"starred":       starred,
+		"is_org":        isOrg,
+		"organization":  orgData,
 	})
 }
 
@@ -1422,6 +1447,12 @@ func (r *Router) handleDeleteBranch(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	bp, _ := database.GetBranchProtection(repo.ID, branchName)
+	if bp != nil {
+		jsonError(w, http.StatusForbidden, fmt.Sprintf("Cannot delete protected branch '%s'", branchName))
+		return
+	}
+
 	if err := git.DeleteBranch(repoDir, branchName); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
@@ -1600,6 +1631,14 @@ func (r *Router) handleSaveFile(w http.ResponseWriter, req *http.Request) {
 		body.Branch = "main"
 	}
 
+	if body.NewBranch == "" {
+		bp, _ := database.GetBranchProtection(repo.ID, body.Branch)
+		if bp != nil && bp.RequirePR {
+			jsonError(w, http.StatusForbidden, fmt.Sprintf("Branch '%s' is protected. Direct commits are restricted; please create a pull request.", body.Branch))
+			return
+		}
+	}
+
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
 	commitSHA, targetBranch, err := git.SaveFile(repoDir, body.Branch, filePath, body.Content, user.Username, user.Email, body.Message, body.NewBranch)
 	if err != nil {
@@ -1668,6 +1707,14 @@ func (r *Router) handleDeleteFile(w http.ResponseWriter, req *http.Request) {
 	}
 	if body.Branch == "" {
 		body.Branch = "main"
+	}
+
+	if body.NewBranch == "" {
+		bp, _ := database.GetBranchProtection(repo.ID, body.Branch)
+		if bp != nil && bp.RequirePR {
+			jsonError(w, http.StatusForbidden, fmt.Sprintf("Branch '%s' is protected. Direct commits are restricted; please create a pull request.", body.Branch))
+			return
+		}
 	}
 
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
@@ -2341,6 +2388,26 @@ func (r *Router) handleMergePull(w http.ResponseWriter, req *http.Request) {
 	}
 
 	_ = database.MarkPullRequestMerged(pr.ID, user.ID, mergeCommitSHA)
+
+	// Auto-close issues referenced in PR title, body, and merge message (Fixes #X, Closes #X)
+	closeRefRegex := regexp.MustCompile(`(?i)(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#(\d+)`)
+	fullText := fmt.Sprintf("%s\n%s\n%s", issue.Title, issue.Content, body.Message)
+	for _, match := range closeRefRegex.FindAllStringSubmatch(fullText, -1) {
+		if len(match) > 1 {
+			targetIdx, _ := strconv.ParseInt(match[1], 10, 64)
+			if targetIdx > 0 && targetIdx != issue.IndexNumber {
+				if refIssue, err := database.GetIssueByIndex(repo.ID, targetIdx); err == nil && refIssue != nil && !refIssue.IsClosed && !refIssue.IsPull {
+					_ = database.UpdateIssueStatus(refIssue.ID, true)
+					commitPrefix := mergeCommitSHA
+					if len(commitPrefix) > 7 {
+						commitPrefix = commitPrefix[:7]
+					}
+					_, _ = database.AddComment(refIssue.ID, user.ID, "comment", fmt.Sprintf("Closed by pull request #%d (%s)", issue.IndexNumber, commitPrefix))
+					database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "issue", fmt.Sprintf("Closed issue #%d via pull request #%d", refIssue.IndexNumber, issue.IndexNumber))
+				}
+			}
+		}
+	}
 	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "pull", fmt.Sprintf("Merged pull request #%d into %s", issue.IndexNumber, pr.BaseBranch))
 	database.DispatchRepoWebhooks(repo.ID, "pull_request", map[string]any{
 		"action":           "merged",
@@ -5678,5 +5745,475 @@ func (r *Router) handleListDevelopers(w http.ResponseWriter, req *http.Request) 
 	}
 
 	jsonResponse(w, http.StatusOK, developers)
+}
+
+// ============================================================================
+// Server Certificate Download (P0)
+// ============================================================================
+
+func (r *Router) handleDownloadCert(w http.ResponseWriter, req *http.Request) {
+	certPath := r.cfg.Server.CertFile
+	if certPath == "" {
+		certPath = "custom/https/cert.pem"
+	}
+	data, err := os.ReadFile(certPath)
+	if err != nil {
+		jsonError(w, http.StatusNotFound, "TLS certificate file not found")
+		return
+	}
+	w.Header().Set("Content-Type", "application/x-pem-file")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"progit-cert.pem\"")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+}
+
+// ============================================================================
+// Recently Pushed Branches (P0)
+// ============================================================================
+
+func formatTimeAgo(t time.Time) string {
+	d := time.Since(t)
+	if d < time.Minute {
+		return "just now"
+	} else if d < time.Hour {
+		m := int(d.Minutes())
+		if m <= 1 {
+			return "1 minute ago"
+		}
+		return fmt.Sprintf("%d minutes ago", m)
+	} else if d < 24*time.Hour {
+		h := int(d.Hours())
+		if h <= 1 {
+			return "1 hour ago"
+		}
+		return fmt.Sprintf("%d hours ago", h)
+	}
+	days := int(d.Hours() / 24)
+	if days <= 1 {
+		return "yesterday"
+	}
+	return fmt.Sprintf("%d days ago", days)
+}
+
+func (r *Router) handleGetRecentPushes(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
+	branches, _ := git.GetBranches(repoDir)
+
+	type RecentPush struct {
+		Branch    string `json:"branch"`
+		TimeAgo   string `json:"time_ago"`
+		CommitSHA string `json:"commit_sha"`
+		CommitMsg string `json:"commit_msg"`
+	}
+
+	var recents []RecentPush
+	now := time.Now()
+	for _, b := range branches {
+		if b == repo.DefaultBranch {
+			continue
+		}
+		commits, err := git.GetCommits(repoDir, b, 1, 0)
+		if err == nil && len(commits) > 0 {
+			c := commits[0]
+			diff := now.Sub(c.Timestamp)
+			if diff >= 0 && diff < 3*time.Hour {
+				hasOpenPR, _ := database.HasOpenPullForBranch(repo.ID, b)
+				if !hasOpenPR {
+					recents = append(recents, RecentPush{
+						Branch:    b,
+						TimeAgo:   formatTimeAgo(c.Timestamp),
+						CommitSHA: c.ShortSHA,
+						CommitMsg: c.Message,
+					})
+				}
+			}
+		}
+	}
+	if recents == nil {
+		recents = []RecentPush{}
+	}
+	jsonResponse(w, http.StatusOK, map[string]any{"recent_pushes": recents})
+}
+
+// ============================================================================
+// Git Blame Endpoint (P2)
+// ============================================================================
+
+func (r *Router) handleGetBlame(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	ref := req.URL.Query().Get("branch")
+	if ref == "" {
+		ref = req.URL.Query().Get("ref")
+	}
+	if ref == "" {
+		ref = repo.DefaultBranch
+	}
+	if ref == "" {
+		ref = "main"
+	}
+	filePath := req.URL.Query().Get("path")
+	if filePath == "" {
+		jsonError(w, http.StatusBadRequest, "path parameter required")
+		return
+	}
+
+	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
+	blameLines, err := git.GetBlame(repoDir, ref, filePath)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if blameLines == nil {
+		blameLines = []git.BlameLine{}
+	}
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"branch": ref,
+		"path":   filePath,
+		"lines":  blameLines,
+	})
+}
+
+// ============================================================================
+// In-Repo Code Search (P3)
+// ============================================================================
+
+func (r *Router) handleSearchRepoCode(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	q := strings.TrimSpace(req.URL.Query().Get("q"))
+	if q == "" {
+		jsonResponse(w, http.StatusOK, map[string]any{"matches": []git.CodeMatch{}})
+		return
+	}
+
+	ref := req.URL.Query().Get("branch")
+	if ref == "" {
+		ref = repo.DefaultBranch
+	}
+	if ref == "" {
+		ref = "main"
+	}
+
+	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
+	matches, err := git.SearchCode(repoDir, ref, q)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if matches == nil {
+		matches = []git.CodeMatch{}
+	}
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"query":   q,
+		"branch":  ref,
+		"matches": matches,
+	})
+}
+
+// ============================================================================
+// Branch Protection Endpoints (P3)
+// ============================================================================
+
+func (r *Router) handleListBranchProtections(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	list, err := database.ListBranchProtections(repo.ID)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if list == nil {
+		list = []database.BranchProtection{}
+	}
+	jsonResponse(w, http.StatusOK, list)
+}
+
+func (r *Router) handleSetBranchProtection(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Admin permission required")
+		return
+	}
+
+	var body struct {
+		BranchName        string `json:"branch_name"`
+		RequirePR         bool   `json:"require_pr"`
+		RequiredApprovals int    `json:"required_approvals"`
+		PreventForcePush  bool   `json:"prevent_force_push"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	body.BranchName = strings.TrimSpace(body.BranchName)
+	if body.BranchName == "" {
+		jsonError(w, http.StatusBadRequest, "branch_name is required")
+		return
+	}
+
+	bp, err := database.SetBranchProtection(repo.ID, body.BranchName, body.RequirePR, body.RequiredApprovals, body.PreventForcePush)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, bp)
+}
+
+func (r *Router) handleDeleteBranchProtection(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Admin permission required")
+		return
+	}
+
+	branch := req.PathValue("branch")
+	if err := database.DeleteBranchProtection(repo.ID, branch); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "Branch protection removed"})
+}
+
+// ============================================================================
+// Releases & Assets Endpoints (P3)
+// ============================================================================
+
+func (r *Router) handleListReleases(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	releases, err := database.ListReleases(repo.ID)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if releases == nil {
+		releases = []database.Release{}
+	}
+	jsonResponse(w, http.StatusOK, releases)
+}
+
+func (r *Router) handleCreateRelease(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required")
+		return
+	}
+
+	var body struct {
+		TagName      string `json:"tag_name"`
+		Title        string `json:"title"`
+		Note         string `json:"note"`
+		IsDraft      bool   `json:"is_draft"`
+		IsPrerelease bool   `json:"is_prerelease"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	body.TagName = strings.TrimSpace(body.TagName)
+	if body.TagName == "" {
+		jsonError(w, http.StatusBadRequest, "tag_name is required")
+		return
+	}
+	if body.Title == "" {
+		body.Title = body.TagName
+	}
+
+	rel, err := database.CreateRelease(repo.ID, user.ID, body.TagName, body.Title, body.Note, body.IsDraft, body.IsPrerelease)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "release", fmt.Sprintf("Published release %s in %s/%s", rel.TagName, owner, repoName))
+	jsonResponse(w, http.StatusCreated, rel)
+}
+
+func (r *Router) handleDeleteRelease(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required")
+		return
+	}
+
+	id, _ := strconv.ParseInt(req.PathValue("id"), 10, 64)
+	if err := database.DeleteRelease(id); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "Release deleted"})
+}
+
+func (r *Router) handleUploadReleaseAsset(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, true) {
+		jsonError(w, http.StatusForbidden, "Write permission required")
+		return
+	}
+
+	releaseID, _ := strconv.ParseInt(req.PathValue("id"), 10, 64)
+	rel, err := database.GetReleaseByID(releaseID)
+	if err != nil || rel == nil {
+		jsonError(w, http.StatusNotFound, "Release not found")
+		return
+	}
+
+	// 100MB max upload
+	_ = req.ParseMultipartForm(100 << 20)
+	file, handler, err := req.FormFile("file")
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, "Missing file in multipart form")
+		return
+	}
+	defer file.Close()
+
+	assetDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git", "releases", fmt.Sprintf("%d", releaseID))
+	_ = os.MkdirAll(assetDir, 0755)
+	destPath := filepath.Join(assetDir, handler.Filename)
+
+	dst, err := os.Create(destPath)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer dst.Close()
+
+	size, err := io.Copy(dst, file)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	cType := handler.Header.Get("Content-Type")
+	if cType == "" {
+		cType = "application/octet-stream"
+	}
+
+	asset, err := database.CreateReleaseAsset(releaseID, handler.Filename, size, destPath, cType)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusCreated, asset)
+}
+
+func (r *Router) handleDownloadReleaseAsset(w http.ResponseWriter, req *http.Request) {
+	assetID, _ := strconv.ParseInt(req.PathValue("asset_id"), 10, 64)
+	asset, err := database.GetReleaseAsset(assetID)
+	if err != nil || asset == nil {
+		jsonError(w, http.StatusNotFound, "Release asset not found")
+		return
+	}
+
+	if _, err := os.Stat(asset.FilePath); os.IsNotExist(err) {
+		jsonError(w, http.StatusNotFound, "Asset file missing from disk")
+		return
+	}
+
+	_ = database.IncrementReleaseAssetDownloads(assetID)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", asset.Name))
+	w.Header().Set("Content-Type", asset.ContentType)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", asset.SizeBytes))
+	http.ServeFile(w, req, asset.FilePath)
 }
 

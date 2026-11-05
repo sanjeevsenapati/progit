@@ -98,8 +98,12 @@ export const App: React.FC = () => {
     if (path === '/install') return <Install />;
     if (path === '/org/new') return <NewOrg />;
 
-    // Organization View: /org/:orgname
+    // Organization View: /org/:orgname or /orgs/:orgname
     if (path.startsWith('/org/')) {
+      const orgName = path.split('/')[2];
+      return <OrgView orgName={orgName} />;
+    }
+    if (path.startsWith('/orgs/')) {
       const orgName = path.split('/')[2];
       return <OrgView orgName={orgName} />;
     }

@@ -355,6 +355,54 @@ func runMigrations(db *sql.DB) error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient_id, is_read, created_at DESC);
 	CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id, created_at DESC);
+
+	CREATE TABLE IF NOT EXISTS sessions (
+		token TEXT PRIMARY KEY,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		username TEXT NOT NULL,
+		created_at DATETIME NOT NULL,
+		expires_at DATETIME NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+
+	CREATE TABLE IF NOT EXISTS branch_protections (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		repo_id INTEGER NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+		branch_name TEXT NOT NULL,
+		require_pr BOOLEAN NOT NULL DEFAULT 1,
+		required_approvals INTEGER NOT NULL DEFAULT 1,
+		prevent_force_push BOOLEAN NOT NULL DEFAULT 1,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(repo_id, branch_name)
+	);
+	CREATE INDEX IF NOT EXISTS idx_branch_protections_repo ON branch_protections(repo_id);
+
+	CREATE TABLE IF NOT EXISTS releases (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		repo_id INTEGER NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+		publisher_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		tag_name TEXT NOT NULL,
+		title TEXT NOT NULL,
+		note TEXT NOT NULL DEFAULT '',
+		is_draft BOOLEAN NOT NULL DEFAULT 0,
+		is_prerelease BOOLEAN NOT NULL DEFAULT 0,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		published_at DATETIME,
+		UNIQUE(repo_id, tag_name)
+	);
+	CREATE INDEX IF NOT EXISTS idx_releases_repo ON releases(repo_id, created_at DESC);
+
+	CREATE TABLE IF NOT EXISTS release_assets (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		release_id INTEGER NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
+		name TEXT NOT NULL,
+		size_bytes INTEGER NOT NULL DEFAULT 0,
+		download_count INTEGER NOT NULL DEFAULT 0,
+		file_path TEXT NOT NULL,
+		content_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_release_assets_release ON release_assets(release_id);
 	`
 
 	if _, err := db.Exec(schema); err != nil {
@@ -1564,6 +1612,20 @@ func MarkPullRequestMerged(prID, mergedByID int64, mergeCommitSHA string) error 
 	return nil
 }
 
+func HasOpenPullForBranch(repoID int64, headBranch string) (bool, error) {
+	if DB == nil {
+		return false, nil
+	}
+	var count int
+	err := DB.QueryRow(`
+		SELECT COUNT(*)
+		FROM pull_requests pr
+		JOIN issues i ON i.id = pr.issue_id
+		WHERE pr.head_repo_id = ? AND pr.head_branch = ? AND i.is_closed = 0 AND pr.is_merged = 0
+	`, repoID, headBranch).Scan(&count)
+	return count > 0, err
+}
+
 // Pull Request Reviews
 
 func CreatePullReview(issueID, pullID, reviewerID int64, state, content string, comments []PullReviewComment) (*PullReview, error) {
@@ -2060,10 +2122,19 @@ func ListOrgMembers(orgID int64) ([]OrgMember, error) {
 func IsOrgAdmin(orgID, userID int64) bool {
 	var role string
 	err := DB.QueryRow(`SELECT role FROM org_members WHERE org_id = ? AND user_id = ?`, orgID, userID).Scan(&role)
-	if err != nil {
-		return false
+	if err == nil && (role == "owner" || role == "admin") {
+		return true
 	}
-	return role == "owner" || role == "admin"
+	// Fallback: If only 1 member exists in the organization, treat that member as admin
+	var memberCount int
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM org_members WHERE org_id = ?`, orgID).Scan(&memberCount)
+	if memberCount <= 1 {
+		var singleUserID int64
+		if err := DB.QueryRow(`SELECT user_id FROM org_members WHERE org_id = ? LIMIT 1`, orgID).Scan(&singleUserID); err == nil && singleUserID == userID {
+			return true
+		}
+	}
+	return false
 }
 
 func CreateTeam(orgID int64, name, description, permission string) (*Team, error) {
@@ -2550,4 +2621,333 @@ func ListActiveDevelopers(limit int) ([]User, error) {
 	}
 	return users, nil
 }
+
+// ============================================================================
+// Session Persistence (P0)
+// ============================================================================
+
+type DBSession struct {
+	Token     string    `json:"token"`
+	UserID    int64     `json:"user_id"`
+	Username  string    `json:"username"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+func SaveDBSession(token string, userID int64, username string, createdAt, expiresAt time.Time) error {
+	if DB == nil {
+		return nil
+	}
+	_, err := DB.Exec(`
+		INSERT INTO sessions (token, user_id, username, created_at, expires_at)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(token) DO UPDATE SET
+			user_id = excluded.user_id,
+			username = excluded.username,
+			expires_at = excluded.expires_at
+	`, token, userID, username, createdAt, expiresAt)
+	return err
+}
+
+func GetDBSession(token string) (*DBSession, error) {
+	if DB == nil {
+		return nil, nil
+	}
+	var s DBSession
+	err := DB.QueryRow(`
+		SELECT token, user_id, username, created_at, expires_at
+		FROM sessions
+		WHERE token = ?
+	`, token).Scan(&s.Token, &s.UserID, &s.Username, &s.CreatedAt, &s.ExpiresAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if time.Now().After(s.ExpiresAt) {
+		_ = DeleteDBSession(token)
+		return nil, nil
+	}
+	return &s, nil
+}
+
+func DeleteDBSession(token string) error {
+	if DB == nil {
+		return nil
+	}
+	_, err := DB.Exec(`DELETE FROM sessions WHERE token = ?`, token)
+	return err
+}
+
+func CleanExpiredDBSessions() error {
+	if DB == nil {
+		return nil
+	}
+	_, err := DB.Exec(`DELETE FROM sessions WHERE expires_at <= CURRENT_TIMESTAMP`)
+	return err
+}
+
+// ============================================================================
+// Branch Protection (P3)
+// ============================================================================
+
+type BranchProtection struct {
+	ID                int64     `json:"id"`
+	RepoID            int64     `json:"repo_id"`
+	BranchName        string    `json:"branch_name"`
+	RequirePR         bool      `json:"require_pr"`
+	RequiredApprovals int       `json:"required_approvals"`
+	PreventForcePush  bool      `json:"prevent_force_push"`
+	CreatedAt         time.Time `json:"created_at"`
+}
+
+func GetBranchProtection(repoID int64, branchName string) (*BranchProtection, error) {
+	if DB == nil {
+		return nil, nil
+	}
+	var bp BranchProtection
+	err := DB.QueryRow(`
+		SELECT id, repo_id, branch_name, require_pr, required_approvals, prevent_force_push, created_at
+		FROM branch_protections
+		WHERE repo_id = ? AND branch_name = ?
+	`, repoID, branchName).Scan(&bp.ID, &bp.RepoID, &bp.BranchName, &bp.RequirePR, &bp.RequiredApprovals, &bp.PreventForcePush, &bp.CreatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &bp, nil
+}
+
+func ListBranchProtections(repoID int64) ([]BranchProtection, error) {
+	if DB == nil {
+		return nil, nil
+	}
+	rows, err := DB.Query(`
+		SELECT id, repo_id, branch_name, require_pr, required_approvals, prevent_force_push, created_at
+		FROM branch_protections
+		WHERE repo_id = ?
+		ORDER BY branch_name ASC
+	`, repoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []BranchProtection
+	for rows.Next() {
+		var bp BranchProtection
+		if err := rows.Scan(&bp.ID, &bp.RepoID, &bp.BranchName, &bp.RequirePR, &bp.RequiredApprovals, &bp.PreventForcePush, &bp.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, bp)
+	}
+	return list, nil
+}
+
+func SetBranchProtection(repoID int64, branchName string, requirePR bool, requiredApprovals int, preventForcePush bool) (*BranchProtection, error) {
+	if DB == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+	if requiredApprovals < 0 {
+		requiredApprovals = 0
+	}
+	_, err := DB.Exec(`
+		INSERT INTO branch_protections (repo_id, branch_name, require_pr, required_approvals, prevent_force_push)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(repo_id, branch_name) DO UPDATE SET
+			require_pr = excluded.require_pr,
+			required_approvals = excluded.required_approvals,
+			prevent_force_push = excluded.prevent_force_push
+	`, repoID, branchName, requirePR, requiredApprovals, preventForcePush)
+	if err != nil {
+		return nil, err
+	}
+	return GetBranchProtection(repoID, branchName)
+}
+
+func DeleteBranchProtection(repoID int64, branchName string) error {
+	if DB == nil {
+		return nil
+	}
+	_, err := DB.Exec(`DELETE FROM branch_protections WHERE repo_id = ? AND branch_name = ?`, repoID, branchName)
+	return err
+}
+
+// ============================================================================
+// Releases & Assets (P3)
+// ============================================================================
+
+type Release struct {
+	ID            int64          `json:"id"`
+	RepoID        int64          `json:"repo_id"`
+	PublisherID   int64          `json:"publisher_id"`
+	PublisherName string         `json:"publisher_name"`
+	TagName       string         `json:"tag_name"`
+	Title         string         `json:"title"`
+	Note          string         `json:"note"`
+	IsDraft       bool           `json:"is_draft"`
+	IsPrerelease  bool           `json:"is_prerelease"`
+	CreatedAt     time.Time      `json:"created_at"`
+	PublishedAt   *time.Time     `json:"published_at"`
+	Assets        []ReleaseAsset `json:"assets"`
+}
+
+type ReleaseAsset struct {
+	ID            int64     `json:"id"`
+	ReleaseID     int64     `json:"release_id"`
+	Name          string    `json:"name"`
+	SizeBytes     int64     `json:"size_bytes"`
+	DownloadCount int64     `json:"download_count"`
+	FilePath      string    `json:"file_path,omitempty"`
+	ContentType   string    `json:"content_type"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+func CreateRelease(repoID, publisherID int64, tagName, title, note string, isDraft, isPrerelease bool) (*Release, error) {
+	if DB == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+	res, err := DB.Exec(`
+		INSERT INTO releases (repo_id, publisher_id, tag_name, title, note, is_draft, is_prerelease, published_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+	`, repoID, publisherID, tagName, title, note, isDraft, isPrerelease)
+	if err != nil {
+		return nil, err
+	}
+	id, _ := res.LastInsertId()
+	return GetReleaseByID(id)
+}
+
+func GetReleaseByID(id int64) (*Release, error) {
+	if DB == nil {
+		return nil, nil
+	}
+	var r Release
+	var pubName sql.NullString
+	err := DB.QueryRow(`
+		SELECT r.id, r.repo_id, r.publisher_id, u.username, r.tag_name, r.title, r.note,
+		       r.is_draft, r.is_prerelease, r.created_at, r.published_at
+		FROM releases r
+		LEFT JOIN users u ON u.id = r.publisher_id
+		WHERE r.id = ?
+	`, id).Scan(&r.ID, &r.RepoID, &r.PublisherID, &pubName, &r.TagName, &r.Title, &r.Note,
+		&r.IsDraft, &r.IsPrerelease, &r.CreatedAt, &r.PublishedAt)
+	if err != nil {
+		return nil, err
+	}
+	r.PublisherName = pubName.String
+	assets, _ := ListReleaseAssets(r.ID)
+	r.Assets = assets
+	return &r, nil
+}
+
+func ListReleases(repoID int64) ([]Release, error) {
+	if DB == nil {
+		return nil, nil
+	}
+	rows, err := DB.Query(`
+		SELECT r.id, r.repo_id, r.publisher_id, u.username, r.tag_name, r.title, r.note,
+		       r.is_draft, r.is_prerelease, r.created_at, r.published_at
+		FROM releases r
+		LEFT JOIN users u ON u.id = r.publisher_id
+		WHERE r.repo_id = ?
+		ORDER BY r.created_at DESC
+	`, repoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []Release
+	for rows.Next() {
+		var r Release
+		var pubName sql.NullString
+		if err := rows.Scan(&r.ID, &r.RepoID, &r.PublisherID, &pubName, &r.TagName, &r.Title, &r.Note,
+			&r.IsDraft, &r.IsPrerelease, &r.CreatedAt, &r.PublishedAt); err != nil {
+			return nil, err
+		}
+		r.PublisherName = pubName.String
+		assets, _ := ListReleaseAssets(r.ID)
+		r.Assets = assets
+		list = append(list, r)
+	}
+	return list, nil
+}
+
+func DeleteRelease(releaseID int64) error {
+	if DB == nil {
+		return nil
+	}
+	_, err := DB.Exec(`DELETE FROM releases WHERE id = ?`, releaseID)
+	return err
+}
+
+func CreateReleaseAsset(releaseID int64, name string, sizeBytes int64, filePath, contentType string) (*ReleaseAsset, error) {
+	if DB == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+	res, err := DB.Exec(`
+		INSERT INTO release_assets (release_id, name, size_bytes, file_path, content_type)
+		VALUES (?, ?, ?, ?, ?)
+	`, releaseID, name, sizeBytes, filePath, contentType)
+	if err != nil {
+		return nil, err
+	}
+	id, _ := res.LastInsertId()
+	return GetReleaseAsset(id)
+}
+
+func GetReleaseAsset(assetID int64) (*ReleaseAsset, error) {
+	if DB == nil {
+		return nil, nil
+	}
+	var a ReleaseAsset
+	err := DB.QueryRow(`
+		SELECT id, release_id, name, size_bytes, download_count, file_path, content_type, created_at
+		FROM release_assets
+		WHERE id = ?
+	`, assetID).Scan(&a.ID, &a.ReleaseID, &a.Name, &a.SizeBytes, &a.DownloadCount, &a.FilePath, &a.ContentType, &a.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+func ListReleaseAssets(releaseID int64) ([]ReleaseAsset, error) {
+	if DB == nil {
+		return nil, nil
+	}
+	rows, err := DB.Query(`
+		SELECT id, release_id, name, size_bytes, download_count, file_path, content_type, created_at
+		FROM release_assets
+		WHERE release_id = ?
+		ORDER BY id ASC
+	`, releaseID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []ReleaseAsset
+	for rows.Next() {
+		var a ReleaseAsset
+		if err := rows.Scan(&a.ID, &a.ReleaseID, &a.Name, &a.SizeBytes, &a.DownloadCount, &a.FilePath, &a.ContentType, &a.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, a)
+	}
+	return list, nil
+}
+
+func IncrementReleaseAssetDownloads(assetID int64) error {
+	if DB == nil {
+		return nil
+	}
+	_, err := DB.Exec(`UPDATE release_assets SET download_count = download_count + 1 WHERE id = ?`, assetID)
+	return err
+}
+
 

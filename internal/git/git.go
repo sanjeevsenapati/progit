@@ -1261,3 +1261,145 @@ func UploadFiles(repoPath, branch, baseSubPath string, files []UploadedFile, aut
 	return sha, targetBranch, nil
 }
 
+// ============================================================================
+// Git Blame & In-Repo Code Search (P2 & P3)
+// ============================================================================
+
+type BlameLine struct {
+	LineNumber int    `json:"line_number"`
+	CommitSHA  string `json:"commit_sha"`
+	ShortSHA   string `json:"short_sha"`
+	Author     string `json:"author"`
+	AuthorMail string `json:"author_mail"`
+	Timestamp  string `json:"timestamp"`
+	Summary    string `json:"summary"`
+	Content    string `json:"content"`
+}
+
+func GetBlame(repoDir, ref, filePath string) ([]BlameLine, error) {
+	if ref == "" {
+		ref = "HEAD"
+	}
+	cleanPath := filepath.Clean(filePath)
+	cleanPath = strings.TrimPrefix(cleanPath, "/")
+
+	out, err := RunGit(repoDir, "blame", "--line-porcelain", ref, "--", cleanPath)
+	if err != nil {
+		return nil, fmt.Errorf("git blame failed: %v", err)
+	}
+
+	lines := strings.Split(string(out), "\n")
+	var result []BlameLine
+	var currentSha, currentAuthor, currentMail, currentSummary, currentTimestamp string
+
+	lineNum := 1
+	for _, l := range lines {
+		if l == "" {
+			continue
+		}
+		if strings.HasPrefix(l, "\t") {
+			// Tab prefix denotes line content
+			content := strings.TrimPrefix(l, "\t")
+			shortSha := currentSha
+			if len(shortSha) > 7 {
+				shortSha = shortSha[:7]
+			}
+			result = append(result, BlameLine{
+				LineNumber: lineNum,
+				CommitSHA:  currentSha,
+				ShortSHA:   shortSha,
+				Author:     currentAuthor,
+				AuthorMail: currentMail,
+				Timestamp:  currentTimestamp,
+				Summary:    currentSummary,
+				Content:    content,
+			})
+			lineNum++
+			continue
+		}
+
+		parts := strings.SplitN(l, " ", 2)
+		header := parts[0]
+		val := ""
+		if len(parts) > 1 {
+			val = parts[1]
+		}
+
+		if len(header) == 40 && isHex(header) {
+			currentSha = header
+		} else if header == "author" {
+			currentAuthor = val
+		} else if header == "author-mail" {
+			currentMail = strings.Trim(val, "<>")
+		} else if header == "author-time" {
+			if sec, err := strconv.ParseInt(val, 10, 64); err == nil {
+				currentTimestamp = time.Unix(sec, 0).Format(time.RFC3339)
+			} else {
+				currentTimestamp = val
+			}
+		} else if header == "summary" {
+			currentSummary = val
+		}
+	}
+
+	return result, nil
+}
+
+func isHex(s string) bool {
+	for _, c := range s {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+
+type CodeMatch struct {
+	Path       string `json:"path"`
+	LineNumber int    `json:"line_number"`
+	Content    string `json:"content"`
+}
+
+func SearchCode(repoDir, ref, query string) ([]CodeMatch, error) {
+	if ref == "" {
+		ref = "HEAD"
+	}
+	if query == "" {
+		return nil, nil
+	}
+
+	out, err := RunGit(repoDir, "grep", "-n", "-I", "-i", "--max-count=150", query, ref)
+	if err != nil {
+		// Exit code 1 from git grep means no matches found
+		return []CodeMatch{}, nil
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	var matches []CodeMatch
+	prefix := ref + ":"
+
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		line = strings.TrimPrefix(line, prefix)
+		parts := strings.SplitN(line, ":", 3)
+		if len(parts) < 3 {
+			continue
+		}
+		path := parts[0]
+		lineNo, err := strconv.Atoi(parts[1])
+		if err != nil {
+			continue
+		}
+		content := parts[2]
+		matches = append(matches, CodeMatch{
+			Path:       path,
+			LineNumber: lineNo,
+			Content:    content,
+		})
+	}
+
+	return matches, nil
+}
+

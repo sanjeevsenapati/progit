@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository, TreeEntry, Commit } from '../lib/api';
+import { api, Repository, TreeEntry, Commit, RecentPush } from '../lib/api';
 import { RepoNav } from '../components/RepoNav';
 import { MarkdownViewer } from '../components/MarkdownViewer';
 import { showToast } from '../components/ModalDialog';
@@ -74,6 +74,7 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
   const [copiedQuick, setCopiedQuick] = useState(false);
   const [copiedBlock1, setCopiedBlock1] = useState(false);
   const [copiedBlock2, setCopiedBlock2] = useState(false);
+  const [recentPushes, setRecentPushes] = useState<RecentPush[]>([]);
 
   const selectedCloneUrl = cloneTab === 'ssh' && cloneSSH ? cloneSSH : (cloneHTTP || `${window.location.origin}/${owner}/${repoName}.git`);
   const isEmptyRepo = !loading && !initialPath && entries.length === 0 && !latestCommit;
@@ -110,6 +111,10 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
         }
         setCloneHTTP(data.clone_url_http);
         setCloneSSH(data.clone_url_ssh);
+
+        api.getRecentPushes(owner, repoName).then(res => {
+          setRecentPushes(res?.recent_pushes || []);
+        }).catch(() => {});
 
         const treeData = await api.getTree(owner, repoName, branch, initialPath);
         setEntries(treeData.entries || []);
@@ -435,6 +440,33 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
                   </button>
                 </div>
 
+                {cloneTab === 'http' && (
+                  <div className="pt-2 border-t border-gray-100 dark:border-dark-border space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-dark-muted">
+                      <span>Bypass self-signed SSL:</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyClone(`git -c http.sslVerify=false clone ${cloneHTTP}`)}
+                        className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline inline-flex items-center space-x-1 cursor-pointer"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>Copy command</span>
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-dark-muted">
+                      <span>Root CA Certificate:</span>
+                      <a
+                        href="/api/v1/server/cert"
+                        download="progit-cert.pem"
+                        className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline inline-flex items-center space-x-1 cursor-pointer"
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>Download (.pem)</span>
+                      </a>
+                    </div>
+                  </div>
+                )}
+
                 <p className="text-xs text-gray-500 dark:text-dark-muted">
                   Use Git or checkout with SVN using the web URL.
                 </p>
@@ -443,6 +475,32 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
           </div>
         </div>
       </div>
+
+        {/* Recently Pushed Branches Banner with 1-click Compare & PR */}
+        {recentPushes.length > 0 && (
+          <div className="space-y-2 mb-4">
+            {recentPushes.map((rp) => (
+              <div
+                key={rp.branch}
+                className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-xl flex items-center justify-between gap-3 text-xs shadow-xs"
+              >
+                <div className="flex items-center space-x-2.5 min-w-0">
+                  <GitBranch className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span className="font-mono font-bold text-gray-900 dark:text-white truncate">{rp.branch}</span>
+                  <span className="text-gray-500 dark:text-dark-muted hidden sm:inline truncate">
+                    had recent pushes {rp.time_ago}
+                  </span>
+                </div>
+                <a
+                  href={`/${owner}/${repoName}/compare?base=${repoData?.default_branch || 'main'}&head=${encodeURIComponent(rp.branch)}`}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shrink-0 shadow-sm transition-colors cursor-pointer"
+                >
+                  Compare & pull request
+                </a>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* GitHub-Style Blank / Empty Repo Quick Setup OR File Tree Table */}
         {isEmptyRepo ? (

@@ -4,9 +4,12 @@ import { Copy, Check } from 'lucide-react';
 interface MarkdownViewerProps {
   content: string;
   className?: string;
+  owner?: string;
+  repo?: string;
+  branch?: string;
 }
 
-export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, className = '' }) => {
+export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, className = '', owner, repo, branch }) => {
   if (!content) return null;
 
   const renderInline = (text: string): React.ReactNode => {
@@ -34,12 +37,17 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, classNa
         if (match.index > lastIndex) {
           result.push(part.substring(lastIndex, match.index));
         }
+        let rawSrc = match[2].trim();
+        if (owner && repo && !/^(https?:\/\/|data:|\/)/i.test(rawSrc)) {
+          const cleanPath = rawSrc.replace(/^\.\//, '');
+          rawSrc = `/api/v1/repos/${owner}/${repo}/raw?branch=${encodeURIComponent(branch || 'main')}&path=${encodeURIComponent(cleanPath)}`;
+        }
         result.push(
           <img
             key={`img-${match.index}`}
-            src={match[2]}
+            src={rawSrc}
             alt={match[1]}
-            className="max-w-full rounded border border-gray-200 dark:border-dark-border my-2 inline-block"
+            className="max-w-full rounded border border-gray-200 dark:border-dark-border my-2 inline-block shadow-xs"
           />
         );
         lastIndex = match.index + match[0].length;
@@ -334,9 +342,35 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, classNa
       continue;
     }
 
-    // Blockquote
+    // Blockquote & GFM Alerts
     if (line.startsWith('>')) {
       const quoteText = line.replace(/^>\s?/, '');
+      const alertMatch = quoteText.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*(.*)$/i);
+      if (alertMatch) {
+        const alertType = alertMatch[1].toUpperCase();
+        const alertBody = alertMatch[2];
+        const alertStyles: Record<string, { border: string; bg: string; text: string; label: string }> = {
+          NOTE: { border: 'border-blue-500', bg: 'bg-blue-50/60 dark:bg-blue-950/20', text: 'text-blue-700 dark:text-blue-300', label: 'Note' },
+          TIP: { border: 'border-emerald-500', bg: 'bg-emerald-50/60 dark:bg-emerald-950/20', text: 'text-emerald-700 dark:text-emerald-300', label: 'Tip' },
+          IMPORTANT: { border: 'border-purple-500', bg: 'bg-purple-50/60 dark:bg-purple-950/20', text: 'text-purple-700 dark:text-purple-300', label: 'Important' },
+          WARNING: { border: 'border-amber-500', bg: 'bg-amber-50/60 dark:bg-amber-950/20', text: 'text-amber-700 dark:text-amber-300', label: 'Warning' },
+          CAUTION: { border: 'border-red-500', bg: 'bg-red-50/60 dark:bg-red-950/20', text: 'text-red-700 dark:text-red-300', label: 'Caution' },
+        };
+        const s = alertStyles[alertType] || alertStyles.NOTE;
+        elements.push(
+          <div
+            key={`alert-${elements.length}`}
+            className={`border-l-4 ${s.border} ${s.bg} p-3.5 my-3 rounded-r-lg shadow-2xs space-y-1 text-xs`}
+          >
+            <div className={`font-bold flex items-center space-x-1.5 ${s.text}`}>
+              <span>{s.label}</span>
+            </div>
+            {alertBody && <div className="text-gray-800 dark:text-gray-200">{renderInline(alertBody)}</div>}
+          </div>
+        );
+        continue;
+      }
+
       elements.push(
         <blockquote
           key={`quote-${elements.length}`}
@@ -344,6 +378,19 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, classNa
         >
           {renderInline(quoteText)}
         </blockquote>
+      );
+      continue;
+    }
+
+    // Task list items
+    if (line.trim().startsWith('- [ ] ') || line.trim().startsWith('- [x] ')) {
+      const isChecked = line.trim().startsWith('- [x] ');
+      const taskText = line.trim().slice(6);
+      elements.push(
+        <div key={`task-${elements.length}`} className="flex items-center space-x-2 my-1 text-sm text-gray-800 dark:text-gray-200">
+          <input type="checkbox" checked={isChecked} readOnly className="rounded text-emerald-600 pointer-events-none" />
+          <span className={isChecked ? 'line-through text-gray-400 dark:text-gray-500' : ''}>{renderInline(taskText)}</span>
+        </div>
       );
       continue;
     }

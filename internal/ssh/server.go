@@ -121,6 +121,11 @@ func (s *Server) handleConnection(nConn net.Conn) {
 func (s *Server) handleSession(channel gossh.Channel, requests <-chan *gossh.Request, perms *gossh.Permissions) {
 	defer channel.Close()
 
+	username := "user"
+	if perms != nil && perms.Extensions["username"] != "" {
+		username = perms.Extensions["username"]
+	}
+
 	for req := range requests {
 		switch req.Type {
 		case "exec":
@@ -129,7 +134,25 @@ func (s *Server) handleSession(channel gossh.Channel, requests <-chan *gossh.Req
 			if len(cmdStr) > 4 {
 				cmdStr = cmdStr[4:]
 			}
+			cmdTrimmed := strings.TrimSpace(cmdStr)
+			if cmdTrimmed == "" || cmdTrimmed == "whoami" || (!strings.HasPrefix(cmdTrimmed, "git-upload-pack") && !strings.HasPrefix(cmdTrimmed, "git-receive-pack")) {
+				_ = req.Reply(true, nil)
+				msg := fmt.Sprintf("\nHi %s! You've successfully authenticated over SSH, but ProGit does not provide interactive shell access.\nConnection to %s closed.\n\n", username, s.cfg.Server.Domain)
+				_, _ = channel.Write([]byte(msg))
+				status := struct{ Status uint32 }{Status: 0}
+				_, _ = channel.SendRequest("exit-status", false, gossh.Marshal(&status))
+				return
+			}
 			s.executeGitCommand(channel, req, cmdStr, perms)
+			return
+		case "pty-req":
+			_ = req.Reply(true, nil)
+		case "shell":
+			_ = req.Reply(true, nil)
+			msg := fmt.Sprintf("\nHi %s! You've successfully authenticated over SSH, but ProGit does not provide interactive shell access.\nConnection to %s closed.\n\n", username, s.cfg.Server.Domain)
+			_, _ = channel.Write([]byte(msg))
+			status := struct{ Status uint32 }{Status: 0}
+			_, _ = channel.SendRequest("exit-status", false, gossh.Marshal(&status))
 			return
 		case "env":
 			_ = req.Reply(true, nil)
@@ -235,6 +258,12 @@ func (s *Server) executeGitCommand(channel gossh.Channel, req *gossh.Request, ra
 	}()
 
 	_ = cmd.Wait()
+
+	if isWrite {
+		rootURL := strings.TrimRight(s.cfg.Server.RootURL, "/")
+		prMsg := fmt.Sprintf("\nremote: \nremote: To create a pull request on ProGit, visit:\nremote:   %s/%s/%s/pulls/new\nremote: \n", rootURL, ownerName, cleanRepoName)
+		_, _ = channel.Stderr().Write([]byte(prMsg))
+	}
 
 	status := struct{ Status uint32 }{Status: 0}
 	if cmd.ProcessState != nil && !cmd.ProcessState.Success() {

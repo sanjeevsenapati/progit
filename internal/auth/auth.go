@@ -46,17 +46,22 @@ func CreateSession(userID int64, username string) (*Session, error) {
 		return nil, err
 	}
 	token := hex.EncodeToString(b)
+	now := time.Now()
+	expires := now.Add(7 * 24 * time.Hour)
 	sess := &Session{
 		Token:     token,
 		UserID:    userID,
 		Username:  username,
-		CreatedAt: time.Now(),
-		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
+		CreatedAt: now,
+		ExpiresAt: expires,
 	}
 
 	sessionsMu.Lock()
 	sessions[token] = sess
 	sessionsMu.Unlock()
+
+	// Persist to SQLite so container restarts preserve login sessions
+	_ = database.SaveDBSession(token, userID, username, now, expires)
 
 	return sess, nil
 }
@@ -64,20 +69,39 @@ func CreateSession(userID int64, username string) (*Session, error) {
 // GetSession returns the active session for a given token.
 func GetSession(token string) *Session {
 	sessionsMu.RLock()
-	defer sessionsMu.RUnlock()
-
 	sess, ok := sessions[token]
-	if !ok || time.Now().After(sess.ExpiresAt) {
-		return nil
+	sessionsMu.RUnlock()
+
+	if ok && !time.Now().After(sess.ExpiresAt) {
+		return sess
 	}
-	return sess
+
+	// Fallback to SQLite DB if not in memory (e.g. after container/service restart)
+	dbSess, err := database.GetDBSession(token)
+	if err == nil && dbSess != nil && time.Now().Before(dbSess.ExpiresAt) {
+		sess = &Session{
+			Token:     dbSess.Token,
+			UserID:    dbSess.UserID,
+			Username:  dbSess.Username,
+			CreatedAt: dbSess.CreatedAt,
+			ExpiresAt: dbSess.ExpiresAt,
+		}
+		sessionsMu.Lock()
+		sessions[token] = sess
+		sessionsMu.Unlock()
+		return sess
+	}
+
+	return nil
 }
 
-// DeleteSession destroys the session.
+// DeleteSession destroys the session in memory and database.
 func DeleteSession(token string) {
 	sessionsMu.Lock()
 	delete(sessions, token)
 	sessionsMu.Unlock()
+
+	_ = database.DeleteDBSession(token)
 }
 
 // CountActiveSessions returns the number of unexpired active sessions.

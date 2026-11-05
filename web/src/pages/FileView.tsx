@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository, Commit } from '../lib/api';
+import { api, Repository, Commit, BlameLine } from '../lib/api';
 import { navigate } from '../lib/router';
 import { useTheme } from '../lib/theme';
 import { RepoNav } from '../components/RepoNav';
@@ -22,10 +22,10 @@ import {
   X, 
   AlertTriangle,
   BookOpen,
-  Code,
-  PanelLeft,
-  Clock,
-  History
+  Code, 
+  History, 
+  PanelLeft, 
+  Clock 
 } from 'lucide-react';
 
 interface FileViewProps {
@@ -57,6 +57,44 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
   // Markdown view mode
   const isMarkdown = filePath.toLowerCase().endsWith('.md');
   const [viewMode, setViewMode] = useState<'rendered' | 'source'>(isMarkdown ? 'rendered' : 'source');
+
+  // Code vs Blame view mode
+  const [activeTab, setActiveTab] = useState<'code' | 'blame'>('code');
+  const [blameLines, setBlameLines] = useState<BlameLine[]>([]);
+  const [loadingBlame, setLoadingBlame] = useState(false);
+  const [selectedLine, setSelectedLine] = useState<number | null>(null);
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.startsWith('#L')) {
+      const num = parseInt(hash.slice(2), 10);
+      if (!isNaN(num)) {
+        setSelectedLine(num);
+      }
+    }
+  }, []);
+
+  const handleLineClick = (lineNum: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    setSelectedLine(lineNum);
+    const hash = `#L${lineNum}`;
+    window.history.replaceState(null, '', `${window.location.pathname}${hash}`);
+    navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}${hash}`);
+    showToast(`Copied permalink for line ${lineNum}`);
+  };
+
+  const loadBlame = async () => {
+    if (blameLines.length > 0) return;
+    try {
+      setLoadingBlame(true);
+      const data = await api.getBlame(owner, repoName, branch, filePath);
+      setBlameLines(data.lines || []);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to load blame', 'error');
+    } finally {
+      setLoadingBlame(false);
+    }
+  };
 
   useEffect(() => {
     async function load() {
@@ -134,77 +172,7 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
     <div>
       <RepoNav repo={repoData} activeTab="code" />
 
-      <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-5 space-y-4">
-        {/* Top Header: Sidebar toggle & Breadcrumbs */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-dark-surface p-3.5 rounded-xl border border-gray-200 dark:border-dark-border shadow-xs">
-          <div className="flex items-center space-x-1.5 text-sm font-semibold text-gray-600 dark:text-dark-muted flex-wrap">
-            {!isSidebarOpen && (
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen(true)}
-                className="p-1.5 mr-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-gray-50 dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-100 transition-colors cursor-pointer flex items-center space-x-1"
-                title="Show file tree"
-              >
-                <PanelLeft className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span className="text-xs font-bold">Files</span>
-              </button>
-            )}
-
-            <a href={`/${owner}/${repoName}`} className="text-emerald-600 dark:text-emerald-400 hover:underline">
-              {repoName}
-            </a>
-            {pathParts.map((part, idx) => {
-              const isLast = idx === pathParts.length - 1;
-              const sub = pathParts.slice(0, idx + 1).join('/');
-              return (
-                <React.Fragment key={sub}>
-                  <ChevronRight className="w-4 h-4 text-gray-400" />
-                  {isLast ? (
-                    <span className="text-gray-900 dark:text-white font-bold font-mono">{part}</span>
-                  ) : (
-                    <a
-                      href={`/${owner}/${repoName}/tree/${branch}/${sub}`}
-                      className="text-emerald-600 dark:text-emerald-400 hover:underline font-mono"
-                    >
-                      {part}
-                    </a>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </div>
-
-          {/* Right Header: Render / Source Switcher for Markdown */}
-          {isMarkdown && (
-            <div className="flex space-x-1 p-1 rounded-lg bg-gray-100 dark:bg-dark-hover border border-gray-200 dark:border-dark-border text-xs font-semibold self-start sm:self-auto">
-              <button
-                type="button"
-                onClick={() => setViewMode('rendered')}
-                className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
-                  viewMode === 'rendered'
-                    ? 'bg-white dark:bg-dark-surface shadow-xs text-emerald-600 dark:text-emerald-400 font-bold'
-                    : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
-                }`}
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>Preview</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('source')}
-                className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
-                  viewMode === 'source'
-                    ? 'bg-white dark:bg-dark-surface shadow-xs text-emerald-600 dark:text-emerald-400 font-bold'
-                    : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
-                }`}
-              >
-                <Code className="w-3.5 h-3.5" />
-                <span>Code</span>
-              </button>
-            </div>
-          )}
-        </div>
-
+      <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-5">
         {/* Main Content: File Explorer Sidebar + File Content Viewer */}
         <div className="flex flex-col lg:flex-row gap-4 items-start">
           {/* File Explorer Sidebar */}
@@ -229,6 +197,68 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
 
           {/* Right: File Viewer Area */}
           <div className="flex-1 min-w-0 space-y-4 w-full">
+            {/* Top Breadcrumb Bar (GitHub Style) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-dark-surface p-3 rounded-xl border border-gray-200 dark:border-dark-border shadow-xs">
+              <div className="flex items-center space-x-1.5 text-sm font-semibold text-gray-600 dark:text-dark-muted flex-wrap">
+                {!isSidebarOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="p-1.5 mr-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-gray-50 dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-100 transition-colors cursor-pointer flex items-center space-x-1"
+                    title="Show file tree"
+                  >
+                    <PanelLeft className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-xs font-bold">Files</span>
+                  </button>
+                )}
+
+                <a href={`/${owner}/${repoName}`} className="text-emerald-600 dark:text-emerald-400 hover:underline">
+                  {repoName}
+                </a>
+                {pathParts.map((part, idx) => {
+                  const isLast = idx === pathParts.length - 1;
+                  const sub = pathParts.slice(0, idx + 1).join('/');
+                  return (
+                    <React.Fragment key={sub}>
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                      {isLast ? (
+                        <span className="text-gray-900 dark:text-white font-bold font-mono">{part}</span>
+                      ) : (
+                        <a
+                          href={`/${owner}/${repoName}/tree/${branch}/${sub}`}
+                          className="text-emerald-600 dark:text-emerald-400 hover:underline font-mono"
+                        >
+                          {part}
+                        </a>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(filePath);
+                    showToast('Copied file path to clipboard');
+                  }}
+                  className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-dark-text ml-1"
+                  title="Copy path"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <a
+                  href={`/${owner}/${repoName}/commits/${branch}`}
+                  className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-600 dark:text-dark-muted hover:text-emerald-600 transition-colors"
+                >
+                  <History className="w-3.5 h-3.5" />
+                  <span>History</span>
+                </a>
+              </div>
+            </div>
+
             {/* Latest Commit Bar (GitHub Style) */}
             {latestCommit && (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-xs shadow-xs">
@@ -247,32 +277,86 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
                   <span className="bg-gray-100 dark:bg-dark-hover px-1.5 py-0.5 rounded">
                     {latestCommit.short_sha || latestCommit.sha?.substring(0, 7)}
                   </span>
-                  <a
-                    href={`/${owner}/${repoName}/commits/${branch}`}
-                    className="inline-flex items-center space-x-1 hover:text-emerald-600 dark:hover:text-emerald-400 font-sans"
-                  >
-                    <History className="w-3.5 h-3.5" />
-                    <span>History</span>
-                  </a>
+                  <span className="text-gray-400">
+                    {latestCommit.timestamp ? new Date(latestCommit.timestamp).toLocaleDateString() : ''}
+                  </span>
                 </div>
               </div>
             )}
 
             {/* File Content Box */}
             <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-xs overflow-hidden">
-              {/* Box Sub-header */}
-              <div className="px-4 py-2.5 bg-gray-50 dark:bg-[#14161f] border-b border-gray-200 dark:border-dark-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-gray-600 dark:text-dark-muted">
-                <div className="flex items-center space-x-2 font-mono">
-                  <FileText className="w-4 h-4 text-sky-500" />
-                  <span className="font-bold text-gray-900 dark:text-white">{fileName}</span>
-                  <span>•</span>
-                  <span>{lines.length} lines</span>
-                  <span>•</span>
-                  <span>{(size / 1024).toFixed(1)} KB</span>
-                  <span>•</span>
-                  <span className="capitalize">{language}</span>
+              {/* Box Sub-header (Code/Blame, Lines/Size, Actions) */}
+              <div className="px-4 py-2 bg-gray-50 dark:bg-[#14161f] border-b border-gray-200 dark:border-dark-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-gray-600 dark:text-dark-muted">
+                {/* Left: Code/Blame Switcher & Markdown Mode & Info */}
+                <div className="flex items-center space-x-3 flex-wrap">
+                  <div className="flex space-x-1 p-0.5 rounded-lg bg-gray-200/60 dark:bg-dark-hover border border-gray-200 dark:border-dark-border text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('code')}
+                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                        activeTab === 'code'
+                          ? 'bg-white dark:bg-dark-surface shadow-2xs text-emerald-600 dark:text-emerald-400 font-bold'
+                          : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
+                      }`}
+                    >
+                      <Code className="w-3.5 h-3.5" />
+                      <span>Code</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('blame');
+                        loadBlame();
+                      }}
+                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                        activeTab === 'blame'
+                          ? 'bg-white dark:bg-dark-surface shadow-2xs text-emerald-600 dark:text-emerald-400 font-bold'
+                          : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
+                      }`}
+                    >
+                      <History className="w-3.5 h-3.5" />
+                      <span>Blame</span>
+                    </button>
+                  </div>
+
+                  {isMarkdown && activeTab === 'code' && (
+                    <div className="flex space-x-1 p-0.5 rounded-lg bg-gray-200/60 dark:bg-dark-hover border border-gray-200 dark:border-dark-border text-xs font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('rendered')}
+                        className={`flex items-center space-x-1 px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                          viewMode === 'rendered'
+                            ? 'bg-white dark:bg-dark-surface shadow-2xs text-emerald-600 dark:text-emerald-400 font-bold'
+                            : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
+                        }`}
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>Preview</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('source')}
+                        className={`flex items-center space-x-1 px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                          viewMode === 'source'
+                            ? 'bg-white dark:bg-dark-surface shadow-2xs text-emerald-600 dark:text-emerald-400 font-bold'
+                            : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
+                        }`}
+                      >
+                        <Code className="w-3.5 h-3.5" />
+                        <span>Source</span>
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center space-x-2 font-mono text-[11px] text-gray-500">
+                    <span>{lines.length} lines</span>
+                    <span>•</span>
+                    <span>{(size / 1024).toFixed(1)} KB</span>
+                  </div>
                 </div>
 
+                {/* Right: Actions */}
                 <div className="flex items-center space-x-2">
                   {/* Edit file online */}
                   {canWrite && (
@@ -321,24 +405,98 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
               </div>
 
               {/* File Content Body */}
-              {isMarkdown && viewMode === 'rendered' ? (
+              {activeTab === 'blame' ? (
+                <div className={`overflow-x-auto text-xs font-mono transition-colors ${autoEditorTheme}`}>
+                  {loadingBlame ? (
+                    <div className="py-16 text-center text-gray-400 space-y-2">
+                      <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      <p>Loading git blame information...</p>
+                    </div>
+                  ) : blameLines.length === 0 ? (
+                    <div className="py-16 text-center text-gray-400">
+                      No blame information available for this file.
+                    </div>
+                  ) : (
+                    <table className="w-full border-collapse">
+                      <tbody>
+                        {blameLines.map((blame, idx) => (
+                          <tr
+                            key={idx}
+                            id={`L${blame.line_number}`}
+                            className={`hover:bg-emerald-500/5 group ${
+                              selectedLine === blame.line_number ? 'bg-amber-100/70 dark:bg-amber-950/40 ring-1 ring-amber-400' : ''
+                            }`}
+                          >
+                            {/* Commit author & summary gutter */}
+                            <td className="w-64 py-0.5 px-3 border-r border-gray-200 dark:border-dark-border text-gray-500 dark:text-dark-muted font-sans text-[11px] truncate select-none bg-gray-50/50 dark:bg-dark-bg/40">
+                              <div className="flex items-center space-x-2 truncate">
+                                <a
+                                  href={`/${owner}/${repoName}/commit/${blame.commit_sha}`}
+                                  className="font-mono text-emerald-600 dark:text-emerald-400 hover:underline shrink-0"
+                                  title={`Commit: ${blame.commit_sha} - ${blame.summary}`}
+                                >
+                                  {blame.short_sha}
+                                </a>
+                                <span className="font-semibold text-gray-700 dark:text-gray-300 truncate">{blame.author}</span>
+                                <span className="text-[10px] text-gray-400 shrink-0">
+                                  {blame.timestamp ? new Date(blame.timestamp).toLocaleDateString() : ''}
+                                </span>
+                              </div>
+                            </td>
+                            {/* Clickable Line Number */}
+                            <td className="w-12 text-right pr-3 pl-2 py-0.5 border-r border-gray-200 dark:border-dark-border select-none">
+                              <a
+                                href={`#L${blame.line_number}`}
+                                onClick={(e) => handleLineClick(blame.line_number, e)}
+                                className={`text-[11px] font-mono block cursor-pointer transition-colors ${
+                                  selectedLine === blame.line_number ? 'text-amber-600 font-bold' : 'text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                                }`}
+                              >
+                                {blame.line_number}
+                              </a>
+                            </td>
+                            {/* Code Line */}
+                            <td className="pl-4 pr-4 py-0.5 whitespace-pre overflow-x-auto">
+                              <span dangerouslySetInnerHTML={{ __html: highlightCode(blame.content || ' ', language) }} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              ) : isMarkdown && viewMode === 'rendered' ? (
                 <div className="p-6">
-                  <MarkdownViewer content={content || '*Empty markdown file*'} />
+                  <MarkdownViewer content={content || '*Empty markdown file*'} owner={owner} repo={repoName} branch={branch} />
                 </div>
               ) : (
                 <div className={`overflow-x-auto text-xs font-mono transition-colors ${autoEditorTheme}`}>
                   <table className="w-full border-collapse">
                     <tbody>
                       {lines.map((line, idx) => (
-                        <tr key={idx} className="hover:bg-emerald-500/5 group">
+                        <tr
+                          key={idx}
+                          id={`L${idx + 1}`}
+                          className={`hover:bg-emerald-500/5 group ${
+                            selectedLine === idx + 1 ? 'bg-amber-100/70 dark:bg-amber-950/40 ring-1 ring-amber-400' : ''
+                          }`}
+                        >
                           <td
                             className={`select-none text-right pr-4 pl-4 py-0.5 border-r w-12 text-gray-400 font-mono text-[11px] ${
-                              autoEditorTheme === 'prettier-light'
+                              selectedLine === idx + 1
+                                ? 'bg-amber-400 text-gray-950 font-bold border-amber-500'
+                                : autoEditorTheme === 'prettier-light'
                                 ? 'border-gray-200 bg-gray-50/70 text-gray-400'
                                 : 'border-white/10 bg-black/20 text-gray-500'
                             }`}
                           >
-                            {idx + 1}
+                            <a
+                              href={`#L${idx + 1}`}
+                              onClick={(e) => handleLineClick(idx + 1, e)}
+                              className="block cursor-pointer transition-colors hover:text-gray-900 dark:hover:text-white"
+                            >
+                              {idx + 1}
+                            </a>
                           </td>
                           <td className="pl-4 pr-4 py-0.5 whitespace-pre overflow-x-auto">
                             <span

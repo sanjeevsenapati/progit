@@ -270,95 +270,7 @@ export const FileEditor: React.FC<FileEditorProps> = ({
     <div>
       <RepoNav repo={repoData} activeTab="code" />
 
-      <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-5 space-y-4">
-        {/* Top Header: Sidebar toggle & Editable Breadcrumb Path */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-dark-surface p-3.5 rounded-xl border border-gray-200 dark:border-dark-border shadow-xs">
-          <div className="flex items-center space-x-2 text-sm font-semibold flex-wrap">
-            {!isSidebarOpen && (
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen(true)}
-                className="p-1.5 mr-1 rounded-lg border border-gray-300 dark:border-dark-border bg-gray-50 dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-100 transition-colors cursor-pointer flex items-center space-x-1"
-                title="Show file tree"
-              >
-                <PanelLeft className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span className="text-xs font-bold">Files</span>
-              </button>
-            )}
-
-            <a
-              href={`/${owner}/${repoName}/tree/${currentBranch}`}
-              className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 mr-1" />
-              <span>{repoName}</span>
-            </a>
-            <span className="text-gray-400">/</span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-gray-100 dark:bg-dark-hover text-gray-700 dark:text-dark-text">
-              <GitBranch className="w-3 h-3 mr-1 text-emerald-600" />
-              {currentBranch}
-            </span>
-            <span className="text-gray-400">/</span>
-
-            {/* Editable Path Input (GitHub Style) */}
-            <div className="flex items-center space-x-1">
-              <input
-                type="text"
-                required
-                value={pathInput}
-                onChange={(e) => setPathInput(e.target.value)}
-                placeholder="filename or path (e.g. src/app.tsx)"
-                className="px-3 py-1 text-xs font-mono rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 min-w-[200px] sm:min-w-[320px]"
-              />
-              {pathInput && (
-                <button
-                  type="button"
-                  onClick={handleCopyPath}
-                  className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-dark-text rounded hover:bg-gray-100 dark:hover:bg-dark-hover transition-colors cursor-pointer"
-                  title="Copy path"
-                >
-                  {copiedPath ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Edit / Preview Tabs */}
-          <div className="flex space-x-1 p-1 rounded-lg bg-gray-100 dark:bg-dark-hover border border-gray-200 dark:border-dark-border text-xs font-semibold self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => setActiveTab('edit')}
-              className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
-                activeTab === 'edit'
-                  ? 'bg-white dark:bg-dark-surface shadow-xs text-emerald-600 dark:text-emerald-400 font-bold'
-                  : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
-              }`}
-            >
-              <Code className="w-3.5 h-3.5" />
-              <span>Edit</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('preview')}
-              className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
-                activeTab === 'preview'
-                  ? 'bg-white dark:bg-dark-surface shadow-xs text-emerald-600 dark:text-emerald-400 font-bold'
-                  : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
-              }`}
-            >
-              <Eye className="w-3.5 h-3.5" />
-              <span>Preview</span>
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/40 text-xs font-semibold text-red-700 dark:text-red-400 flex items-center">
-            <AlertCircle className="w-4 h-4 mr-2 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
+      <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-5">
         {/* Split Layout: GitHub Explorer Sidebar on Left + Editor on Right */}
         <div className="flex flex-col lg:flex-row gap-4 items-start">
           {/* File Explorer Sidebar */}
@@ -377,6 +289,93 @@ export const FileEditor: React.FC<FileEditorProps> = ({
 
           {/* Right: Code Editor & Commit Pane */}
           <div className="flex-1 min-w-0 space-y-4 w-full">
+            {/* Top Breadcrumb & Edit/Preview Mode Bar (GitHub Style) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-dark-surface p-3.5 rounded-xl border border-gray-200 dark:border-dark-border shadow-xs">
+              <div className="flex items-center space-x-2 text-sm font-semibold flex-wrap">
+                {!isSidebarOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="p-1.5 mr-1 rounded-lg border border-gray-300 dark:border-dark-border bg-gray-50 dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-100 transition-colors cursor-pointer flex items-center space-x-1"
+                    title="Show file tree"
+                  >
+                    <PanelLeft className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-xs font-bold">Files</span>
+                  </button>
+                )}
+
+                <a
+                  href={`/${owner}/${repoName}/tree/${currentBranch}`}
+                  className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 mr-1" />
+                  <span>{repoName}</span>
+                </a>
+                <span className="text-gray-400">/</span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-gray-100 dark:bg-dark-hover text-gray-700 dark:text-dark-text">
+                  <GitBranch className="w-3 h-3 mr-1 text-emerald-600" />
+                  {currentBranch}
+                </span>
+                <span className="text-gray-400">/</span>
+
+                {/* Editable Path Input (GitHub Style) */}
+                <div className="flex items-center space-x-1">
+                  <input
+                    type="text"
+                    required
+                    value={pathInput}
+                    onChange={(e) => setPathInput(e.target.value)}
+                    placeholder="filename or path (e.g. src/app.tsx)"
+                    className="px-3 py-1 text-xs font-mono rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 min-w-[200px] sm:min-w-[320px]"
+                  />
+                  {pathInput && (
+                    <button
+                      type="button"
+                      onClick={handleCopyPath}
+                      className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-dark-text rounded hover:bg-gray-100 dark:hover:bg-dark-hover transition-colors cursor-pointer"
+                      title="Copy path"
+                    >
+                      {copiedPath ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Edit / Preview Tabs */}
+              <div className="flex space-x-1 p-1 rounded-lg bg-gray-100 dark:bg-dark-hover border border-gray-200 dark:border-dark-border text-xs font-semibold self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('edit')}
+                  className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
+                    activeTab === 'edit'
+                      ? 'bg-white dark:bg-dark-surface shadow-xs text-emerald-600 dark:text-emerald-400 font-bold'
+                      : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
+                  }`}
+                >
+                  <Code className="w-3.5 h-3.5" />
+                  <span>Edit</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('preview')}
+                  className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
+                    activeTab === 'preview'
+                      ? 'bg-white dark:bg-dark-surface shadow-xs text-emerald-600 dark:text-emerald-400 font-bold'
+                      : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
+                  }`}
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Preview</span>
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/40 text-xs font-semibold text-red-700 dark:text-red-400 flex items-center">
+                <AlertCircle className="w-4 h-4 mr-2 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
             {/* Latest Commit Bar (if editing existing file) */}
             {latestCommit && currentMode === 'edit' && (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-xs shadow-xs">

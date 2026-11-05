@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository, CollaboratorUser, Webhook, WebhookDelivery } from '../lib/api';
+import { api, Repository, CollaboratorUser, Webhook, WebhookDelivery, BranchProtection } from '../lib/api';
 import { useAuth } from '../lib/theme';
 import { navigate } from '../lib/router';
 import { RepoNav } from '../components/RepoNav';
@@ -83,6 +83,13 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
   const [togglingVisibility, setTogglingVisibility] = useState(false);
   const [togglingArchive, setTogglingArchive] = useState(false);
 
+  // Branch Protection
+  const [branchProtections, setBranchProtections] = useState<BranchProtection[]>([]);
+  const [protBranch, setProtBranch] = useState('main');
+  const [protRequirePR, setProtRequirePR] = useState(true);
+  const [protPreventForcePush, setProtPreventForcePush] = useState(true);
+  const [savingProt, setSavingProt] = useState(false);
+
   // Editable fields
   const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
@@ -107,12 +114,14 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
         setPagesFolder(r.repository.pages_folder || '/');
 
         if (hasAdminAccess) {
-          const [collabs, hooks] = await Promise.all([
+          const [collabs, hooks, prots] = await Promise.all([
             api.getCollaborators(owner, repoName).catch(() => []),
-            api.listWebhooks(owner, repoName).catch(() => [])
+            api.listWebhooks(owner, repoName).catch(() => []),
+            api.listBranchProtections(owner, repoName).catch(() => [])
           ]);
           setCollaborators(collabs || []);
           setWebhooks(hooks || []);
+          setBranchProtections(prots || []);
         }
       } catch (err: any) {
         console.error(err);
@@ -613,6 +622,146 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
             </button>
           </div>
         </form>
+
+        {/* Branch Protection Rules */}
+        <div className="p-6 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm space-y-5">
+          <div className="flex items-center justify-between border-b border-gray-200 dark:border-dark-border pb-3">
+            <div className="flex items-center space-x-2">
+              <Shield className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <h2 className="font-bold text-base text-gray-900 dark:text-white">
+                Branch Protection Rules
+              </h2>
+            </div>
+            <span className="text-xs text-gray-500 dark:text-dark-muted">
+              {branchProtections.length} protected {branchProtections.length === 1 ? 'branch' : 'branches'}
+            </span>
+          </div>
+
+          <p className="text-xs text-gray-500 dark:text-dark-muted">
+            Protect important branches by requiring pull request reviews before merging and preventing destructive force pushes.
+          </p>
+
+          {/* Existing Rules */}
+          {branchProtections.length > 0 && (
+            <div className="space-y-2">
+              {branchProtections.map(bp => (
+                <div key={bp.id} className="p-3.5 rounded-lg border border-gray-200 dark:border-dark-border bg-gray-50/50 dark:bg-dark-hover/40 flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-mono text-xs font-bold text-gray-900 dark:text-white px-2 py-0.5 rounded bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border">
+                        {bp.branch_name}
+                      </span>
+                      {bp.require_pr && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40 font-semibold">
+                          Require PR
+                        </span>
+                      )}
+                      {bp.prevent_force_push && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40 font-semibold">
+                          No Force Push
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await api.deleteBranchProtection(owner, repoName, bp.branch_name);
+                        setBranchProtections(prev => prev.filter(p => p.branch_name !== bp.branch_name));
+                        showToast(`Removed branch protection for '${bp.branch_name}'`);
+                      } catch (err: any) {
+                        showToast(err.message || 'Failed to remove branch protection', 'error');
+                      }
+                    }}
+                    className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors cursor-pointer"
+                    title="Remove rule"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add / Update Rule Form */}
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!protBranch.trim()) return;
+              try {
+                setSavingProt(true);
+                await api.setBranchProtection(owner, repoName, {
+                  branch_name: protBranch.trim(),
+                  require_pr: protRequirePR,
+                  prevent_force_push: protPreventForcePush,
+                });
+                const data = await api.listBranchProtections(owner, repoName);
+                setBranchProtections(data || []);
+                showToast(`Branch protection for '${protBranch}' updated`);
+              } catch (err: any) {
+                showToast(err.message || 'Failed to set branch protection', 'error');
+              } finally {
+                setSavingProt(false);
+              }
+            }}
+            className="p-4 rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50/50 dark:bg-dark-hover/20 space-y-3"
+          >
+            <h3 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">
+              Add or Edit Branch Protection Rule
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-600 dark:text-dark-muted mb-1">
+                  Branch Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={protBranch}
+                  onChange={e => setProtBranch(e.target.value)}
+                  placeholder="e.g. main"
+                  className="w-full px-3 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-xs font-mono text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="flex items-center space-x-2 cursor-pointer text-xs text-gray-700 dark:text-dark-text">
+                  <input
+                    type="checkbox"
+                    checked={protRequirePR}
+                    onChange={e => setProtRequirePR(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded border-gray-300 dark:border-dark-border focus:ring-emerald-500"
+                  />
+                  <span>Require pull request before merging</span>
+                </label>
+
+                <label className="flex items-center space-x-2 cursor-pointer text-xs text-gray-700 dark:text-dark-text">
+                  <input
+                    type="checkbox"
+                    checked={protPreventForcePush}
+                    onChange={e => setProtPreventForcePush(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded border-gray-300 dark:border-dark-border focus:ring-emerald-500"
+                  />
+                  <span>Prevent force pushes</span>
+                </label>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={savingProt}
+                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors cursor-pointer flex items-center space-x-1.5"
+                >
+                  {savingProt && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Save Protection Rule</span>
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
 
         {/* Collaborators & Access Controls */}
         <div className="p-6 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm space-y-5">

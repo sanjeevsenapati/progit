@@ -16,8 +16,12 @@ import {
   Plus,
   X,
   Loader2,
-  Clock
+  Clock,
+  Trash2,
+  Columns,
+  Split
 } from 'lucide-react';
+import { detectLanguage, highlightCode } from '../lib/codeEditor';
 
 interface PullDetailProps {
   owner: string;
@@ -30,6 +34,55 @@ interface ParsedDiffLine {
   text: string;
   oldLineNumber?: number;
   newLineNumber?: number;
+}
+
+interface SplitRow {
+  header?: string;
+  left?: { lineNum?: number; text: string; type: 'del' | 'normal' };
+  right?: { lineNum?: number; text: string; type: 'add' | 'normal' };
+}
+
+function buildSplitRows(lines: ParsedDiffLine[]): SplitRow[] {
+  const rows: SplitRow[] = [];
+  let delQueue: ParsedDiffLine[] = [];
+
+  const flushDels = () => {
+    for (const d of delQueue) {
+      rows.push({
+        left: { lineNum: d.oldLineNumber, text: d.text, type: 'del' },
+      });
+    }
+    delQueue = [];
+  };
+
+  for (const line of lines) {
+    if (line.type === 'header') {
+      flushDels();
+      rows.push({ header: line.text });
+    } else if (line.type === 'normal') {
+      flushDels();
+      rows.push({
+        left: { lineNum: line.oldLineNumber, text: line.text, type: 'normal' },
+        right: { lineNum: line.newLineNumber, text: line.text, type: 'normal' },
+      });
+    } else if (line.type === 'del') {
+      delQueue.push(line);
+    } else if (line.type === 'add') {
+      if (delQueue.length > 0) {
+        const d = delQueue.shift()!;
+        rows.push({
+          left: { lineNum: d.oldLineNumber, text: d.text, type: 'del' },
+          right: { lineNum: line.newLineNumber, text: line.text, type: 'add' },
+        });
+      } else {
+        rows.push({
+          right: { lineNum: line.newLineNumber, text: line.text, type: 'add' },
+        });
+      }
+    }
+  }
+  flushDels();
+  return rows;
 }
 
 function parseDiffPatch(patch: string): ParsedDiffLine[] {
@@ -89,6 +142,11 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
   const [reviewState, setReviewState] = useState<'COMMENTED' | 'APPROVED' | 'CHANGES_REQUESTED'>('COMMENTED');
   const [reviewContent, setReviewContent] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+
+  // Split vs Unified diff mode & post-merge branch deletion
+  const [diffViewMode, setDiffViewMode] = useState<'unified' | 'split'>('unified');
+  const [deletingBranch, setDeletingBranch] = useState(false);
+  const [branchDeleted, setBranchDeleted] = useState(false);
 
   // Inline commenting state
   const [activeInlineComment, setActiveInlineComment] = useState<{ file: string; line: number } | null>(null);
@@ -439,6 +497,49 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
               </div>
             )}
 
+            {/* Post-Merge: Delete Branch Banner */}
+            {pull.is_merged && (
+              <div className="p-4 rounded-xl border border-purple-200 dark:border-purple-900/50 bg-purple-50/50 dark:bg-purple-950/20 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center flex-shrink-0">
+                    <GitMerge className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-900 dark:text-white">Pull request merged and closed</h4>
+                    <p className="text-gray-500 dark:text-dark-muted">
+                      The <span className="font-mono font-semibold text-purple-700 dark:text-purple-300">{pull.head_branch}</span> branch can now be safely deleted.
+                    </p>
+                  </div>
+                </div>
+
+                {pull.head_branch !== pull.base_branch && !branchDeleted && (
+                  <button
+                    type="button"
+                    disabled={deletingBranch}
+                    onClick={async () => {
+                      try {
+                        setDeletingBranch(true);
+                        await api.deleteBranch(owner, repoName, pull.head_branch);
+                        setBranchDeleted(true);
+                        showToast(`Branch ${pull.head_branch} deleted successfully`);
+                      } catch (err: any) {
+                        showToast(err.message || 'Failed to delete branch', 'error');
+                      } finally {
+                        setDeletingBranch(false);
+                      }
+                    }}
+                    className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg border border-red-200 dark:border-red-900/60 bg-white dark:bg-dark-surface text-red-600 dark:text-red-400 font-semibold hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors shadow-2xs shrink-0 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>{deletingBranch ? 'Deleting...' : 'Delete branch'}</span>
+                  </button>
+                )}
+                {branchDeleted && (
+                  <span className="text-gray-400 dark:text-dark-muted italic">Branch deleted</span>
+                )}
+              </div>
+            )}
+
             {/* Comment box */}
             {user && (
               <form onSubmit={handleAddComment} className="flex-1 space-y-3 pt-4 border-t border-gray-200 dark:border-dark-border">
@@ -447,15 +548,24 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
                   required
                   value={newComment}
                   onChange={e => setNewComment(e.target.value)}
-                  placeholder="Leave a comment on this pull request..."
+                  onKeyDown={e => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddComment(e as any);
+                    }
+                  }}
+                  placeholder="Leave a comment on this pull request (Cmd+Enter to submit)..."
                   className="w-full px-3 py-2 rounded-lg bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500"
                 />
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm cursor-pointer"
-                >
-                  Comment
-                </button>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-gray-400 hidden sm:inline">Tip: Press Cmd+Enter to submit</span>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm cursor-pointer"
+                  >
+                    Comment
+                  </button>
+                </div>
               </form>
             )}
           </div>
@@ -470,17 +580,43 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
                 <strong className="text-red-500">-{totalDeletions}</strong> lines
               </div>
 
-              {/* Review Changes Button & Popover */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowReviewPanel(!showReviewPanel)}
-                  className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm transition-colors cursor-pointer"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Review changes</span>
-                  <ChevronDown className="w-3.5 h-3.5 ml-0.5" />
-                </button>
+              {/* Review Changes Button & Popover + Split/Unified Toggle */}
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-1 p-0.5 rounded-lg border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setDiffViewMode('unified')}
+                    className={`px-2.5 py-1 rounded font-semibold transition-colors cursor-pointer ${
+                      diffViewMode === 'unified'
+                        ? 'bg-white dark:bg-dark-surface shadow-2xs text-emerald-600 dark:text-emerald-400 font-bold'
+                        : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Unified
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDiffViewMode('split')}
+                    className={`px-2.5 py-1 rounded font-semibold transition-colors cursor-pointer ${
+                      diffViewMode === 'split'
+                        ? 'bg-white dark:bg-dark-surface shadow-2xs text-emerald-600 dark:text-emerald-400 font-bold'
+                        : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Split
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowReviewPanel(!showReviewPanel)}
+                    className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm transition-colors cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Review changes</span>
+                    <ChevronDown className="w-3.5 h-3.5 ml-0.5" />
+                  </button>
 
                 {showReviewPanel && (
                   <div className="absolute right-0 mt-2 w-96 z-40 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl shadow-2xl p-5 space-y-4">
@@ -573,163 +709,248 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
                     </form>
                   </div>
                 )}
+                </div>
               </div>
             </div>
 
-            {/* Diffs with line-by-line commenting */}
-            {files.map((file, idx) => {
-              const filePath = file.new_path || file.old_path;
-              const parsedLines = parseDiffPatch(file.patch);
-
-              return (
-                <div key={idx} className="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm overflow-hidden">
-                  <div className="px-4 py-2.5 bg-gray-50 dark:bg-dark-hover/40 border-b border-gray-200 dark:border-dark-border flex items-center justify-between text-xs font-mono">
-                    <span className="font-bold text-gray-900 dark:text-white flex items-center space-x-2">
-                      <FileText className="w-4 h-4 text-gray-400" />
-                      <span>{filePath}</span>
-                    </span>
-                    <span className="text-gray-400 font-sans">
-                      <span className="text-emerald-600">+{file.additions}</span> <span className="text-red-500">-{file.deletions}</span>
-                    </span>
-                  </div>
-
-                  <div className="overflow-x-auto text-xs font-mono bg-gray-950 text-gray-100">
-                    <table className="w-full border-collapse">
-                      <tbody>
-                        {parsedLines.map((line, lIdx) => {
-                          const targetLineNum = line.newLineNumber || line.oldLineNumber || 0;
-                          const lineComments = reviewComments.filter(
-                            rc => rc.file_path === filePath && rc.line_number === targetLineNum
-                          );
-                          const isReplying =
-                            activeInlineComment?.file === filePath &&
-                            activeInlineComment?.line === targetLineNum;
-
-                          let rowBg = '';
-                          let textClr = 'text-gray-300';
-                          if (line.type === 'header') {
-                            rowBg = 'bg-blue-950/40 text-blue-300';
-                            textClr = 'text-blue-300';
-                          } else if (line.type === 'add') {
-                            rowBg = 'bg-emerald-950/40 text-emerald-300';
-                            textClr = 'text-emerald-300';
-                          } else if (line.type === 'del') {
-                            rowBg = 'bg-red-950/40 text-red-300';
-                            textClr = 'text-red-300';
-                          }
-
-                          return (
-                            <React.Fragment key={lIdx}>
-                              <tr className={`group hover:bg-gray-800/60 ${rowBg}`}>
-                                {/* Action / Add comment button */}
-                                <td className="w-8 py-0.5 px-1 text-center select-none">
-                                  {user && line.type !== 'header' && targetLineNum > 0 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setActiveInlineComment({ file: filePath, line: targetLineNum });
-                                        setInlineContent('');
-                                      }}
-                                      title="Add line comment"
-                                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded bg-emerald-600 text-white hover:bg-emerald-500 transition-opacity"
-                                    >
-                                      <Plus className="w-3 h-3" />
-                                    </button>
-                                  )}
-                                </td>
-
-                                {/* Old Line Number */}
-                                <td className="w-10 py-0.5 px-2 text-right select-none text-gray-500 border-r border-gray-800">
-                                  {line.oldLineNumber || ''}
-                                </td>
-
-                                {/* New Line Number */}
-                                <td className="w-10 py-0.5 px-2 text-right select-none text-gray-500 border-r border-gray-800">
-                                  {line.newLineNumber || ''}
-                                </td>
-
-                                {/* Diff Line Content */}
-                                <td className={`py-0.5 px-3 whitespace-pre font-mono leading-relaxed ${textClr}`}>
-                                  {line.text}
-                                </td>
-                              </tr>
-
-                              {/* Render any existing review comments under this line */}
-                              {lineComments.map((rc) => (
-                                <tr key={`rc-${rc.id}`} className="bg-gray-900 border-y border-gray-800">
-                                  <td colSpan={4} className="p-3 pl-16">
-                                    <div className="bg-white dark:bg-dark-surface border border-emerald-500/30 rounded-lg p-3 text-xs shadow-md space-y-1.5 font-sans">
-                                      <div className="flex items-center justify-between text-gray-500 dark:text-dark-muted">
-                                        <div className="flex items-center space-x-2">
-                                          <div className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[10px]">
-                                            {rc.user_name.charAt(0).toUpperCase()}
-                                          </div>
-                                          <strong className="text-gray-900 dark:text-white">{rc.user_name}</strong>
-                                          <span>line {rc.line_number}</span>
-                                        </div>
-                                        <span className="text-[10px]">{new Date(rc.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                      </div>
-                                      <div className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
-                                        {rc.content}
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-
-                              {/* Inline Comment Box */}
-                              {isReplying && (
-                                <tr className="bg-gray-900 border-y border-emerald-600/40">
-                                  <td colSpan={4} className="p-3 pl-16">
-                                    <div className="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-lg p-3 shadow-lg space-y-2 font-sans">
-                                      <div className="flex items-center justify-between text-xs font-semibold text-gray-800 dark:text-white">
-                                        <span>Add comment on line {targetLineNum}</span>
-                                        <button
-                                          type="button"
-                                          onClick={() => setActiveInlineComment(null)}
-                                          className="text-gray-400 hover:text-gray-600 dark:hover:text-white"
-                                        >
-                                          <X className="w-3.5 h-3.5" />
-                                        </button>
-                                      </div>
-                                      <textarea
-                                        rows={2}
-                                        value={inlineContent}
-                                        onChange={e => setInlineContent(e.target.value)}
-                                        placeholder="Leave a comment on this line..."
-                                        className="w-full px-2.5 py-1.5 text-xs rounded border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
-                                      />
-                                      <div className="flex items-center justify-end space-x-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => setActiveInlineComment(null)}
-                                          className="px-3 py-1 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors"
-                                        >
-                                          Cancel
-                                        </button>
-                                        <button
-                                          type="button"
-                                          disabled={submittingInline || !inlineContent.trim()}
-                                          onClick={() => handleAddInlineComment(filePath, targetLineNum, line.text)}
-                                          className="px-3 py-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded disabled:opacity-50 cursor-pointer flex items-center space-x-1"
-                                        >
-                                          {submittingInline && <Loader2 className="w-3 h-3 animate-spin mr-1" />}
-                                          <span>Add comment</span>
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
-                              )}
-                            </React.Fragment>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+            {/* Split layout: Files sidebar on left + diffs on right */}
+            <div className="flex flex-col lg:flex-row gap-6 items-start">
+              {/* Changed Files Sidebar (Sticky) */}
+              <div className="w-full lg:w-72 shrink-0 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface p-3 shadow-xs space-y-2 sticky top-4">
+                <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-dark-border">
+                  <span className="font-bold text-xs text-gray-900 dark:text-white flex items-center space-x-1.5">
+                    <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Changed files ({files.length})</span>
+                  </span>
                 </div>
-              );
-            })}
+                <div className="max-h-[70vh] overflow-y-auto space-y-1">
+                  {files.map((f, i) => (
+                    <a
+                      key={i}
+                      href={`#diff-file-${i}`}
+                      className="block px-2 py-1.5 rounded-lg text-xs hover:bg-gray-50 dark:hover:bg-dark-hover transition-colors font-mono truncate text-gray-700 dark:text-dark-text"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="truncate">{f.new_path || f.old_path}</span>
+                        <span className="text-[10px] ml-1 shrink-0 font-sans">
+                          <span className="text-emerald-600 font-semibold">+{f.additions}</span>{' '}
+                          <span className="text-red-500 font-semibold">-{f.deletions}</span>
+                        </span>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              {/* Diffs Area */}
+              <div className="flex-1 min-w-0 space-y-6 w-full">
+                {files.map((file, idx) => {
+                  const filePath = file.new_path || file.old_path;
+                  const parsedLines = parseDiffPatch(file.patch);
+                  const splitRows = buildSplitRows(parsedLines);
+
+                  return (
+                    <div id={`diff-file-${idx}`} key={idx} className="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm overflow-hidden scroll-mt-6">
+                      <div className="px-4 py-2.5 bg-gray-50 dark:bg-dark-hover/40 border-b border-gray-200 dark:border-dark-border flex items-center justify-between text-xs font-mono">
+                        <span className="font-bold text-gray-900 dark:text-white flex items-center space-x-2">
+                          <FileText className="w-4 h-4 text-gray-400" />
+                          <span>{filePath}</span>
+                        </span>
+                        <span className="text-gray-400 font-sans">
+                          <span className="text-emerald-600">+{file.additions}</span> <span className="text-red-500">-{file.deletions}</span>
+                        </span>
+                      </div>
+
+                      {diffViewMode === 'split' ? (
+                        /* Split Diff (Side-by-Side) */
+                        <div className="overflow-x-auto text-xs font-mono bg-gray-950 text-gray-100">
+                          <table className="w-full border-collapse table-fixed">
+                            <colgroup>
+                              <col className="w-10" />
+                              <col className="w-1/2" />
+                              <col className="w-10" />
+                              <col className="w-1/2" />
+                            </colgroup>
+                            <tbody>
+                              {splitRows.map((row, rIdx) => {
+                                if (row.header) {
+                                  return (
+                                    <tr key={rIdx} className="bg-blue-950/40 text-blue-300">
+                                      <td colSpan={4} className="py-1 px-4 text-xs font-mono">
+                                        {row.header}
+                                      </td>
+                                    </tr>
+                                  );
+                                }
+
+                                const leftBg = row.left?.type === 'del' ? 'bg-red-950/40 text-red-300' : 'text-gray-300';
+                                const rightBg = row.right?.type === 'add' ? 'bg-emerald-950/40 text-emerald-300' : 'text-gray-300';
+
+                                return (
+                                  <tr key={rIdx} className="hover:bg-gray-800/40 border-b border-gray-900/50">
+                                    {/* Left (Old) Line */}
+                                    <td className="w-10 py-0.5 px-2 text-right select-none text-gray-500 border-r border-gray-800 bg-gray-900/40">
+                                      {row.left?.lineNum || ''}
+                                    </td>
+                                    <td className={`py-0.5 px-3 whitespace-pre font-mono leading-relaxed border-r border-gray-800 truncate ${leftBg}`}>
+                                      {row.left?.text || ''}
+                                    </td>
+
+                                    {/* Right (New) Line */}
+                                    <td className="w-10 py-0.5 px-2 text-right select-none text-gray-500 border-r border-gray-800 bg-gray-900/40">
+                                      {row.right?.lineNum || ''}
+                                    </td>
+                                    <td className={`py-0.5 px-3 whitespace-pre font-mono leading-relaxed truncate ${rightBg}`}>
+                                      {row.right?.text || ''}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        /* Unified Diff */
+                        <div className="overflow-x-auto text-xs font-mono bg-gray-950 text-gray-100">
+                          <table className="w-full border-collapse">
+                            <tbody>
+                              {parsedLines.map((line, lIdx) => {
+                                const targetLineNum = line.newLineNumber || line.oldLineNumber || 0;
+                                const lineComments = reviewComments.filter(
+                                  rc => rc.file_path === filePath && rc.line_number === targetLineNum
+                                );
+                                const isReplying =
+                                  activeInlineComment?.file === filePath &&
+                                  activeInlineComment?.line === targetLineNum;
+
+                                let rowBg = '';
+                                let textClr = 'text-gray-300';
+                                if (line.type === 'header') {
+                                  rowBg = 'bg-blue-950/40 text-blue-300';
+                                  textClr = 'text-blue-300';
+                                } else if (line.type === 'add') {
+                                  rowBg = 'bg-emerald-950/40 text-emerald-300';
+                                  textClr = 'text-emerald-300';
+                                } else if (line.type === 'del') {
+                                  rowBg = 'bg-red-950/40 text-red-300';
+                                  textClr = 'text-red-300';
+                                }
+
+                                return (
+                                  <React.Fragment key={lIdx}>
+                                    <tr className={`group hover:bg-gray-800/60 ${rowBg}`}>
+                                      {/* Action / Add comment button */}
+                                      <td className="w-8 py-0.5 px-1 text-center select-none">
+                                        {user && line.type !== 'header' && targetLineNum > 0 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setActiveInlineComment({ file: filePath, line: targetLineNum });
+                                              setInlineContent('');
+                                            }}
+                                            title="Add line comment"
+                                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded bg-emerald-600 text-white hover:bg-emerald-500 transition-opacity"
+                                          >
+                                            <Plus className="w-3 h-3" />
+                                          </button>
+                                        )}
+                                      </td>
+
+                                      {/* Old Line Number */}
+                                      <td className="w-10 py-0.5 px-2 text-right select-none text-gray-500 border-r border-gray-800">
+                                        {line.oldLineNumber || ''}
+                                      </td>
+
+                                      {/* New Line Number */}
+                                      <td className="w-10 py-0.5 px-2 text-right select-none text-gray-500 border-r border-gray-800">
+                                        {line.newLineNumber || ''}
+                                      </td>
+
+                                      {/* Diff Line Content */}
+                                      <td className={`py-0.5 px-3 whitespace-pre font-mono leading-relaxed ${textClr}`}>
+                                        {line.text}
+                                      </td>
+                                    </tr>
+
+                                    {/* Render any existing review comments under this line */}
+                                    {lineComments.map((rc) => (
+                                      <tr key={`rc-${rc.id}`} className="bg-gray-900 border-y border-gray-800">
+                                        <td colSpan={4} className="p-3 pl-16">
+                                          <div className="bg-white dark:bg-dark-surface border border-emerald-500/30 rounded-lg p-3 text-xs shadow-md space-y-1.5 font-sans">
+                                            <div className="flex items-center justify-between text-gray-500 dark:text-dark-muted">
+                                              <div className="flex items-center space-x-2">
+                                                <div className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[10px]">
+                                                  {rc.user_name.charAt(0).toUpperCase()}
+                                                </div>
+                                                <strong className="text-gray-900 dark:text-white">{rc.user_name}</strong>
+                                                <span>line {rc.line_number}</span>
+                                              </div>
+                                              <span className="text-[10px]">{new Date(rc.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                            </div>
+                                            <div className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
+                                              {rc.content}
+                                            </div>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    ))}
+
+                                    {/* Inline Comment Box */}
+                                    {isReplying && (
+                                      <tr className="bg-gray-900 border-y border-emerald-600/40">
+                                        <td colSpan={4} className="p-3 pl-16">
+                                          <div className="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-lg p-3 shadow-lg space-y-2 font-sans">
+                                            <div className="flex items-center justify-between text-xs font-semibold text-gray-800 dark:text-white">
+                                              <span>Add comment on line {targetLineNum}</span>
+                                              <button
+                                                type="button"
+                                                onClick={() => setActiveInlineComment(null)}
+                                                className="text-gray-400 hover:text-gray-600 dark:hover:text-white"
+                                              >
+                                                <X className="w-3.5 h-3.5" />
+                                              </button>
+                                            </div>
+                                            <textarea
+                                              rows={2}
+                                              value={inlineContent}
+                                              onChange={e => setInlineContent(e.target.value)}
+                                              placeholder="Leave a comment on this line..."
+                                              className="w-full px-2.5 py-1.5 text-xs rounded border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                                            />
+                                            <div className="flex items-center justify-end space-x-2">
+                                              <button
+                                                type="button"
+                                                onClick={() => setActiveInlineComment(null)}
+                                                className="px-3 py-1 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors"
+                                              >
+                                                Cancel
+                                              </button>
+                                              <button
+                                                type="button"
+                                                disabled={submittingInline || !inlineContent.trim()}
+                                                onClick={() => handleAddInlineComment(filePath, targetLineNum, line.text)}
+                                                className="px-3 py-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded disabled:opacity-50 cursor-pointer flex items-center space-x-1"
+                                              >
+                                                {submittingInline && <Loader2 className="w-3 h-3 animate-spin mr-1" />}
+                                                <span>Add comment</span>
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </React.Fragment>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
       </div>

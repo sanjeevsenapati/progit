@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, User, Repository, Activity, Organization } from '../lib/api';
 import { useAuth } from '../lib/theme';
+import { OrgView } from './OrgView';
 import { 
   BookOpen, 
   GitBranch, 
@@ -59,9 +60,14 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username }) => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [starred, setStarred] = useState<Repository[]>([]);
+  const [isOrg, setIsOrg] = useState(false);
   const [loading, setLoading] = useState(() => !isSelf);
   
-  const [activeTab, setActiveTab] = useState<'overview' | 'repositories' | 'starred' | 'organizations'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'repositories' | 'starred' | 'organizations'>(() => {
+    const urlTab = new URLSearchParams(window.location.search).get('tab');
+    if (urlTab === 'organizations' || urlTab === 'repositories' || urlTab === 'starred') return urlTab;
+    return 'overview';
+  });
   const [repoSearch, setRepoSearch] = useState('');
   const [repoTypeFilter, setRepoTypeFilter] = useState<'all' | 'public' | 'private'>('all');
 
@@ -69,6 +75,10 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username }) => {
     async function load() {
       try {
         const data = await api.getUserProfile(username);
+        if (data.is_org) {
+          setIsOrg(true);
+          return;
+        }
         setProfile(data.user);
         setRepos(data.repositories || []);
         setActivities(data.activities || []);
@@ -82,6 +92,10 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username }) => {
     }
     load();
   }, [username]);
+
+  if (isOrg) {
+    return <OrgView orgName={username} />;
+  }
 
   if (loading && !profile) {
     return (
