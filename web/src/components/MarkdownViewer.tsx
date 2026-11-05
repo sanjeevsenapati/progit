@@ -105,7 +105,7 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, classNa
         result.push(
           <code
             key={`code-${match.index}`}
-            className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-dark-hover font-mono text-xs text-pink-600 dark:text-pink-400 font-semibold"
+            className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-dark-hover font-mono text-[13.5px] text-pink-600 dark:text-pink-400 font-semibold"
           >
             {match[1]}
           </code>
@@ -180,7 +180,7 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, classNa
     if (listItems.length > 0 && listType) {
       if (listType === 'ul') {
         elements.push(
-          <ul key={`ul-${elements.length}`} className="list-disc list-inside space-y-1 my-3 pl-2 text-gray-700 dark:text-gray-300">
+          <ul key={`ul-${elements.length}`} className="list-disc list-inside space-y-1.5 my-3 pl-2 text-base text-gray-700 dark:text-gray-300">
             {listItems.map((item, idx) => (
               <li key={idx} className="leading-relaxed">
                 {renderInline(item)}
@@ -190,7 +190,7 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, classNa
         );
       } else {
         elements.push(
-          <ol key={`ol-${elements.length}`} className="list-decimal list-inside space-y-1 my-3 pl-2 text-gray-700 dark:text-gray-300">
+          <ol key={`ol-${elements.length}`} className="list-decimal list-inside space-y-1.5 my-3 pl-2 text-base text-gray-700 dark:text-gray-300">
             {listItems.map((item, idx) => (
               <li key={idx} className="leading-relaxed">
                 {renderInline(item)}
@@ -360,7 +360,7 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, classNa
         elements.push(
           <div
             key={`alert-${elements.length}`}
-            className={`border-l-4 ${s.border} ${s.bg} p-3.5 my-3 rounded-r-lg shadow-2xs space-y-1 text-xs`}
+            className={`border-l-4 ${s.border} ${s.bg} p-3.5 my-3 rounded-r-lg shadow-2xs space-y-1 text-sm`}
           >
             <div className={`font-bold flex items-center space-x-1.5 ${s.text}`}>
               <span>{s.label}</span>
@@ -374,7 +374,7 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, classNa
       elements.push(
         <blockquote
           key={`quote-${elements.length}`}
-          className="border-l-4 border-emerald-500 pl-4 py-1.5 my-3 text-gray-600 dark:text-gray-300 italic bg-gray-50/50 dark:bg-dark-hover/30 rounded-r"
+          className="border-l-4 border-emerald-500 pl-4 py-2 my-3 text-base text-gray-600 dark:text-gray-300 italic bg-gray-50/50 dark:bg-dark-hover/30 rounded-r"
         >
           {renderInline(quoteText)}
         </blockquote>
@@ -387,7 +387,7 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, classNa
       const isChecked = line.trim().startsWith('- [x] ');
       const taskText = line.trim().slice(6);
       elements.push(
-        <div key={`task-${elements.length}`} className="flex items-center space-x-2 my-1 text-sm text-gray-800 dark:text-gray-200">
+        <div key={`task-${elements.length}`} className="flex items-center space-x-2 my-1.5 text-base text-gray-800 dark:text-gray-200">
           <input type="checkbox" checked={isChecked} readOnly className="rounded text-emerald-600 pointer-events-none" />
           <span className={isChecked ? 'line-through text-gray-400 dark:text-gray-500' : ''}>{renderInline(taskText)}</span>
         </div>
@@ -403,7 +403,7 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, classNa
 
     // Regular paragraph
     elements.push(
-      <p key={`p-${elements.length}`} className="text-sm leading-relaxed text-gray-800 dark:text-gray-200 my-1.5">
+      <p key={`p-${elements.length}`} className="text-base leading-relaxed text-gray-800 dark:text-gray-200 my-2">
         {renderInline(line)}
       </p>
     );
@@ -429,7 +429,7 @@ const CodeBlockSnippet: React.FC<{ code: string; lang?: string }> = ({ code, lan
   };
 
   return (
-    <div className="relative group my-4 rounded-lg overflow-hidden border border-gray-200 dark:border-dark-border bg-gray-900 text-gray-100 text-xs font-mono shadow-sm">
+    <div className="relative group my-4 rounded-lg overflow-hidden border border-gray-200 dark:border-dark-border bg-gray-900 text-gray-100 text-[13.5px] font-mono shadow-sm">
       <div className="flex items-center justify-between px-4 py-1.5 bg-gray-800 border-b border-gray-700 text-gray-400 text-xs">
         <span>{lang || 'code'}</span>
         <button
