@@ -41,17 +41,29 @@ From the repository overview or the Git CLI Quick Reference card, copy the clone
 
 - **Smart HTTP / HTTPS**:
   ```bash
-  git clone https://progit.local/<username>/<reponame>.git
-  # Or with custom port:
+  # Standard HTTPS clone with custom port:
   git clone https://progit.local:3443/<username>/<reponame>.git
+
+  # If using the self-signed TLS certificate without installing root CA:
+  git -c http.sslVerify=false clone https://progit.local:3443/<username>/<reponame>.git
   ```
   Authenticate with your ProGit username and password, or a Personal Access Token.
+  > [!TIP]
+  > You can download the ProGit Root CA certificate directly from the Clone dropdown in the web UI (`Download Root CA`) to trust it system-wide.
 
 - **Native SSH**:
   ```bash
   git clone ssh://git@progit.local:2222/<username>/<reponame>.git
   ```
-  Ensure your public SSH key is uploaded to your ProGit user settings.
+  Ensure your public SSH key is uploaded to your ProGit user settings. Connecting to `ssh -p 2222 git@progit.local` prints an interactive GitHub-style welcome banner:
+  ```text
+  Hi <username>! You've successfully authenticated over SSH on ProGit, but interactive shell access is disabled.
+  ```
+
+### 2.3 Recently Pushed Branches & Quick PR Creation
+When pushing a new branch via the command line, ProGit automatically:
+1. Prints the direct Pull Request creation URL in the Git terminal output (`remote: Create a pull request for 'branch': https://progit.local:3443/owner/repo/pulls/new`).
+2. Displays a sticky **"Recently pushed branches"** banner on the repository homepage with a 1-click **[Compare & pull request]** button.
 
 ### 2.3 Pushing Commits
 ```bash
@@ -75,16 +87,21 @@ ProGit features a global, real-time repository search engine:
 
 ---
 
-## 3. Code Browsing & Navigation
+## 3. Code Browsing & Explorer Layout
 
-- **File Tree**: Click any folder or file to browse its contents.
-- **Syntax Highlighting & Markdown**: Source code is highlighted automatically; Markdown READMEs are formatted with GitHub-style aesthetics.
-- **Branch & Tag Selector**: Switch branches or tags using the dropdown at the top of the file tree.
-- **Commit History**: Click **Commits** to view the commit timeline and click any commit SHA to inspect unified diffs.
+ProGit features a GitHub-style two-column file explorer interface:
+- **Collapsible File Explorer Sidebar**: Browse the full folder and file tree directly alongside the file content without losing context.
+  - Quick keyboard search: Press `t` from anywhere in the file view to jump to the "Go to file" filter.
+  - Branch switching within the explorer: Quickly switch branches while keeping your position in the tree.
+  - Dedicated `+` button to create a new file in the active directory.
+- **Syntax Highlighting & Auto-Theme**: Code highlighting automatically matches the global light or dark theme with zero user configuration required.
+- **Clickable Line Anchors & Permalinks**: Click any line number in the code viewer to jump to that line and automatically copy the permalink (`#L42`) to your clipboard.
+- **Git Blame View**: Switch between **Code** and **Blame** tabs to inspect line-by-line history, including commit author, short SHA, commit summary, and relative date.
 
 ### 3.1 Online File Creation and Editing
-- **Create New File**: Click **Add file > Create new file** from any directory view. You can type nested paths (e.g. `src/utils/math.js`) and ProGit will automatically create the required directories. Enter your code, provide a commit message, choose to commit directly or to a new branch, and click **Commit changes**.
-- **Edit Existing File**: In the file view (`FileView`), click the **Edit** (pencil) button. This opens the online editor with syntax highlighting, line numbers, and a **Preview** tab for Markdown files. Update your code and submit an online commit.
+- **Create New File**: Click **Add file > Create new file** or click the `+` icon in the explorer sidebar. You can type nested paths (e.g. `src/utils/math.js`) and ProGit will automatically create the required directories. Enter your code, format with the **Format with Prettier** button, choose to commit directly or to a new branch, and click **Commit changes**.
+- **Edit Existing File**: In the file view (`FileView`), click the **Edit** (pencil) button. This opens the online editor with the same explorer sidebar, auto-theme matching, line numbers, and a **Preview** tab for Markdown files.
+- **Prettier Code Formatting**: 1-click **Format with Prettier** button automatically formats TypeScript, JavaScript, JSON, CSS, and Markdown.
 
 ### 3.2 Uploading Files and Directories
 - Click **Add file > Upload files** from any repository code view.
@@ -107,18 +124,44 @@ ProGit features a global, real-time repository search engine:
 3. Add comments, assign team members, and track status.
 
 ### 4.2 Pull Requests & Merges
-1. Navigate to the **Pull Requests** tab and click **New Pull Request**.
+1. Navigate to the **Pull Requests** tab and click **New Pull Request** (or use the 1-click banner on recently pushed branches).
 2. Select your head branch and target base branch.
 3. Review the live diff comparison of files changed.
 4. Click **Create Pull Request**.
-5. Once approved, merge using your preferred strategy:
-   - **Merge Commit**: Standard non-fast-forward merge.
-   - **Squash and Merge**: Combines all commits into a single commit on the base branch.
-   - **Rebase and Merge**: Rebases head commits linearly on top of the base branch.
+5. **Split Diff vs. Unified Diff**: Use the mode toggle on the review bar to switch between side-by-side **Split Diff** and classic **Unified Diff**.
+6. **Changed Files Sidebar**: Sticky file list on the left displays all changed files with additions and deletions counts; click any file to jump directly to its diff.
+7. **Line-by-Line Review**: Click the `+` icon on any line to leave an inline review comment.
+8. **Auto-Closing Issues**: Referencing issues in PR descriptions or commit messages using `Fixes #X`, `Closes #X`, or `Resolves #X` automatically closes the referenced issues when the PR is merged.
+9. **Post-Merge Branch Deletion**: Once merged, a 1-click **Delete branch** button is displayed to immediately delete the head branch and keep the repository clean.
 
 ---
 
-## 5. Account Settings & Authentication
+## 5. Repository Settings & Branch Protection
+
+### 5.1 Branch Protection Rules
+Protect important branches like `main` or release branches:
+1. Navigate to **Settings > Branch Protection Rules**.
+2. Enter the target branch name (e.g., `main`).
+3. Configure enforcement rules:
+   - **Require pull request before merging**: Blocks direct online commits and non-PR pushes to the branch.
+   - **Prevent force pushes**: Blocks destructive force-pushes (`git push --force`) and branch deletion.
+4. Click **Save Protection Rule**.
+
+### 5.2 Access Controls & Collaborators
+- Grant users write or admin permissions to allow them to push commits, edit files online, upload documents, and manage project boards.
+
+---
+
+## 6. Organizations & Team Management
+
+### 6.1 Organization Profile & Editing
+- Organizations are accessible directly via `/org/:orgname` or `/:orgname` (e.g. `https://progit.local:3443/acme`).
+- Organization owners can update display names, descriptions, locations, and website URLs either via the inline **Edit Organization** modal or the **Settings** tab.
+- Quick navigation: Access all your organizations from the top-right user menu under **Your Organizations**.
+
+---
+
+## 7. Account Settings & Authentication
 
 - **SSH Keys**: Go to **Settings > SSH Keys** to register your public key (`id_ed25519.pub`).
 - **Personal Access Tokens (PAT)**: Go to **Settings > Access Tokens** to generate tokens for CLI or CI/CD pipelines.

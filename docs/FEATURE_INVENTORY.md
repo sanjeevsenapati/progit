@@ -23,29 +23,33 @@
 | **Git Engine** | Smart HTTP (Clone/Push/Pull)| Yes | Implemented | Native `git-upload-pack` & `receive-pack` |
 | **Git Engine** | SSH Protocol (Clone/Push) | OpenSSH wrapper | Implemented (Native SSH) | Built-in Go SSH server on port 2222 |
 | **Online Editor**| Online File Creation | Yes | Implemented | Create files with subpaths, commit message & branch selection |
-| **Online Editor**| Online File Editing | Yes | Implemented | In-browser editing, markdown preview & direct online commits |
+| **Online Editor**| Online File Editing | Yes | Implemented | In-browser editing, GitHub explorer sidebar, zero-config auto theme (light/dark) |
 | **Online Editor**| Online File Deletion | Yes | Implemented | In-browser delete confirmation modal & direct online commit |
 | **Online Editor**| Multi-File & Folder Upload | Basic | Implemented | Drag-and-drop, multi-file & full directory uploads (`webkitdirectory`) |
-| **Code Browser**| Directory & File Tree | Basic | Implemented | Modern breadcrumbs, icons & speed |
-| **Code Browser**| File Viewer | Basic | Implemented | Syntax highlight, line nums, copy raw |
-| **Code Browser**| Markdown Rendering | Yes | Implemented | Rich markdown with GitHub flavor & stored XSS protocol hardening |
+| **Code Browser**| Directory & File Tree | Basic | Implemented | Modern breadcrumbs, icons, GitHub-style collapsible sidebar explorer |
+| **Code Browser**| File Viewer | Basic | Implemented | Syntax highlight, line numbers, clickable line anchors (`#L42`) with permalink copy |
+| **Code Browser**| Git Blame | No | Implemented | Full Git blame gutter with commit SHA, author, date, and commit message |
+| **Code Browser**| Markdown Rendering | Yes | Implemented | Rich GFM alert callouts (`> [!NOTE]`, etc.), task lists, relative image rewriting |
 | **Code Browser**| Commit Log & Details | Basic | Implemented | Author avatars, commit diffs |
 | **Code Browser**| Branch / Tag Switcher | Yes | Implemented | Instant dropdown filtering, protected default branch |
 | **Issues** | Issue Creation & Editing | Yes | Implemented | Rich markdown description |
 | **Issues** | Discussion & Comments | Yes | Implemented | Real-time comment threads |
 | **Issues** | Labels & Milestones | Yes | Implemented | Color-coded badges & progress bars |
 | **Issues** | Assignees & Security Scoping | Partial | Implemented | Strictly scoped to repo owner and confirmed collaborators; blocks strangers |
-| **Pull Requests**| PR Creation & Branch Compare | Yes | Implemented | Native `git diff` calculation |
-| **Pull Requests**| Unified Diff Viewer | Basic | Implemented | Syntax highlighted diff blocks |
-| **Pull Requests**| PR Code Reviews | Basic | Implemented | In-line reviews, approvals, and review state comments |
-| **Pull Requests**| Merge Execution | Basic Merge | Implemented | Native Merge Commit, Squash, Rebase |
+| **Pull Requests**| PR Creation & Branch Compare | Yes | Implemented | Native `git diff` calculation, recently pushed branch banner with 1-click PR |
+| **Pull Requests**| Diff Viewers | Basic | Implemented | Side-by-side Split Diff and Unified Diff toggler, syntax highlighting |
+| **Pull Requests**| PR Code Reviews | Basic | Implemented | Sticky Changed Files sidebar, inline line comments, approvals, Cmd+Enter shortcut |
+| **Pull Requests**| Merge Execution | Basic Merge | Implemented | Native Merge Commit, Squash, Rebase; auto-closes issues (`Fixes #X`), post-merge branch delete |
 | **Developer Messaging**| Direct Developer Messaging | No (ProGit exclusive)| Implemented | Built-in developer direct messaging, inbox/outbox, unread counter, thread replies |
-| **Organizations**| Org & Team Management | Yes | Implemented | Multi-user roles, teams & permissions |
+| **Organizations**| Org & Team Management | Yes | Implemented | Multi-user roles, teams & permissions, full profile editing, direct routing `/:org` |
+| **Settings** | Branch Protection Rules | No | Implemented | Require pull request before merge, prevent force push on `main` or custom branches |
 | **Settings** | User & Repo Settings | Yes | Implemented | Tabbed modern settings pages matching dark/light base theme |
 | **Webhooks** | Automated Event Dispatch | Basic HTTP | Implemented | Push, Issue, and PR triggers, HMAC-SHA256 signature, test ping, delivery log |
 | **Wiki** | Git-backed Wiki | Yes | Implemented | Dedicated `<repo>.wiki.git` bare repo, CLI clone/push over HTTP & SSH, Markdown editor |
 | **Pages** | ProGit Pages (GitHub Pages) | No (ProGit exclusive) | Implemented | Static site & documentation hosting from `gh-pages` or `main` (`/` or `/docs`), automatic Markdown-to-HTML |
 | **Security & Permissions** | Access Control & Collaborators | Yes | Implemented | Strict permission checks for online file edit, create, upload, delete, and issue assignment |
+| **Platform** | Session Persistence | No | Implemented | SQLite session persistence ensuring users stay logged in across container restarts |
+| **CLI & Setup** | Clone URLs & TLS | Basic | Implemented | HTTPS clone URLs with port 3443, root CA certificate download, SSH welcome banner |
 | **Projects** | Kanban Project Boards | Yes | Implemented | GitHub-style interactive project boards (`/projects`), custom columns, drag/move workflows |
 | **Admin** | Admin Dashboard | Basic | Implemented | System telemetry, users, repo manager, WAL maintenance checkpoints |
 | **Observability**| Health & Readiness Check | Basic | Implemented | `/api/health` and `/api/ready` with SQLite & disk checks |

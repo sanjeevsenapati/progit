@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://progit.co.in"><img src="https://img.shields.io/badge/Docs-progit.co.in-10b981?style=for-the-badge&logo=gitbook" alt="Official Documentation" /></a>
-  <a href="https://github.com/sanjeevsenapati/progit/pkgs/container/progit"><img src="https://img.shields.io/badge/GHCR-v1.1.0-blue?style=for-the-badge&logo=docker" alt="GHCR Container" /></a>
+  <a href="https://github.com/sanjeevsenapati/progit/pkgs/container/progit"><img src="https://img.shields.io/badge/GHCR-v1.2.0-blue?style=for-the-badge&logo=docker" alt="GHCR Container" /></a>
   <img src="https://img.shields.io/badge/Go-1.22+-00ADD8?style=for-the-badge&logo=go" alt="Go Version" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react" alt="React 19" />
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="License: MIT" />
