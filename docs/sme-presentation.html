@@ -185,9 +185,10 @@
       box-shadow: var(--card-shadow);
       padding: 44px 56px;
       opacity: 0;
+      visibility: hidden;
       transform: scale(0.96) translateY(20px);
       pointer-events: none;
-      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.35s;
       display: flex;
       flex-direction: column;
       overflow-y: auto;
@@ -195,12 +196,14 @@
     }
     .slide.active {
       opacity: 1;
+      visibility: visible;
       transform: scale(1) translateY(0);
       pointer-events: auto;
       z-index: 10;
     }
     .slide.prev {
       opacity: 0;
+      visibility: hidden;
       transform: scale(0.96) translateX(-40px);
     }
 
@@ -1271,36 +1274,6 @@ podman run -d \
 
         <div class="card" style="background: var(--accent-soft); border-color: rgba(16, 185, 129, 0.4); text-align: center; padding: 32px;">
           <h3 style="font-size: 22px; font-weight: 800; color: var(--text-bright); margin-bottom: 8px;">Schedule Your On-Premise Implementation</h3>
-          <p style="font-size: 14.5px; color: var(--text-muted); max-width: 600px; margin: 0 auto 20px;">
-            Supported by <strong>PDIH</strong> and created by <strong>ProGit Team and Sanjeev</strong>. Built on top of Gogs source code. Released under the open-source MIT License.
-          </p>
-          <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">
-            <a href="https://progit.co.in" class="btn-action btn-primary" style="padding: 10px 24px; font-size: 14px;">Visit Official Documentation</a>
-            <a href="presentation.html" class="btn-action" style="padding: 10px 24px; font-size: 14px;">View Enterprise HA Deck</a>
-            <a href="https://github.com/sanjeevsenapati/progit" target="_blank" rel="noopener noreferrer" class="btn-action" style="padding: 10px 24px; font-size: 14px;">View GitHub Repository</a>
-          </div>
-        </div>
-      </div>
-    </section>
-
-      <div class="slide-body">
-        <div class="grid-3" style="margin-bottom: 28px;">
-          <div class="card" style="border-top: 4px solid var(--accent);">
-            <div class="card-title">1. Deploy Free Instantly</div>
-            <div class="card-desc">Pull the official multi-arch container from GitHub Container Registry and spin up your team's Git server in 2 minutes.</div>
-          </div>
-          <div class="card" style="border-top: 4px solid #3b82f6;">
-            <div class="card-title">2. Read Comprehensive Docs</div>
-            <div class="card-desc">Explore in-depth installation, configuration, backup, and REST API guides on our official documentation portal.</div>
-          </div>
-          <div class="card" style="border-top: 4px solid #8b5cf6;">
-            <div class="card-title">3. Enterprise HA Roadmap</div>
-            <div class="card-desc">Growing into a large enterprise? Explore our multi-node High Availability architecture deck and commercial strategy.</div>
-          </div>
-        </div>
-
-        <div class="card" style="background: var(--accent-soft); border-color: rgba(16, 185, 129, 0.4); text-align: center; padding: 32px;">
-          <h3 style="font-size: 22px; font-weight: 800; color: var(--text-bright); margin-bottom: 8px;">Ready to Empower Your Engineering Team?</h3>
           <p style="font-size: 14.5px; color: var(--text-muted); max-width: 600px; margin: 0 auto 20px;">
             Supported by <strong>PDIH</strong> and created by <strong>ProGit Team and Sanjeev</strong>. Built on top of Gogs source code. Released under the open-source MIT License.
           </p>
