@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProGit for SMEs & Agencies — Product & Sales Deck</title>
+  <meta name="description" content="Interactive Sales & Product Presentation for ProGit: High-performance, self-hosted Git collaboration platform for SMEs, IT agencies, and startups.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='2.5'%3E%3Ccircle cx='18' cy='18' r='3'/%3E%3Ccircle cx='6' cy='6' r='3'/%3E%3Cpath d='M6 9v12'/%3E%3Cpath d='M18 9a9 9 0 0 0-9 9'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+      /* Light Mode Palette */
+      --bg: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-subtle: #f1f5f9;
+      --border: #e2e8f0;
+      --border-focus: #10b981;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --text-bright: #0f172a;
+      --accent: #10b981;
+      --accent-hover: #059669;
+      --accent-soft: rgba(16, 185, 129, 0.12);
+      --accent-glow: rgba(16, 185, 129, 0.25);
+      --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+      --card-shadow-hover: 0 20px 30px -10px rgba(16, 185, 129, 0.15);
+      --code-bg: #1e293b;
+      --code-text: #e2e8f0;
+    }
+
+    [data-theme="dark"] {
+      --bg: #090d16;
+      --bg-surface: #0f172a;
+      --bg-subtle: #131c31;
+      --border: #1e293b;
+      --border-focus: #10b981;
+      --text: #cbd5e1;
+      --text-muted: #94a3b8;
+      --text-bright: #f8fafc;
+      --accent: #10b981;
+      --accent-hover: #34d399;
+      --accent-soft: rgba(16, 185, 129, 0.16);
+      --accent-glow: rgba(16, 185, 129, 0.35);
+      --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      --card-shadow-hover: 0 20px 35px -5px rgba(16, 185, 129, 0.25);
+      --code-bg: #050811;
+      --code-text: #f1f5f9;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    /* Top Presentation Bar */
+    header.deck-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+    .brand-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-bright);
+      font-weight: 700;
+      font-size: 16px;
+    }
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: var(--accent);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .deck-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .header-center {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .slide-indicator {
+      font-family: var(--font-mono);
+      color: var(--text-bright);
+      background: var(--bg-subtle);
+      padding: 3px 10px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-decoration: none;
+    }
+    .btn-action:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white !important;
+    }
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    /* Main Deck Viewport */
+    .deck-viewport {
+      position: absolute;
+      top: 56px;
+      bottom: 56px;
+      left: 0;
+      right: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    /* Slide Card */
+    .slide {
+      position: absolute;
+      width: 100%;
+      max-width: 1200px;
+      height: 100%;
+      max-height: 720px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--card-shadow);
+      padding: 44px 56px;
+      opacity: 0;
+      transform: scale(0.96) translateY(20px);
+      pointer-events: none;
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+    .slide.active {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+      pointer-events: auto;
+      z-index: 10;
+    }
+    .slide.prev {
+      opacity: 0;
+      transform: scale(0.96) translateX(-40px);
+    }
+
+    /* Slide Header */
+    .slide-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .slide-category {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+    }
+    .slide-category svg { width: 14px; height: 14px; }
+    .slide-attribution {
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+
+    .slide-title {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      color: var(--text-bright);
+      line-height: 1.25;
+      margin-bottom: 8px;
+    }
+    .slide-subtitle {
+      font-size: 16px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 28px;
+    }
+
+    .slide-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    /* Grids & Cards */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+    }
+    .card:hover {
+      border-color: var(--border-focus);
+      box-shadow: var(--card-shadow-hover);
+      transform: translateY(-2px);
+    }
+    .card-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 8px;
+    }
+    .card-desc {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Stat Pill */
+    .stat-badge {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .stat-number {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--accent);
+      font-family: var(--font-mono);
+    }
+    .stat-label {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* Comparison Table */
+    .comp-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+      background: var(--bg-surface);
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .comp-table th {
+      background: var(--bg-subtle);
+      padding: 12px 16px;
+      font-weight: 700;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-bright);
+    }
+    .comp-table td {
+      padding: 11px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .comp-table tr:last-child td { border-bottom: none; }
+    .col-highlight {
+      background: var(--accent-soft);
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    /* Interactive SME Calculator */
+    .calc-container {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+    }
+    .calc-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-bright);
+    }
+    .slider-val {
+      font-family: var(--font-mono);
+      color: var(--accent);
+      font-size: 16px;
+      font-weight: 700;
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      background: var(--border);
+      border-radius: 4px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+    .calc-results {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .savings-hero {
+      text-align: center;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .savings-amount {
+      font-size: 38px;
+      font-weight: 900;
+      font-family: var(--font-mono);
+      color: var(--accent);
+      letter-spacing: -0.03em;
+    }
+    .savings-pct {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .cost-breakdown {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 16px;
+      font-size: 13px;
+    }
+    .cost-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .cost-num {
+      font-size: 16px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--text-bright);
+    }
+
+    /* Bottom Navigation Bar */
+    footer.deck-footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 100;
+    }
+    .deck-progress-container {
+      flex: 1;
+      max-width: 400px;
+      height: 6px;
+      background: var(--bg-subtle);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 0 20px;
+    }
+    .deck-progress-bar {
+      height: 100%;
+      background: var(--accent);
+      width: 9.09%;
+      transition: width 0.3s ease;
+    }
+    .deck-nav-buttons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-nav {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-nav:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .btn-nav:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* Overview Grid Modal */
+    .overview-overlay {
+      position: fixed;
+      top: 56px;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 200;
+      display: none;
+      padding: 40px;
+      overflow-y: auto;
+    }
+    .overview-overlay.open {
+      display: block;
+      animation: fadeIn 0.2s ease-out;
+    }
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .thumb-card {
+      background: var(--bg-surface);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .thumb-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-3px);
+    }
+    .thumb-card.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+    .thumb-num {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .thumb-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-bright);
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .slide { padding: 24px; max-height: 90%; }
+      .grid-2, .grid-3, .grid-4, .calc-container { grid-template-columns: 1fr; }
+      .slide-title { font-size: 24px; }
+      .slide-subtitle { font-size: 14px; margin-bottom: 16px; }
+    }
+  </style>
+</head>
+<body data-theme="dark">
+
+  <!-- Top Navigation Header -->
+  <header class="deck-header">
+    <div class="brand-box">
+      <div class="brand-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
+      </div>
+      <span>ProGit</span>
+      <span class="deck-badge">SME & Agency Deck</span>
+    </div>
+
+    <div class="header-center">
+      <span id="slideCategoryTitle">Product Overview</span>
+      <span class="slide-indicator" id="slideIndicator">01 / 11</span>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn-action" id="btnToggleOverview" title="Slide Overview (Esc)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Slides</span>
+      </button>
+      <button class="btn-action" id="btnToggleTheme" title="Toggle Dark/Light">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      </button>
+      <button class="btn-action" id="btnFullscreen" title="Fullscreen (F)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+      </button>
+      <a href="presentation.html" class="btn-action" title="View Enterprise HA Roadmap">
+        <span>Enterprise HA Deck</span>
+      </a>
+      <a href="index.html" class="btn-action btn-primary" title="Return to Documentation">
+        <span>Documentation</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <!-- Deck Main Stage -->
+  <div class="deck-viewport">
+
+    <!-- SLIDE 1: Title & SME Vision -->
+    <section class="slide active" data-index="1" data-category="SME & Agency Solution">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span>SME Collaboration</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h1 class="slide-title">ProGit for SMEs &amp; IT Agencies</h1>
+      <p class="slide-subtitle">High-Performance, Self-Hosted Git Collaboration Without the SaaS Seat Tax. Shipped and ready to deploy on existing hardware today.</p>
+
+      <div class="slide-body">
+        <div class="grid-4" style="margin-bottom: 24px;">
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+            <div class="card-title">$5/mo Hosting</div>
+            <div class="card-desc">Runs comfortably on a low-cost VPS or office NAS. No multi-gigabyte server required.</div>
+          </div>
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+            <div class="card-title">&lt; 100 MB RAM</div>
+            <div class="card-desc">Pure-Go single binary with embedded React 19 UI. Boots in under 2 seconds.</div>
+          </div>
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
+            <div class="card-title">Zero DB Admin</div>
+            <div class="card-desc">Zero-CGO SQLite in WAL mode. No PostgreSQL or MySQL instances to maintain or back up.</div>
+          </div>
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+            <div class="card-title">100% Code Privacy</div>
+            <div class="card-desc">Client code stays on your private servers. Fully offline, air-gap ready, zero telemetry.</div>
+          </div>
+        </div>
+
+        <div class="card" style="background: var(--accent-soft); border-color: rgba(16, 185, 129, 0.3);">
+          <div style="font-size: 14.5px; font-weight: 600; color: var(--accent); margin-bottom: 4px;">Designed Specifically for Engineering Teams of 5 to 150 Developers</div>
+          <div style="font-size: 14px; color: var(--text-bright); line-height: 1.6;">
+            Software consultancies, dev shops, and tech startups shouldn't sacrifice profitability to proprietary SaaS platforms. ProGit provides the GitHub developer experience your engineers already know, packaged for self-hosted operational simplicity.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 2: The SME Pain Points -->
+    <section class="slide" data-index="2" data-category="Industry Pain Points">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>The SME Pain</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Why Small &amp; Midsize Teams Overpay</h2>
+      <p class="slide-subtitle">SaaS vendors extract heavy margins from growing software teams, while traditional self-hosted solutions demand excessive DevOps maintenance.</p>
+
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card" style="border-left: 4px solid #ef4444;">
+            <div class="card-title" style="color: #ef4444;">1. The Per-Seat Penalty on Agency Margins</div>
+            <div class="card-desc">
+              GitHub Team costs $4/seat/mo, Enterprise costs $21/seat/mo, and GitLab ranges from $29 to $99/seat/mo. For a 40-engineer software agency, you spend <strong>$10,000 to $47,000 every year</strong> on hosting git repositories. That comes directly off your bottom line.
+            </div>
+            <div class="stat-badge">
+              <span class="stat-number" style="color: #ef4444;">-$25K/yr</span>
+              <span class="stat-label">Average agency profit lost to per-seat SaaS bills</span>
+            </div>
+          </div>
+
+          <div class="card" style="border-left: 4px solid #f59e0b;">
+            <div class="card-title" style="color: #f59e0b;">2. GitLab Self-Hosted Is an Ops Nightmare</div>
+            <div class="card-desc">
+              GitLab Omnibus requires <strong>8 to 16 GB of RAM</strong> just to idle. It launches 20+ microservices (Puma, Sidekiq, Redis, Gitaly, PostgreSQL) that break during version upgrades and demand dedicated DevOps engineers that small teams don't have.
+            </div>
+            <div class="stat-badge">
+              <span class="stat-number" style="color: #f59e0b;">16 GB</span>
+              <span class="stat-label">Minimum server RAM needed for GitLab self-managed</span>
+            </div>
+          </div>
+
+          <div class="card" style="border-left: 4px solid #8b5cf6;">
+            <div class="card-title" style="color: #8b5cf6;">3. Client NDAs &amp; Third-Party Cloud Risks</div>
+            <div class="card-desc">
+              Enterprise clients frequently demand that their proprietary source code never leaves private customer-controlled or agency-controlled networks. Putting NDA-protected client code on public cloud SaaS platforms creates legal exposure.
+            </div>
+            <div class="stat-badge">
+              <span class="stat-number" style="color: #8b5cf6;">0%</span>
+              <span class="stat-label">Tolerance for client IP leaks or cloud outages</span>
+            </div>
+          </div>
+
+          <div class="card" style="border-left: 4px solid #06b6d4;">
+            <div class="card-title" style="color: #06b6d4;">4. Gitea &amp; Legacy Clones Lack Modern Polish</div>
+            <div class="card-desc">
+              Traditional open-source alternatives often rely on server-rendered HTML templates that feel dated. Developers miss modern SPA responsiveness, intuitive split-diff reviews, clickable permalinks, and GitHub-style file explorer trees.
+            </div>
+            <div class="stat-badge">
+              <span class="stat-number" style="color: #06b6d4;">React 19</span>
+              <span class="stat-label">ProGit solves this with modern GitHub-grade SPA</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 3: Pure-Go Architecture Simplicity -->
+    <section class="slide" data-index="3" data-category="Architecture & Tech Stack">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25"/></svg>
+          <span>Architecture &amp; Simplicity</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Built for Speed &amp; Operational Simplicity</h2>
+      <p class="slide-subtitle">A zero-maintenance single Go binary that runs circles around bloated enterprise stacks.</p>
+
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
+            <div class="card-title">Single Static Binary (~35 MB)</div>
+            <div class="card-desc">No external runtimes, no Node.js or Python daemons. The entire React 19 UI is compiled directly into the binary with <code>embed.FS</code>.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
+            <div class="card-title">Zero-CGO SQLite WAL Mode</div>
+            <div class="card-desc">High-concurrency SQLite with Write-Ahead Logging. Handles thousands of concurrent reads and writes with zero database server setup.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/></svg></div>
+            <div class="card-title">Embedded SSH on Port 2222</div>
+            <div class="card-desc">Built-in pure-Go SSH server. No need to touch your host's OpenSSH or manage Linux system user accounts. Keys are scoped and verified automatically.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+            <div class="card-title">Native HTTPS &amp; Auto-Redirect</div>
+            <div class="card-desc">Built-in HTTPS listener on port 3443 with self-signed certificate generation and automatic HTTP port 3000 &rarr; 3443 redirection.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+            <div class="card-title">Sub-Second Startup</div>
+            <div class="card-desc">Spins up in less than 2 seconds. Ready for instant local developer workstations, branch review pods, and continuous integration runners.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg></div>
+            <div class="card-title">Single Volume Backup</div>
+            <div class="card-desc">Backing up ProGit is as simple as copying the <code>/data</code> directory or taking a snapshot of SQLite and repository bare trees.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 4: GitHub-Grade Developer Experience -->
+    <section class="slide" data-index="4" data-category="Developer Experience">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <span>Developer UX</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">The Exact GitHub UX Developers Love</h2>
+      <p class="slide-subtitle">Zero onboarding friction. Your engineers feel right at home from their very first push.</p>
+
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <span>GitHub-Style File Explorer</span>
+            </div>
+            <div class="card-desc">
+              Collapsible file hierarchy tree on the left side of both file viewer and online file editor. Fast navigation, instant branch switcher, and automatic dark/light theme matching.
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
+              <span>Unified &amp; Split Diff PR Reviews</span>
+            </div>
+            <div class="card-desc">
+              Review code changes side-by-side or unified with syntax highlighting across 20+ languages. Sticky changed files sidebar lets you jump directly to modified files.
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              <span>Line Anchors (#L42) &amp; Git Blame</span>
+            </div>
+            <div class="card-desc">
+              Click any line number to highlight and copy a shareable permalink. Inspect line-by-line author history, commit hashes, and timestamps in the interactive Blame tab.
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Smart Git Push Hooks &amp; Terminal Welcome</span>
+            </div>
+            <div class="card-desc">
+              Pushing code over SSH greets developers in the terminal: <code>Hi &lt;user&gt;! You've successfully authenticated</code> and prints 1-click Pull Request creation URLs.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 5: All-In-One Collaboration Suite -->
+    <section class="slide" data-index="5" data-category="Collaboration Features">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+          <span>All-In-One Features</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Everything Your Agency Needs in One Box</h2>
+      <p class="slide-subtitle">Consolidate multiple separate tools into a single cohesive platform.</p>
+
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+            <div class="card-title">Issues &amp; Milestones</div>
+            <div class="card-desc">Track client requests, assign developers, set milestones, and label bugs. Auto-closes issues via commit messages (<code>Fixes #12</code>).</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg></div>
+            <div class="card-title">Kanban Project Boards</div>
+            <div class="card-desc">Visual drag-and-drop workflow columns (To Do, In Progress, In Review, Done). Manage sprint deliverables without paying for Jira or Trello.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+            <div class="card-title">Real Git-Backed Wikis</div>
+            <div class="card-desc">Independent Git repository (<code>repo.wiki.git</code>) for project documentation. Clone, write in Markdown, and push offline or edit online.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
+            <div class="card-title">ProGit Pages (Static Hosting)</div>
+            <div class="card-desc">Host client documentation sites, portfolios, and static staging builds directly from <code>gh-pages</code> or <code>main</code> branch with automated rendering.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
+            <div class="card-title">Organizations &amp; Teams</div>
+            <div class="card-desc">Group repositories by client or product. Invite team members with fine-grained Read, Write, or Admin permissions. Profile editing built-in.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+            <div class="card-title">Developer Direct Messaging</div>
+            <div class="card-desc">Built-in internal messaging for code discussions, announcements, and peer coordination right inside the Git platform.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 6: Webhooks & CI/CD Integrations -->
+    <section class="slide" data-index="6" data-category="Integrations & Automation">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <span>Integrations &amp; Automation</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Seamless CI/CD &amp; Webhook Automation</h2>
+      <p class="slide-subtitle">Trigger automated tests, deploy pipelines, and notify team chat with HMAC-signed webhooks.</p>
+
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              <span>HMAC-SHA256 Webhooks Engine</span>
+            </div>
+            <div class="card-desc">
+              Dispatches authenticated payloads on <code>push</code>, <code>pull_request</code>, <code>issues</code>, and <code>release</code> events. Compatible with Jenkins, Drone CI, Woodpecker, GitHub Actions runners, and Slack/Discord bots.
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+              <span>Full REST API (v1)</span>
+            </div>
+            <div class="card-desc">
+              Comprehensive REST API for provisioning users, creating repositories, managing personal access tokens, creating webhooks, committing files online, and generating audit reports.
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Branch Protection Rules</span>
+            </div>
+            <div class="card-desc">
+              Protect your <code>main</code> or release branches against accidental deletion or force pushes. Enforce pull request reviews before merging client production code.
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+              <span>Binary Releases &amp; Assets</span>
+            </div>
+            <div class="card-desc">
+              Tag releases and upload client deliverables, compiled executables, or documentation ZIP packages with Git tag association and download counters.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 7: Data Sovereignty & Client Privacy -->
+    <section class="slide" data-index="7" data-category="Security & Privacy">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>Data Sovereignty</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">100% Data Sovereignty &amp; Privacy</h2>
+      <p class="slide-subtitle">Keep your agency's intellectual property and confidential client code strictly under your control.</p>
+
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+            <div class="card-title">Zero Phone-Home Telemetry</div>
+            <div class="card-desc">ProGit contains zero tracking beacons, external analytics, or remote license check calls. It runs completely air-gapped without internet access.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg></div>
+            <div class="card-title">Rootless Non-Root Execution</div>
+            <div class="card-desc">Runs by default under dedicated unprivileged system user (UID 1000). Built-in support for SELinux container volume labels (<code>:Z</code>).</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
+            <div class="card-title">Zero CGO Memory Safety</div>
+            <div class="card-desc">Pure Go codebase eliminates legacy C pointer errors, memory leaks, and buffer overflow vulnerabilities present in C-based Git wrappers.</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 20px; background: var(--bg-subtle);">
+          <div style="font-weight: 700; font-size: 14px; color: var(--text-bright); margin-bottom: 6px;">Client Pitch Advantage for Consultancies</div>
+          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+            When pitching enterprise clients, you can proudly declare: <em>"We host and build your custom software exclusively on our private, air-gapped Git infrastructure with zero third-party cloud data exposure."</em> This is a major differentiator in competitive agency bids.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 8: Interactive SME Cost & ROI Calculator -->
+    <section class="slide" data-index="8" data-category="Cost & ROI Calculator">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span>SME Cost Calculator</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Calculate Your SME Cost Savings</h2>
+      <p class="slide-subtitle">See how much capital your agency or startup saves every year by hosting ProGit on a $5 VPS or office server.</p>
+
+      <div class="slide-body">
+        <div class="calc-container">
+          <div class="calc-controls">
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Developer Team Size</span>
+                <span class="slider-val" id="teamSizeVal">30 Engineers</span>
+              </div>
+              <input type="range" id="teamSizeSlider" min="5" max="150" step="5" value="30">
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Comparison SaaS Platform</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; background: var(--bg-surface); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);">
+                  <input type="radio" name="baseline" value="github_team" checked> GitHub Team ($4/dev/mo = $48/yr)
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; background: var(--bg-surface); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);">
+                  <input type="radio" name="baseline" value="github_ent"> GitHub Enterprise ($21/dev/mo = $252/yr)
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; background: var(--bg-surface); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);">
+                  <input type="radio" name="baseline" value="gitlab_prem"> GitLab Premium ($29/dev/mo = $348/yr)
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="calc-results">
+            <div class="savings-hero">
+              <div style="font-size: 12px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); margin-bottom: 4px;">Annual Agency Margin Saved</div>
+              <div class="savings-amount" id="savingsAmount">$1,380</div>
+              <span class="savings-pct" id="savingsPct">95% Cost Reduction</span>
+            </div>
+
+            <div class="cost-breakdown">
+              <div class="cost-item">
+                <span style="color: var(--text-muted); font-size: 12px;">SaaS Annual Cost</span>
+                <span class="cost-num" id="competitorTotal">$1,440</span>
+              </div>
+              <div class="cost-item">
+                <span style="color: var(--accent); font-size: 12px; font-weight: 600;">ProGit Hosting (VPS)</span>
+                <span class="cost-num" id="progitTotal" style="color: var(--accent);">$60/yr</span>
+              </div>
+              <div class="cost-item">
+                <span style="color: var(--text-muted); font-size: 12px;">3-Year Cumulative</span>
+                <span class="cost-num" id="threeYearSavings" style="color: #3b82f6;">$4,140</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 9: Head-to-Head SME Comparison -->
+    <section class="slide" data-index="9" data-category="Platform Comparison">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span>SME Comparison</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">How ProGit Compares for Small &amp; Midsize Teams</h2>
+      <p class="slide-subtitle">Clear differences in deployment overhead, user experience, and ongoing cost.</p>
+
+      <div class="slide-body">
+        <table class="comp-table">
+          <thead>
+            <tr>
+              <th>Evaluation Feature</th>
+              <th class="col-highlight">ProGit</th>
+              <th>GitHub SaaS</th>
+              <th>GitLab Self-Hosted</th>
+              <th>Gitea / Forgejo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Server Hardware Needed</strong></td>
+              <td class="col-highlight"><strong>$5 VPS (&lt; 100 MB RAM)</strong></td>
+              <td>N/A (SaaS Cloud)</td>
+              <td>Heavy (8–16 GB RAM)</td>
+              <td>Light (~300 MB RAM)</td>
+            </tr>
+            <tr>
+              <td><strong>Per-Seat Monthly Fee</strong></td>
+              <td class="col-highlight"><strong>$0 (Unlimited Users)</strong></td>
+              <td>$4 – $21 / user / mo</td>
+              <td>$29 – $99 / user / mo</td>
+              <td>$0 (Free)</td>
+            </tr>
+            <tr>
+              <td><strong>Setup Time</strong></td>
+              <td class="col-highlight"><strong>&lt; 2 Minutes (1 Command)</strong></td>
+              <td>Instant Sign-up</td>
+              <td>2–4 Hours (Complex Omnibus)</td>
+              <td>15–30 Minutes</td>
+            </tr>
+            <tr>
+              <td><strong>Database Maintenance</strong></td>
+              <td class="col-highlight"><strong>Zero (Embedded SQLite WAL)</strong></td>
+              <td>Managed by GitHub</td>
+              <td>Heavy PostgreSQL Admin</td>
+              <td>Requires MySQL/Postgres for scale</td>
+            </tr>
+            <tr>
+              <td><strong>Frontend Experience</strong></td>
+              <td class="col-highlight"><strong>Modern React 19 SPA</strong></td>
+              <td>Modern SPA</td>
+              <td>Ruby / Vue Hybrid (Heavy)</td>
+              <td>Server HTML Templates</td>
+            </tr>
+            <tr>
+              <td><strong>Code Privacy / Air-Gap</strong></td>
+              <td class="col-highlight"><strong>100% Private (No Telemetry)</strong></td>
+              <td>Public Cloud Multi-Tenant</td>
+              <td>Supported</td>
+              <td>Supported</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SLIDE 10: 2-Minute Quickstart -->
+    <section class="slide" data-index="10" data-category="Instant Setup">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          <span>2-Minute Setup</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Up and Running in 120 Seconds</h2>
+      <p class="slide-subtitle">Deploy official multi-arch images on Linux, macOS, or any cloud VPS with Podman or Docker.</p>
+
+      <div class="slide-body">
+        <div class="card" style="background: var(--code-bg); border-color: #334155; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span style="font-family: var(--font-mono); font-size: 12px; color: var(--accent);">Production Podman Command</span>
+            <span style="font-size: 11px; color: #94a3b8;">ghcr.io/sanjeevsenapati/progit:latest</span>
+          </div>
+          <pre style="font-family: var(--font-mono); font-size: 13.5px; color: var(--code-text); line-height: 1.6; overflow-x: auto;">
+podman run -d \
+  --name progit \
+  --restart=unless-stopped \
+  -p 3443:3443 -p 3000:3000 -p 2222:2222 \
+  -v progit-data:/data/db:Z \
+  -v progit-repositories:/data/repositories:Z \
+  -v progit-config:/data/config:Z \
+  ghcr.io/sanjeevsenapati/progit:latest</pre>
+        </div>
+
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-title">1. Access Web Portal</div>
+            <div class="card-desc">Navigate to <code>https://&lt;your-server-ip&gt;:3443</code>. Built-in TLS encryption works immediately.</div>
+          </div>
+          <div class="card">
+            <div class="card-title">2. Initial Setup Wizard</div>
+            <div class="card-desc">Follow the 3-step web wizard to create your super admin user and instance settings.</div>
+          </div>
+          <div class="card">
+            <div class="card-title">3. Git Clone &amp; Push</div>
+            <div class="card-desc">Use standard Git CLI: <code>git clone https://&lt;ip&gt;:3443/owner/repo.git</code> or native SSH on port 2222.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 11: Call to Action for SME Leaders -->
+    <section class="slide" data-index="11" data-category="Get Started">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Start Today</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Take Back Control of Your Git Infrastructure</h2>
+      <p class="slide-subtitle">Join the growing community of engineering leaders choosing speed, sovereignty, and cost efficiency.</p>
+
+      <div class="slide-body">
+        <div class="grid-3" style="margin-bottom: 28px;">
+          <div class="card" style="border-top: 4px solid var(--accent);">
+            <div class="card-title">1. Deploy Free Instantly</div>
+            <div class="card-desc">Pull the official multi-arch container from GitHub Container Registry and spin up your team's Git server in 2 minutes.</div>
+          </div>
+          <div class="card" style="border-top: 4px solid #3b82f6;">
+            <div class="card-title">2. Read Comprehensive Docs</div>
+            <div class="card-desc">Explore in-depth installation, configuration, backup, and REST API guides on our official documentation portal.</div>
+          </div>
+          <div class="card" style="border-top: 4px solid #8b5cf6;">
+            <div class="card-title">3. Enterprise HA Roadmap</div>
+            <div class="card-desc">Growing into a large enterprise? Explore our multi-node High Availability architecture deck and commercial strategy.</div>
+          </div>
+        </div>
+
+        <div class="card" style="background: var(--accent-soft); border-color: rgba(16, 185, 129, 0.4); text-align: center; padding: 32px;">
+          <h3 style="font-size: 22px; font-weight: 800; color: var(--text-bright); margin-bottom: 8px;">Ready to Empower Your Engineering Team?</h3>
+          <p style="font-size: 14.5px; color: var(--text-muted); max-width: 600px; margin: 0 auto 20px;">
+            Supported by <strong>PDIH</strong> and created by <strong>ProGit Team and Sanjeev</strong>. Built on top of Gogs source code. Released under the open-source MIT License.
+          </p>
+          <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">
+            <a href="https://progit.co.in" class="btn-action btn-primary" style="padding: 10px 24px; font-size: 14px;">Visit Official Documentation</a>
+            <a href="presentation.html" class="btn-action" style="padding: 10px 24px; font-size: 14px;">View Enterprise HA Deck</a>
+            <a href="https://github.com/sanjeevsenapati/progit" target="_blank" rel="noopener noreferrer" class="btn-action" style="padding: 10px 24px; font-size: 14px;">View GitHub Repository</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Bottom Navigation Bar -->
+  <footer class="deck-footer">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button class="btn-nav" id="btnPrev" title="Previous Slide (Left Arrow)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button class="btn-nav" id="btnNext" title="Next Slide (Right Arrow or Space)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <span style="font-size: 12px; color: var(--text-muted); margin-left: 6px;">Use <kbd style="font-family: var(--font-mono); background: var(--bg-subtle); padding: 2px 5px; border-radius: 4px; border: 1px solid var(--border);">←</kbd> <kbd style="font-family: var(--font-mono); background: var(--bg-subtle); padding: 2px 5px; border-radius: 4px; border: 1px solid var(--border);">→</kbd> or <kbd style="font-family: var(--font-mono); background: var(--bg-subtle); padding: 2px 5px; border-radius: 4px; border: 1px solid var(--border);">Space</kbd></span>
+    </div>
+
+    <div class="deck-progress-container">
+      <div class="deck-progress-bar" id="progressBar"></div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="font-size: 12px; color: var(--text-muted);">ProGit for SMEs v1.2.0</span>
+    </div>
+  </footer>
+
+  <!-- Slide Overview Grid Overlay -->
+  <div class="overview-overlay" id="overviewOverlay">
+    <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto 24px;">
+      <h3 style="font-size: 20px; font-weight: 800; color: white;">Presentation Slide Navigator</h3>
+      <button class="btn-action" id="btnCloseOverview">Close (Esc)</button>
+    </div>
+    <div class="overview-grid" id="overviewGrid"></div>
+  </div>
+
+  <script>
+    // State
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const totalSlides = slides.length;
+    let currentSlide = 0;
+
+    // Elements
+    const slideIndicator = document.getElementById('slideIndicator');
+    const slideCategoryTitle = document.getElementById('slideCategoryTitle');
+    const progressBar = document.getElementById('progressBar');
+    const btnPrev = document.getElementById('btnPrev');
+    const btnNext = document.getElementById('btnNext');
+    const btnToggleTheme = document.getElementById('btnToggleTheme');
+    const btnFullscreen = document.getElementById('btnFullscreen');
+    const btnToggleOverview = document.getElementById('btnToggleOverview');
+    const btnCloseOverview = document.getElementById('btnCloseOverview');
+    const overviewOverlay = document.getElementById('overviewOverlay');
+    const overviewGrid = document.getElementById('overviewGrid');
+
+    function updateSlide(newIndex) {
+      if (newIndex < 0 || newIndex >= totalSlides) return;
+      slides[currentSlide].classList.remove('active');
+      if (newIndex > currentSlide) {
+        slides[currentSlide].classList.add('prev');
+      } else {
+        slides[currentSlide].classList.remove('prev');
+      }
+
+      currentSlide = newIndex;
+      slides.forEach((s, idx) => {
+        if (idx === currentSlide) {
+          s.classList.add('active');
+          s.classList.remove('prev');
+        } else if (idx < currentSlide) {
+          s.classList.add('prev');
+          s.classList.remove('active');
+        } else {
+          s.classList.remove('active', 'prev');
+        }
+      });
+
+      // Update counters & UI
+      const slideNum = (currentSlide + 1).toString().padStart(2, '0');
+      const totalNum = totalSlides.toString().padStart(2, '0');
+      slideIndicator.textContent = `${slideNum} / ${totalNum}`;
+      slideCategoryTitle.textContent = slides[currentSlide].dataset.category || 'Product Overview';
+
+      const progress = ((currentSlide + 1) / totalSlides) * 100;
+      progressBar.style.width = `${progress}%`;
+
+      btnPrev.disabled = currentSlide === 0;
+      btnNext.disabled = currentSlide === totalSlides - 1;
+
+      // Update active card in overview grid
+      document.querySelectorAll('.thumb-card').forEach((card, idx) => {
+        card.classList.toggle('active', idx === currentSlide);
+      });
+    }
+
+    btnPrev.addEventListener('click', () => updateSlide(currentSlide - 1));
+    btnNext.addEventListener('click', () => updateSlide(currentSlide + 1));
+
+    // Keyboard Navigation
+    window.addEventListener('keydown', (e) => {
+      if (overviewOverlay.classList.contains('open')) {
+        if (e.key === 'Escape') toggleOverview(false);
+        return;
+      }
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        e.preventDefault();
+        updateSlide(currentSlide + 1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        updateSlide(currentSlide - 1);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        updateSlide(0);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        updateSlide(totalSlides - 1);
+      } else if (e.key === 'Escape') {
+        toggleOverview(true);
+      } else if (e.key.toLowerCase() === 'f') {
+        toggleFullscreen();
+      }
+    });
+
+    // Theme Toggle
+    btnToggleTheme.addEventListener('click', () => {
+      const isDark = document.body.getAttribute('data-theme') === 'dark';
+      document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    });
+
+    // Fullscreen Toggle
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      }
+    }
+    btnFullscreen.addEventListener('click', toggleFullscreen);
+
+    // Overview Grid Construction
+    slides.forEach((slide, idx) => {
+      const title = slide.querySelector('.slide-title')?.textContent || `Slide ${idx + 1}`;
+      const cat = slide.dataset.category || 'Topic';
+      const card = document.createElement('div');
+      card.className = `thumb-card ${idx === 0 ? 'active' : ''}`;
+      card.innerHTML = `
+        <span class="thumb-num">${(idx + 1).toString().padStart(2, '0')} • ${cat}</span>
+        <span class="thumb-title">${title}</span>
+      `;
+      card.addEventListener('click', () => {
+        updateSlide(idx);
+        toggleOverview(false);
+      });
+      overviewGrid.appendChild(card);
+    });
+
+    function toggleOverview(open) {
+      overviewOverlay.classList.toggle('open', open);
+    }
+    btnToggleOverview.addEventListener('click', () => toggleOverview(true));
+    btnCloseOverview.addEventListener('click', () => toggleOverview(false));
+
+    // Interactive SME Cost Calculator Logic
+    const teamSizeSlider = document.getElementById('teamSizeSlider');
+    const teamSizeVal = document.getElementById('teamSizeVal');
+    const savingsAmount = document.getElementById('savingsAmount');
+    const savingsPct = document.getElementById('savingsPct');
+    const competitorTotal = document.getElementById('competitorTotal');
+    const progitTotal = document.getElementById('progitTotal');
+    const threeYearSavings = document.getElementById('threeYearSavings');
+
+    function calculateTCO() {
+      const teamSize = parseInt(teamSizeSlider.value, 10);
+      const baseline = document.querySelector('input[name="baseline"]:checked')?.value || 'github_team';
+
+      teamSizeVal.textContent = `${teamSize} Developers`;
+
+      // Rates:
+      // github_team: $4/dev/mo = $48/yr
+      // github_ent: $21/dev/mo = $252/yr
+      // gitlab_prem: $29/dev/mo = $348/yr
+      let annualSeatRate = 48;
+      if (baseline === 'github_ent') annualSeatRate = 252;
+      if (baseline === 'gitlab_prem') annualSeatRate = 348;
+
+      const compAnnual = teamSize * annualSeatRate;
+      // ProGit runs on a $5/month VPS = $60/yr hosting, regardless of developer count!
+      const progitAnnual = 60;
+
+      const annualSavings = Math.max(0, compAnnual - progitAnnual);
+      const percentSavings = Math.round((annualSavings / compAnnual) * 100);
+      const threeYear = annualSavings * 3;
+
+      const fmt = (n) => '$' + n.toLocaleString();
+
+      savingsAmount.textContent = fmt(annualSavings);
+      savingsPct.textContent = `${percentSavings}% Cost Reduction`;
+      competitorTotal.textContent = fmt(compAnnual);
+      progitTotal.textContent = fmt(progitAnnual);
+      threeYearSavings.textContent = fmt(threeYear);
+    }
+
+    teamSizeSlider.addEventListener('input', calculateTCO);
+    document.querySelectorAll('input[name="baseline"]').forEach(r => r.addEventListener('change', calculateTCO));
+    calculateTCO();
+
+    // Initial setup
+    updateSlide(0);
+  </script>
+</body>
+</html>
