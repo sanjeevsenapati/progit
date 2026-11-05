@@ -44,7 +44,7 @@ export const Dashboard: React.FC = () => {
   const [repoPage, setRepoPage] = useState(1);
   const repoPageSize = 6;
 
-  const [serverRootUrl, setServerRootUrl] = useState(() => cached?.root_url || 'https://progit.local/');
+  const [serverRootUrl, setServerRootUrl] = useState(() => cached?.root_url || 'https://progit.local:3443/');
   const [serverDomain, setServerDomain] = useState(() => cached?.domain || 'progit.local');
   const [serverSshPort, setServerSshPort] = useState(() => cached?.ssh_port || 2222);
 
@@ -514,7 +514,7 @@ export const Dashboard: React.FC = () => {
                 if (serverRootUrl && serverRootUrl.trim()) {
                   return serverRootUrl.trim().replace(/\/+$/, '');
                 }
-                return 'https://progit.local';
+                return 'https://progit.local:3443';
               };
 
               const getSshCloneHost = () => {

@@ -18,7 +18,7 @@ services:
       - PROGIT_HTTP_PORT=3000
       - PROGIT_HTTPS_PORT=3443
       - PROGIT_PROTOCOL=https
-      - PROGIT_ROOT_URL=https://progit.local/
+      - PROGIT_ROOT_URL=https://progit.local:3443/
       - PROGIT_CERT_FILE=/data/config/https/cert.pem
       - PROGIT_KEY_FILE=/data/config/https/key.pem
       - PROGIT_REDIRECT_OTHER_PORT=true

@@ -85,7 +85,7 @@ func DefaultConfig() *Config {
 			Domain:            "progit.local",
 			HTTPPort:          3000,
 			HTTPSPort:         3443,
-			RootURL:           "https://progit.local/",
+			RootURL:           "https://progit.local:3443/",
 			Protocol:          "https",
 			OfflineMode:       false,
 			CertFile:          certFile,
@@ -211,7 +211,7 @@ func Load(configPath string) (*Config, error) {
 	if val := os.Getenv("PROGIT_ROOT_URL"); val != "" {
 		cfg.Server.RootURL = val
 	} else if cfg.Server.Protocol == "https" && (cfg.Server.RootURL == "" || strings.HasPrefix(cfg.Server.RootURL, "http://localhost")) {
-		if cfg.Server.HTTPSPort == 443 || cfg.Server.HTTPSPort == 3443 {
+		if cfg.Server.HTTPSPort == 443 {
 			cfg.Server.RootURL = fmt.Sprintf("https://%s/", cfg.Server.Domain)
 		} else {
 			cfg.Server.RootURL = fmt.Sprintf("https://%s:%d/", cfg.Server.Domain, cfg.Server.HTTPSPort)

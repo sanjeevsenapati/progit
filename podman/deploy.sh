@@ -52,7 +52,7 @@ echo "==> Container deployed. Waiting for health check..."
 for i in {1..20}; do
     if curl -k -s https://localhost:3443/api/health >/dev/null 2>&1 || curl -k -s http://localhost:3000/api/health >/dev/null 2>&1; then
         echo "==> ProGit is UP and HEALTHY!"
-        echo "==> Default Access URL: https://progit.local"
+        echo "==> Default Access URL: https://progit.local:3443"
         echo "==> (Add '127.0.0.1 progit.local' to your /etc/hosts file for local DNS resolution)"
         exit 0
     fi

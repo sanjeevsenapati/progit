@@ -102,7 +102,7 @@ services:
       - PROGIT_APP_NAME=ProGit
       - PROGIT_DOMAIN=progit.local
       - PROGIT_PROTOCOL=https
-      - PROGIT_ROOT_URL=https://progit.local/
+      - PROGIT_ROOT_URL=https://progit.local:3443/
       - PROGIT_HTTPS_PORT=3443
       - PROGIT_HTTP_PORT=3000
       - PROGIT_REDIRECT_OTHER_PORT=true
