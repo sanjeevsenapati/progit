@@ -30,7 +30,7 @@ import (
 	"progit.io/progit/internal/ui"
 )
 
-var Version = "1.1.0"
+var Version = "1.2.0"
 
 func main() {
 	if len(os.Args) > 1 {

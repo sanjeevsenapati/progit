@@ -13,9 +13,9 @@ Pre-built multi-architecture images and platform-specific artifacts are publicly
 | Registry Image / Tag | Architecture | Platform Description |
 | :--- | :--- | :--- |
 | `ghcr.io/sanjeevsenapati/progit:latest` | `linux/amd64` + `linux/arm64` | Multi-arch manifest (auto-selects native architecture) |
-| `ghcr.io/sanjeevsenapati/progit:1.1.0` | `linux/amd64` + `linux/arm64` | Release 1.1.0 multi-arch manifest |
-| `ghcr.io/sanjeevsenapati/progit:1.1.0-linux-amd64` | `linux/amd64` | Standard x86_64 production Linux servers |
-| `ghcr.io/sanjeevsenapati/progit:1.1.0-linux-arm64` | `linux/arm64` | ARM64 (Apple Silicon, AWS Graviton, Raspberry Pi) |
+| `ghcr.io/sanjeevsenapati/progit:1.2.0` | `linux/amd64` + `linux/arm64` | Release 1.2.0 multi-arch manifest |
+| `ghcr.io/sanjeevsenapati/progit:1.2.0-linux-amd64` | `linux/amd64` | Standard x86_64 production Linux servers |
+| `ghcr.io/sanjeevsenapati/progit:1.2.0-linux-arm64` | `linux/arm64` | ARM64 (Apple Silicon, AWS Graviton, Raspberry Pi) |
 | `ghcr.io/sanjeevsenapati/progit:linux-amd64` | `linux/amd64` | Latest rolling AMD64 build |
 | `ghcr.io/sanjeevsenapati/progit:linux-arm64` | `linux/arm64` | Latest rolling ARM64 build |
 
@@ -23,9 +23,10 @@ Pull the image directly:
 ```bash
 # Auto-detects architecture (AMD64 / ARM64)
 podman pull ghcr.io/sanjeevsenapati/progit:latest
+podman pull ghcr.io/sanjeevsenapati/progit:1.2.0
 
 # Or pull explicitly by architecture
-podman pull ghcr.io/sanjeevsenapati/progit:1.1.0-linux-amd64
+podman pull ghcr.io/sanjeevsenapati/progit:1.2.0-linux-amd64
 ```
 
 ---
@@ -33,7 +34,7 @@ podman pull ghcr.io/sanjeevsenapati/progit:1.1.0-linux-amd64
 ## 2. Directory Layout & Volume Persistence
 
 ProGit stores all dynamic state in `/data` inside the container:
-- `progit-data`: SQLite database file (`/data/db/progit.db`) in high-concurrency WAL mode.
+- `progit-data`: SQLite database file (`/data/db/progit.db`) in high-concurrency WAL mode with persistent web session storage across container restarts.
 - `progit-repositories`: Bare Git repositories (`/data/repositories/<owner>/<repo>.git`).
 - `progit-config`: Configuration overrides and SSL certificates (`/data/config/https/cert.pem` and `key.pem`).
 - `progit-logs`: Application operational logs (`/data/logs`).
@@ -59,7 +60,7 @@ echo "127.0.0.1 progit.local" | sudo tee -a /etc/hosts
 ### 3.2 Automated Script Deployment
 Run the included deployment script:
 ```bash
-bash podman/deploy.sh ghcr.io/sanjeevsenapati/progit:1.1.0-linux-amd64
+bash podman/deploy.sh ghcr.io/sanjeevsenapati/progit:1.2.0
 ```
 
 ### 3.3 Standalone Podman Run CLI
