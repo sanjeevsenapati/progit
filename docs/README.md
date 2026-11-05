@@ -36,5 +36,5 @@ python3 -m http.server 8080
 
 ## 📜 Attribution
 
-**Supported by Prodevans and created by Sanjeev Senapati.**  
+**Supported by PDIH and created by ProGit Team and Sanjeev.**  
 Built on top of the Gogs source code. Released under the MIT License.

@@ -592,7 +592,7 @@ export const Dashboard: React.FC = () => {
           </a>
         </div>
         <p className="font-medium text-gray-700 dark:text-dark-text pt-2 text-sm">
-          Supported by <span className="font-bold text-emerald-600 dark:text-emerald-400">Prodevans</span> • Created by <span className="font-bold text-gray-900 dark:text-white">Sanjeev Senapati</span>
+          Supported by <span className="font-bold text-emerald-600 dark:text-emerald-400">PDIH</span> • Created by <span className="font-bold text-gray-900 dark:text-white">ProGit Team and Sanjeev</span>
         </p>
         <p className="text-gray-500 dark:text-dark-muted text-xs sm:text-sm">
           Credit: Built on top of Gogs source code. Released under the MIT License.

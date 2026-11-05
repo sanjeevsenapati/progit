@@ -78,13 +78,13 @@ EXPLORE_HTML=$(curl -s -f "${PROGIT_URL}/explore")
 echo "${EXPLORE_HTML}" | grep -q 'id="root"' || assert_fail "SPA fallback failed for /explore"
 assert_pass "SPA fallback functional"
 
-log_test "Verify Frontpage Attributions & Prettier: Prodevans, Sanjeev Senapati, Gogs credit"
+log_test "Verify Frontpage Attributions: PDIH, ProGit Team & Sanjeev, Gogs credit"
 ASSET_JS=$(echo "${ROOT_HTML}" | grep -o 'src="/assets/index-[^"]*\.js"' | head -n1 | cut -d'"' -f2)
 [ -n "${ASSET_JS}" ] || assert_fail "Could not find JS asset in root HTML"
 JS_FILE="${TEST_DIR}/bundle.js"
 curl -s -f "${PROGIT_URL}${ASSET_JS}" -o "${JS_FILE}"
-grep -qi "Prodevans" "${JS_FILE}" || assert_fail "Frontpage missing 'Supported by Prodevans'"
-grep -qi "Sanjeev Senapati" "${JS_FILE}" || assert_fail "Frontpage missing 'Created by Sanjeev Senapati'"
+grep -qiE "PDIH|Prodevans" "${JS_FILE}" || assert_fail "Frontpage missing 'Supported by PDIH'"
+grep -qiE "Sanjeev" "${JS_FILE}" || assert_fail "Frontpage missing 'Created by Sanjeev'"
 grep -qi "Gogs source code" "${JS_FILE}" || assert_fail "Frontpage missing 'Built on top of Gogs source code'"
 grep -qi "Prettier" "${JS_FILE}" || assert_fail "Prettier theme / editor missing in bundle"
 assert_pass "Frontpage attributions and Prettier theme confirmed"

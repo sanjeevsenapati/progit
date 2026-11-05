@@ -146,6 +146,13 @@ Detailed architectural and deployment documentation is available in the [`docs/`
 
 ---
 
+## 📜 Attribution & Credits
+
+Supported by **PDIH** and created by **ProGit Team and Sanjeev**.  
+Built on top of the Gogs source code. Released under the open-source MIT License.
+
+---
+
 ## License
 
 ProGit is licensed under the [MIT License](./project.md).

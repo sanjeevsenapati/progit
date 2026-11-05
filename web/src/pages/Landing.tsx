@@ -14,10 +14,10 @@ export const Landing: React.FC = () => {
           </div>
           <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-dark-hover text-gray-700 dark:text-dark-text border border-gray-300 dark:border-dark-border">
             <span>Supported by</span>
-            <strong className="text-emerald-600 dark:text-emerald-400 font-bold">Prodevans</strong>
+            <strong className="text-emerald-600 dark:text-emerald-400 font-bold">PDIH</strong>
             <span className="text-gray-400">•</span>
             <span>Created by</span>
-            <strong className="text-gray-900 dark:text-white font-bold">Sanjeev Senapati</strong>
+            <strong className="text-gray-900 dark:text-white font-bold">ProGit Team and Sanjeev</strong>
           </div>
         </div>
 
@@ -95,20 +95,20 @@ export const Landing: React.FC = () => {
                   <Shield className="w-3.5 h-3.5" />
                   <span>Sponsorship & Backing</span>
                 </div>
-                <h4 className="text-base font-bold text-gray-900 dark:text-white mb-2">Supported by Prodevans</h4>
+                <h4 className="text-base font-bold text-gray-900 dark:text-white mb-2">Supported by PDIH</h4>
                 <p className="text-xs text-gray-600 dark:text-dark-muted leading-relaxed">
-                  Enterprise-grade infrastructure, DevOps automation, continuous verification, and production backing proudly supported by <strong>Prodevans</strong>.
+                  Enterprise-grade infrastructure, DevOps automation, continuous verification, and production backing proudly supported by <strong>PDIH</strong>.
                 </p>
               </div>
 
               <div>
                 <div className="inline-flex items-center space-x-1.5 text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 mb-2">
                   <Award className="w-3.5 h-3.5" />
-                  <span>Lead Architect</span>
+                  <span>Lead Creators</span>
                 </div>
-                <h4 className="text-base font-bold text-gray-900 dark:text-white mb-2">Created by Sanjeev Senapati</h4>
+                <h4 className="text-base font-bold text-gray-900 dark:text-white mb-2">Created by ProGit Team and Sanjeev</h4>
                 <p className="text-xs text-gray-600 dark:text-dark-muted leading-relaxed">
-                  Architected and engineered by <strong>Sanjeev Senapati</strong> as a modern, high-performance, developer-centric self-hosted Git platform.
+                  Architected and engineered by the <strong>ProGit Team and Sanjeev</strong> as a modern, high-performance, developer-centric self-hosted Git platform.
                 </p>
               </div>
 
@@ -130,7 +130,7 @@ export const Landing: React.FC = () => {
       {/* Footer */}
       <footer className="py-8 border-t border-gray-200 dark:border-dark-border text-center text-xs text-gray-500 dark:text-dark-muted space-y-2">
         <p className="font-medium text-gray-700 dark:text-dark-text">
-          Supported by <span className="font-bold text-emerald-600 dark:text-emerald-400">Prodevans</span> • Created by <span className="font-bold text-gray-900 dark:text-white">Sanjeev Senapati</span>
+          Supported by <span className="font-bold text-emerald-600 dark:text-emerald-400">PDIH</span> • Created by <span className="font-bold text-gray-900 dark:text-white">ProGit Team and Sanjeev</span>
         </p>
         <p className="text-gray-600 dark:text-dark-muted">
           Credit: This is built on the top of Gogs source code. Released under the MIT License.

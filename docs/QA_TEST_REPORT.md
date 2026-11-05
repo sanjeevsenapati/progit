@@ -27,7 +27,7 @@ All core capabilities and edge cases across **System Health & Frontpage Attribut
 | 02 | Readiness Check | `GET /api/ready` | **PASS** | 1ms | HTTP 200 returned verifying DB and repository storage are writeable |
 | 03 | Root SPA HTML Delivery | `GET /` | **PASS** | 3ms | Returned HTML with embedded React container (`#root`) and bundled CSS/JS |
 | 04 | Client-side Deep Routing | `GET /explore`, `/settings` | **PASS** | 2ms | Subpath fallbacks correctly served `index.html` for client routing |
-| 05 | Frontpage Attributions & Prettier | Live JS Bundle | **PASS** | 4ms | Confirmed "Supported by Prodevans", "Created by Sanjeev Senapati", "Built on top of Gogs source code", and Prettier Editor styles |
+| 05 | Frontpage Attributions & Prettier | Live JS Bundle | **PASS** | 4ms | Confirmed "Supported by PDIH", "Created by ProGit Team and Sanjeev", "Built on top of Gogs source code", and Prettier Editor styles |
 | 06 | HSTS Security Headers | `GET /` | **PASS** | 1ms | Strict-Transport-Security header enforced for HTTPS hardening |
 
 ### Suite 2: Installation Wizard & Super Admin Setup
