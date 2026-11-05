@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProGit for OMC — Enterprise Sovereign Git & DevOps Platform</title>
+  <meta name="description" content="Dedicated Enterprise Feature & Use Case Presentation for OMC: High-performance, air-gapped, on-premise Git collaboration platform.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='2.5'%3E%3Ccircle cx='18' cy='18' r='3'/%3E%3Ccircle cx='6' cy='6' r='3'/%3E%3Cpath d='M6 9v12'/%3E%3Cpath d='M18 9a9 9 0 0 0-9 9'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+      /* Light Theme */
+      --bg: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-subtle: #f1f5f9;
+      --border: #e2e8f0;
+      --border-focus: #10b981;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --text-bright: #0f172a;
+      --accent: #10b981;
+      --accent-hover: #059669;
+      --accent-soft: rgba(16, 185, 129, 0.12);
+      --accent-glow: rgba(16, 185, 129, 0.25);
+      --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+      --card-shadow-hover: 0 20px 30px -10px rgba(16, 185, 129, 0.15);
+      --code-bg: #1e293b;
+      --code-text: #e2e8f0;
+    }
+
+    [data-theme="dark"] {
+      --bg: #090d16;
+      --bg-surface: #0f172a;
+      --bg-subtle: #131c31;
+      --border: #1e293b;
+      --border-focus: #10b981;
+      --text: #cbd5e1;
+      --text-muted: #94a3b8;
+      --text-bright: #f8fafc;
+      --accent: #10b981;
+      --accent-hover: #34d399;
+      --accent-soft: rgba(16, 185, 129, 0.16);
+      --accent-glow: rgba(16, 185, 129, 0.35);
+      --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      --card-shadow-hover: 0 20px 35px -5px rgba(16, 185, 129, 0.25);
+      --code-bg: #050811;
+      --code-text: #f1f5f9;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    /* Header Bar */
+    header.deck-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+    .brand-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-bright);
+      font-weight: 700;
+      font-size: 16px;
+    }
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: var(--accent);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .deck-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .header-center {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .slide-indicator {
+      font-family: var(--font-mono);
+      color: var(--text-bright);
+      background: var(--bg-subtle);
+      padding: 3px 10px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-decoration: none;
+    }
+    .btn-action:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white !important;
+    }
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    /* Viewport */
+    .deck-viewport {
+      position: absolute;
+      top: 56px;
+      bottom: 56px;
+      left: 0;
+      right: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    /* Slide Card */
+    .slide {
+      position: absolute;
+      width: 100%;
+      max-width: 1200px;
+      height: 100%;
+      max-height: 720px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--card-shadow);
+      padding: 40px 54px;
+      opacity: 0;
+      transform: scale(0.96) translateY(20px);
+      pointer-events: none;
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+    .slide.active {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+      pointer-events: auto;
+      z-index: 10;
+    }
+    .slide.prev {
+      opacity: 0;
+      transform: scale(0.96) translateX(-40px);
+    }
+
+    /* Slide Headers */
+    .slide-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .slide-category {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+    }
+    .slide-category svg { width: 14px; height: 14px; }
+    .slide-attribution {
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+
+    .slide-title {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      color: var(--text-bright);
+      line-height: 1.25;
+      margin-bottom: 8px;
+    }
+    .slide-subtitle {
+      font-size: 15.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 26px;
+    }
+
+    .slide-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    /* Grids & Cards */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 22px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+    }
+    .card:hover {
+      border-color: var(--border-focus);
+      box-shadow: var(--card-shadow-hover);
+      transform: translateY(-2px);
+    }
+    .card-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 8px;
+    }
+    .card-desc {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .feature-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text);
+    }
+    .feature-list li svg {
+      width: 14px;
+      height: 14px;
+      color: var(--accent);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .badge-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+
+    /* Comparison Table */
+    .comp-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+      background: var(--bg-surface);
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .comp-table th {
+      background: var(--bg-subtle);
+      padding: 12px 16px;
+      font-weight: 700;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-bright);
+    }
+    .comp-table td {
+      padding: 11px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .comp-table tr:last-child td { border-bottom: none; }
+    .col-highlight {
+      background: var(--accent-soft);
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    /* Architecture Visual Blocks */
+    .arch-flow {
+      display: flex;
+      gap: 16px;
+      align-items: stretch;
+      justify-content: space-between;
+    }
+    .arch-block {
+      flex: 1;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Bottom Presentation Navigation Bar */
+    footer.deck-footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border);
+      z-index: 100;
+    }
+    .btn-nav {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-nav:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .btn-nav:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+    .deck-progress-container {
+      flex: 1;
+      max-width: 480px;
+      margin: 0 24px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .deck-progress-bar {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.25s ease;
+    }
+
+    /* Slide Overview Modal */
+    .overview-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 15, 29, 0.92);
+      backdrop-filter: blur(12px);
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      padding: 40px;
+      overflow-y: auto;
+    }
+    .overview-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .thumb-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .thumb-card:hover, .thumb-card.active {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(16, 185, 129, 0.2);
+    }
+    .thumb-num {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .thumb-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text-bright);
+    }
+
+    @media (max-width: 1024px) {
+      .slide { padding: 30px 32px; max-height: none; height: auto; }
+      .grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .grid-3 { grid-template-columns: repeat(1, 1fr); }
+      .grid-2 { grid-template-columns: 1fr; }
+      .deck-viewport { padding: 12px; }
+      .arch-flow { flex-direction: column; }
+    }
+  </style>
+</head>
+<body data-theme="dark">
+
+  <!-- Header -->
+  <header class="deck-header">
+    <div class="brand-box">
+      <div class="brand-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/>
+        </svg>
+      </div>
+      <span>ProGit</span>
+      <span class="deck-badge">OMC Dedicated Edition</span>
+    </div>
+
+    <div class="header-center">
+      <span class="slide-indicator" id="slideIndicator">01 / 12</span>
+      <span id="slideCategoryTitle" style="color: var(--text-bright);">Executive Introduction</span>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn-action" id="btnToggleOverview" title="View all slides (Esc)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Overview</span>
+      </button>
+      <button class="btn-action" id="btnToggleTheme" title="Toggle Light/Dark Theme">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <button class="btn-action" id="btnFullscreen" title="Toggle Fullscreen (F)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Viewport -->
+  <main class="deck-viewport">
+
+    <!-- SLIDE 1: Title & Executive Introduction -->
+    <section class="slide active" data-index="1" data-category="Executive Introduction">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          <span>Strategic Proposal</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h1 class="slide-title">Sovereign Git &amp; DevOps Platform for OMC</h1>
+      <p class="slide-subtitle">A high-performance, air-gapped, on-premise Git collaboration platform designed to safeguard OMC's core intellectual property, vendor code deliverables, and digitalization initiatives.</p>
+
+      <div class="slide-body">
+        <div class="grid-4" style="margin-bottom: 24px;">
+          <div class="card" style="border-top: 3px solid var(--accent);">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+            <div class="card-title">100% Data Sovereignty</div>
+            <div class="card-desc">All source code, automation scripts, and project data reside strictly inside OMC's private datacenter infrastructure.</div>
+          </div>
+
+          <div class="card" style="border-top: 3px solid #3b82f6;">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+            <div class="card-title">Air-Gapped &amp; Secure</div>
+            <div class="card-desc">Zero phone-home telemetry. Operates flawlessly in isolated networks, fully aligned with CERT-In and PSU guidelines.</div>
+          </div>
+
+          <div class="card" style="border-top: 3px solid #f59e0b;">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+            <div class="card-title">Ultra-Low Footprint</div>
+            <div class="card-desc">Single-binary Go engine running in &lt; 150 MB RAM with sub-second container boot times on existing OMC hardware.</div>
+          </div>
+
+          <div class="card" style="border-top: 3px solid #8b5cf6;">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+            <div class="card-title">Complete Digital Governance</div>
+            <div class="card-desc">Centralized version control, pull requests, issue tracking, Kanban boards, technical wikis, and software escrow.</div>
+          </div>
+        </div>
+
+        <div style="background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-size: 13px; color: var(--text-muted);">
+            Tailored specifically for <strong>Odisha Mining Corporation (OMC)</strong> IT, Engineering, and Digital Transformation Leadership.
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <span class="badge-tag">Air-Gapped Ready</span>
+            <span class="badge-tag">Pure Go Architecture</span>
+            <span class="badge-tag">Zero Cloud Dependencies</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 2: Strategic Drivers for OMC -->
+    <section class="slide" data-index="2" data-category="Strategic Drivers">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span>Executive Context</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Why a Sovereign Git Platform is Essential for OMC</h2>
+      <p class="slide-subtitle">Addressing compliance, external vendor software risk, operational continuity, and intellectual property defense.</p>
+
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+              <div class="card-icon" style="margin-bottom: 0;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+              <div class="card-title" style="margin-bottom: 0;">1. Regulatory Compliance &amp; CERT-In Mandates</div>
+            </div>
+            <div class="card-desc">Government PSU regulations require critical digital assets, mining logistics code, and institutional data to remain within sovereign borders. Public SaaS repositories (e.g. GitHub/GitLab.com) expose OMC code to foreign cloud jurisdictions and external third-party outages.</div>
+          </div>
+
+          <div class="card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+              <div class="card-icon" style="margin-bottom: 0;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+              <div class="card-title" style="margin-bottom: 0;">2. Vendor Software Deliverable &amp; Escrow Control</div>
+            </div>
+            <div class="card-desc">External system integrators, software contractors, and mining automation vendors often deliver software via zip files or vendor-owned accounts. ProGit gives OMC a unified internal escrow repository where vendors must commit source code directly for inspection.</div>
+          </div>
+
+          <div class="card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+              <div class="card-icon" style="margin-bottom: 0;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+              <div class="card-title" style="margin-bottom: 0;">3. Uninterrupted Intranet Operational Continuity</div>
+            </div>
+            <div class="card-desc">Mining sites and regional administrative offices require high availability. ProGit operates directly on OMC's internal WAN and LAN networks. Engineers, SCADA technicians, and IT teams can push, pull, and review code even during statewide Internet disruptions.</div>
+          </div>
+
+          <div class="card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+              <div class="card-icon" style="margin-bottom: 0;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
+              <div class="card-title" style="margin-bottom: 0;">4. Unified Digital Mine IT Asset Portfolio</div>
+            </div>
+            <div class="card-desc">Centralize version control across ERP integrations, custom weighbridge automation scripts, drone survey spatial data parsers, mine telemetry pipelines, and employee portals under a single corporate governance umbrella.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 3: Architecture & Enterprise Hardening -->
+    <section class="slide" data-index="3" data-category="Architecture & Security">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+          <span>Architecture &amp; Hardening</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Engineered for Sovereign Datacenter Infrastructure</h2>
+      <p class="slide-subtitle">Ultra-lightweight, memory-efficient, single-binary architecture with zero bloat and uncompromising cryptographic security.</p>
+
+      <div class="slide-body">
+        <div class="grid-3" style="margin-bottom: 22px;">
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
+            <div class="card-title">Pure Go Single Binary</div>
+            <div class="card-desc">Compiled directly to native machine code. Requires zero heavy runtimes (no Java JVM, no Ruby Omnibus, no Node daemons). Idles at &lt; 150 MB RAM.</div>
+            <ul class="feature-list">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Sub-second container startup</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Minimal attack surface</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+            <div class="card-title">Strict Air-Gapped Isolation</div>
+            <div class="card-desc">Zero external analytics, zero tracking beacons, and zero mandatory cloud verification. Operates entirely inside OMC's private subnet.</div>
+            <ul class="feature-list">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Zero data leakage to public web</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>100% offline license validation</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
+            <div class="card-title">Crash-Resilient SQLite WAL</div>
+            <div class="card-desc">Write-Ahead Logging (WAL) provides ACID transactional consistency, high-throughput concurrent reads, and hot snapshot backups without lock contention.</div>
+            <ul class="feature-list">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Automated scheduled backups</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Zero corruption on sudden reboot</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card" style="background: var(--bg-surface); border-color: var(--accent); padding: 14px 20px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 13px; font-weight: 700; color: var(--accent);">Enterprise Transports:</span>
+              <span style="font-size: 13px; color: var(--text-bright);">Smart HTTPS (TLS 1.3 on Port 3443 / 443)</span>
+              <span style="color: var(--border);">|</span>
+              <span style="font-size: 13px; color: var(--text-bright);">Native OpenSSH Daemon (Port 2222 / 22)</span>
+            </div>
+            <span style="font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);">SHA-256 Repository Object Verification</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 4: Core Git Collaboration & Reviews -->
+    <section class="slide" data-index="4" data-category="Developer Workflows">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
+          <span>Collaboration Workflows</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Enterprise Git Collaboration &amp; Code Review</h2>
+      <p class="slide-subtitle">A modern, responsive React interface delivering familiar developer workflows without a steep learning curve.</p>
+
+      <div class="slide-body">
+        <div class="grid-4">
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
+            <div class="card-title">Native Git CLI Compatibility</div>
+            <div class="card-desc">Developers and automation scripts use standard Git commands (<code>git clone</code>, <code>git push</code>, <code>git pull</code>, <code>git rebase</code>) over HTTPS and SSH.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg></div>
+            <div class="card-title">Pull Requests &amp; Split Diffs</div>
+            <div class="card-desc">Review pull requests with side-by-side or unified diff views, syntax highlighting across 50+ languages, and collapsible file tree navigation.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+            <div class="card-title">Branch Protection Rules</div>
+            <div class="card-desc">Lock production and <code>main</code> branches. Prevent accidental direct pushes, enforce mandatory pull request reviews, and block force pushes.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+            <div class="card-title">Code Navigation &amp; Blame</div>
+            <div class="card-desc">Deep code inspection with clickable line number anchors (<code>#L45</code>), commit history logs, and line-by-line Git Blame author attribution.</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 20px; background: var(--bg-subtle);">
+          <div style="font-size: 14px; font-weight: 700; color: var(--text-bright); margin-bottom: 8px;">Seamless Developer Onboarding</div>
+          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+            Because ProGit implements standard Git wire protocols and provides GitHub-style clone snippets, OMC developers, data scientists, and external software vendors require zero workflow retraining. They continue using their preferred IDEs (VS Code, IntelliJ, PyCharm, Eclipse).
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 5: Integrated Issues & Kanban Boards -->
+    <section class="slide" data-index="5" data-category="Project Tracking">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+          <span>Integrated Project Management</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Integrated Issue Tracking &amp; Agile Kanban Boards</h2>
+      <p class="slide-subtitle">Manage OMC's software initiatives, bug reports, and vendor sprint deliverables in one unified interface without third-party SaaS tools.</p>
+
+      <div class="slide-body">
+        <div class="grid-3" style="margin-bottom: 20px;">
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg></div>
+            <div class="card-title">Visual Kanban Boards</div>
+            <div class="card-desc">Interactive drag-and-drop workflow boards with customizable columns (To Do, In Progress, Code Review, Quality Testing, Deployed).</div>
+            <ul class="feature-list">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Sprint &amp; backlog planning</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Visual bottleneck detection</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+            <div class="card-title">Issue Management &amp; Milestones</div>
+            <div class="card-desc">Track defect reports, feature enhancements, and system upgrades with colored taxonomy labels, target milestone deadlines, and assignees.</div>
+            <ul class="feature-list">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Custom priority &amp; status labels</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Milestone completion tracking</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
+            <div class="card-title">Bi-Directional Git Linking</div>
+            <div class="card-desc">Automatically link commits, branches, and pull requests to issues. Merging a PR auto-closes corresponding tickets (e.g., <code>Fixes #104</code>).</div>
+            <ul class="feature-list">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Full audit traceability</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Automated ticket resolution</li>
+            </ul>
+          </div>
+        </div>
+
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-size: 13.5px; color: var(--text-bright); font-weight: 600;">Zero Cloud Dependence for Agile Project Tracking</span>
+          <span style="font-size: 12.5px; color: var(--text-muted);">Eliminates reliance on costly external SaaS project management tools while keeping project tasks alongside code.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 6: Versioned Technical Wikis & SOPs -->
+    <section class="slide" data-index="6" data-category="Knowledge Management">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          <span>Knowledge Governance</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Version-Controlled Technical Wikis &amp; SOPs</h2>
+      <p class="slide-subtitle">Centralize standard operating procedures, architectural documentation, and API guides in versioned repositories.</p>
+
+      <div class="slide-body">
+        <div class="grid-2" style="margin-bottom: 20px;">
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
+            <div class="card-title">Git-Backed Repository Wikis</div>
+            <div class="card-desc">Every repository includes an independent Wiki backed by an underlying Git repository. Team members can edit via the responsive web UI or clone the wiki locally to edit with standard Markdown tools.</div>
+            <ul class="feature-list" style="margin-top: 12px;">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Complete line-by-line revision history</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Side-by-side documentation diffs</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
+            <div class="card-title">Operational SOP &amp; Runbook Governance</div>
+            <div class="card-desc">Maintain critical IT runbooks, disaster recovery steps, SCADA maintenance instructions, and mining automation setups directly alongside project code so documentation never gets lost.</div>
+            <ul class="feature-list" style="margin-top: 12px;">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Centralized engineering knowledge base</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Full contributor accountability</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div class="card" style="padding: 16px;">
+            <div style="font-size: 13.5px; font-weight: 700; color: var(--text-bright); margin-bottom: 4px;">GitHub-Flavored Markdown</div>
+            <div style="font-size: 12.5px; color: var(--text-muted);">Supports tables, checklists, callouts, and code blocks with syntax highlighting.</div>
+          </div>
+          <div class="card" style="padding: 16px;">
+            <div style="font-size: 13.5px; font-weight: 700; color: var(--text-bright); margin-bottom: 4px;">Searchable Knowledge Base</div>
+            <div style="font-size: 12.5px; color: var(--text-muted);">Quickly search across wikis and documentation files across all OMC repositories.</div>
+          </div>
+          <div class="card" style="padding: 16px;">
+            <div style="font-size: 13.5px; font-weight: 700; color: var(--text-bright); margin-bottom: 4px;">Permanent Asset Preservation</div>
+            <div style="font-size: 12.5px; color: var(--text-muted);">Protected by the same automated SQLite WAL and Git volume backup schedules.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 7: Releases & Vendor Escrow -->
+    <section class="slide" data-index="7" data-category="Release Governance">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          <span>Artifact &amp; Vendor Escrow</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Releases, Binary Artifacts &amp; Vendor Software Escrow</h2>
+      <p class="slide-subtitle">Ensure cryptographic traceability of deployed software binaries and enforce code handover from external vendors.</p>
+
+      <div class="slide-body">
+        <div class="grid-4" style="margin-bottom: 22px;">
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div>
+            <div class="card-title">Immutable Git Tag Releases</div>
+            <div class="card-desc">Publish formal version releases tied to cryptographic Git tags (e.g., <code>v2.4.0-omc-prod</code>). Ensure zero drift between source code and production binaries.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+            <div class="card-title">Binary Asset Attachments</div>
+            <div class="card-desc">Attach compiled executables, deployment containers, APKs, and firmware packages directly to release entries with automatic SHA-256 checksums.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+            <div class="card-title">Vendor Software Escrow</div>
+            <div class="card-desc">Eliminate vendor lock-in. Require third-party IT contractors to deposit complete source code, build manifests, and libraries into OMC's internal ProGit server.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+            <div class="card-title">Scoped Contractor Access</div>
+            <div class="card-desc">Grant external vendors access only to their contracted repositories. They cannot browse or clone unrelated OMC operational systems or internal tools.</div>
+          </div>
+        </div>
+
+        <div class="card" style="background: var(--bg-surface); border-color: #3b82f6;">
+          <div style="font-size: 13.5px; font-weight: 700; color: #3b82f6; margin-bottom: 4px;">The OMC Vendor Governance Advantage</div>
+          <div style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+            By enforcing code delivery through ProGit pull requests, OMC's internal IT officers can run automated security scanning, inspect dependency trees, and review code before certifying contractor milestones.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 8: Enterprise Identity & Audit Compliance -->
+    <section class="slide" data-index="8" data-category="Access & Governance">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>Access Control &amp; Compliance</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Enterprise Identity, Access Control &amp; Audit Compliance</h2>
+      <p class="slide-subtitle">Role-based permissions, centralized directory integration, and tamper-evident audit logging for CERT-In alignment.</p>
+
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+              <div class="card-icon" style="margin-bottom: 0;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+              <div class="card-title" style="margin-bottom: 0;">Granular Role-Based Access Control (RBAC)</div>
+            </div>
+            <p class="card-desc" style="margin-bottom: 12px;">Enforce strict separation of duties across departments, mines, and administrative zones:</p>
+            <ul class="feature-list">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg><strong>Organization &amp; Team Hierarchies:</strong> Group repos by department (Mining IT, Finance &amp; ERP, GIS &amp; Survey, Admin).</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg><strong>Permission Levels:</strong> Owner, Admin, Write, Read, and Guest visibility controls.</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg><strong>Deploy Keys &amp; Service Accounts:</strong> Read-only SSH keys for CI/CD runners and deployment servers.</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+              <div class="card-icon" style="margin-bottom: 0;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+              <div class="card-title" style="margin-bottom: 0;">Directory Integration &amp; Security Auditing</div>
+            </div>
+            <p class="card-desc" style="margin-bottom: 12px;">Ready for enterprise directory authentication and regulatory compliance audits:</p>
+            <ul class="feature-list">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg><strong>Active Directory &amp; LDAP:</strong> Authenticate users against OMC's corporate Microsoft Active Directory / LDAP servers.</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg><strong>Immutable Security Logs:</strong> Comprehensive records of user logins, SSH access, branch pushes, and permission changes.</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg><strong>Personal Access Tokens (PATs):</strong> Fine-grained API and CLI tokens with individual expirations and revokability.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 9: Tailored Use Cases for OMC -->
+    <section class="slide" data-index="9" data-category="OMC Use Cases">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span>Strategic Operational Use Cases</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">High-Impact Use Cases Tailored for OMC</h2>
+      <p class="slide-subtitle">Purpose-built to streamline internal IT systems, mining automation, and vendor management across OMC.</p>
+
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card">
+            <div style="font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; margin-bottom: 6px;">Use Case 1: In-House IT &amp; Digital Portals</div>
+            <div class="card-title">Enterprise Software &amp; ERP Integration Modules</div>
+            <div class="card-desc">
+              OMC's internal IT department develops custom web portals, SAP/ERP connector scripts, e-procurement extensions, and employee workflow automation.
+            </div>
+            <div style="margin-top: 10px; font-size: 13px; color: var(--text);">
+              <strong>ProGit Benefit:</strong> Complete version control history, pull request approvals, and automated deployment webhooks for internal releases without leaking business logic to external clouds.
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="font-size: 12px; font-weight: 700; color: #3b82f6; text-transform: uppercase; margin-bottom: 6px;">Use Case 2: Smart Mining &amp; SCADA Telemetry</div>
+            <div class="card-title">IoT, Weighbridge &amp; Operational Scripts</div>
+            <div class="card-desc">
+              Engineers manage automated weighbridge drivers, RFID vehicle tracking integration, drone survey spatial data parsers, and sensor telemetry ingestion scripts.
+            </div>
+            <div style="margin-top: 10px; font-size: 13px; color: var(--text);">
+              <strong>ProGit Benefit:</strong> Version-control critical Python, Shell, and C/C++ operational scripts. Prevent catastrophic field mistakes by testing changes through Pull Request diffs.
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="font-size: 12px; font-weight: 700; color: #f59e0b; text-transform: uppercase; margin-bottom: 6px;">Use Case 3: Vendor Software Governance</div>
+            <div class="card-title">Third-Party Software Escrow &amp; Code Review</div>
+            <div class="card-desc">
+              External IT vendors deliver specialized modules for geology modeling, HRMS, and logistics tracking.
+            </div>
+            <div style="margin-top: 10px; font-size: 13px; color: var(--text);">
+              <strong>ProGit Benefit:</strong> Vendors submit deliverables directly into OMC-hosted repositories. OMC technical officers inspect pull requests, enforce coding standards, and verify deliverables before invoice sign-off.
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="font-size: 12px; font-weight: 700; color: #8b5cf6; text-transform: uppercase; margin-bottom: 6px;">Use Case 4: Remote Mine Enclaves &amp; DR</div>
+            <div class="card-title">Air-Gapped Regional Nodes &amp; Disaster Recovery</div>
+            <div class="card-desc">
+              Operating conditions in remote mining regions can suffer from unstable WAN links or periodic connectivity blackouts.
+            </div>
+            <div style="margin-top: 10px; font-size: 13px; color: var(--text);">
+              <strong>ProGit Benefit:</strong> Lightweight single-binary architecture allows running local ProGit instances at remote regional offices or secondary disaster recovery (DR) data centers with zero external reliance.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 10: Enterprise Deployment Architecture -->
+    <section class="slide" data-index="10" data-category="Deployment Topology">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <span>Deployment Topology</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Turnkey Deployment Inside OMC Infrastructure</h2>
+      <p class="slide-subtitle">Flexible, containerized or bare-metal deployment matching OMC's enterprise IT standards and security policies.</p>
+
+      <div class="slide-body">
+        <div class="arch-flow" style="margin-bottom: 22px;">
+          <div class="arch-block">
+            <div style="font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; margin-bottom: 6px;">1. Network Ingress</div>
+            <div style="font-size: 15px; font-weight: 700; color: var(--text-bright); margin-bottom: 8px;">Reverse Proxy &amp; SSL</div>
+            <p style="font-size: 12.5px; color: var(--text-muted); line-height: 1.5;">
+              NGINX or HAProxy terminates internal HTTPS with OMC wildcard SSL certificates. Dedicated SSH routing on Port 2222.
+            </p>
+            <div style="margin-top: auto; padding-top: 10px; font-family: var(--font-mono); font-size: 11.5px; color: var(--accent);">
+              git.omc.in / 3443
+            </div>
+          </div>
+
+          <div class="arch-block" style="border-color: var(--accent);">
+            <div style="font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; margin-bottom: 6px;">2. Application Core</div>
+            <div style="font-size: 15px; font-weight: 700; color: var(--text-bright); margin-bottom: 8px;">ProGit Go Engine</div>
+            <p style="font-size: 12.5px; color: var(--text-muted); line-height: 1.5;">
+              Pure-Go container (Podman / Docker) or native binary running under systemd. Houses Git HTTP/SSH daemons and React 19 UI.
+            </p>
+            <div style="margin-top: auto; padding-top: 10px; font-family: var(--font-mono); font-size: 11.5px; color: var(--accent);">
+              RAM &lt; 150 MB • Sub-2s Boot
+            </div>
+          </div>
+
+          <div class="arch-block">
+            <div style="font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; margin-bottom: 6px;">3. Storage Layer</div>
+            <div style="font-size: 15px; font-weight: 700; color: var(--text-bright); margin-bottom: 8px;">WAL Database &amp; Repos</div>
+            <p style="font-size: 12.5px; color: var(--text-muted); line-height: 1.5;">
+              Isolated storage volumes for SQLite WAL database, Git bare repositories, wikis, and cryptographic release attachments.
+            </p>
+            <div style="margin-top: auto; padding-top: 10px; font-family: var(--font-mono); font-size: 11.5px; color: var(--accent);">
+              SELinux Labeling (:Z)
+            </div>
+          </div>
+
+          <div class="arch-block">
+            <div style="font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; margin-bottom: 6px;">4. Backup &amp; DR</div>
+            <div style="font-size: 15px; font-weight: 700; color: var(--text-bright); margin-bottom: 8px;">Hot Snapshot Sync</div>
+            <p style="font-size: 12.5px; color: var(--text-muted); line-height: 1.5;">
+              Automated cron backups producing consistent SQLite snapshots and git repository mirrors to OMC's internal NAS / DR storage.
+            </p>
+            <div style="margin-top: auto; padding-top: 10px; font-family: var(--font-mono); font-size: 11.5px; color: var(--accent);">
+              Zero Downtime Backups
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="background: var(--code-bg); border-color: #334155; padding: 16px 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-family: var(--font-mono); font-size: 12px; color: var(--accent);">OMC Enterprise Podman Command</span>
+            <span style="font-size: 11px; color: #94a3b8;">linux/amd64 & linux/arm64</span>
+          </div>
+          <pre style="font-family: var(--font-mono); font-size: 12.5px; color: var(--code-text); line-height: 1.5; overflow-x: auto;">
+podman run -d --name omc-progit --restart=unless-stopped \
+  -p 3443:3443 -p 3000:3000 -p 2222:2222 \
+  -v /omc/data/db:/data/db:Z \
+  -v /omc/data/repositories:/data/repositories:Z \
+  -v /omc/data/config:/data/config:Z \
+  ghcr.io/sanjeevsenapati/progit:latest</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 11: Security & Compliance Checklist -->
+    <section class="slide" data-index="11" data-category="Compliance Assurance">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>Security &amp; Governance Matrix</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">OMC Enterprise Security &amp; Compliance Assurance</h2>
+      <p class="slide-subtitle">How ProGit meets each requirement mandated by state public sector undertakings and IT security audit bodies.</p>
+
+      <div class="slide-body">
+        <table class="comp-table">
+          <thead>
+            <tr>
+              <th>Security / Compliance Mandate</th>
+              <th class="col-highlight">ProGit On-Premise Platform</th>
+              <th>Foreign Cloud SaaS (GitHub / GitLab)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Data Sovereignty &amp; Residency</strong></td>
+              <td class="col-highlight"><strong>100% Inside OMC Datacenter (India)</strong></td>
+              <td>Stored on foreign US/EU multi-tenant cloud servers</td>
+            </tr>
+            <tr>
+              <td><strong>Air-Gapped Network Support</strong></td>
+              <td class="col-highlight"><strong>Native &mdash; Zero outbound connectivity required</strong></td>
+              <td>Incompatible; requires continuous internet connectivity</td>
+            </tr>
+            <tr>
+              <td><strong>Telemetry &amp; Data Leaks</strong></td>
+              <td class="col-highlight"><strong>Zero telemetry &mdash; No tracking beacons</strong></td>
+              <td>Extensive product analytics, telemetry, and tracking</td>
+            </tr>
+            <tr>
+              <td><strong>Transport Cryptography</strong></td>
+              <td class="col-highlight"><strong>TLS 1.3 HTTPS &amp; OpenSSH ED25519 Keys</strong></td>
+              <td>Standard cloud TLS</td>
+            </tr>
+            <tr>
+              <td><strong>User Authentication</strong></td>
+              <td class="col-highlight"><strong>OMC Active Directory / LDAP Integration</strong></td>
+              <td>Cloud-dependent SSO or third-party SAML</td>
+            </tr>
+            <tr>
+              <td><strong>Disaster Recovery RPO / RTO</strong></td>
+              <td class="col-highlight"><strong>Sub-minute RPO with hot SQLite WAL mirrors</strong></td>
+              <td>Dependent on vendor SLA and internet link health</td>
+            </tr>
+            <tr>
+              <td><strong>Audit Readiness</strong></td>
+              <td class="col-highlight"><strong>Tamper-evident audit logs for CERT-In inspection</strong></td>
+              <td>Vendor blackbox log exports</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SLIDE 12: Next Steps & Technical Evaluation -->
+    <section class="slide" data-index="12" data-category="Technical Evaluation">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span>Next Steps</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Next Steps for OMC IT &amp; Engineering Leadership</h2>
+      <p class="slide-subtitle">Fast-track an internal technical evaluation sandbox inside OMC's private network.</p>
+
+      <div class="slide-body">
+        <div class="grid-3" style="margin-bottom: 26px;">
+          <div class="card" style="border-top: 4px solid var(--accent);">
+            <div style="font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 6px;">STEP 01</div>
+            <div class="card-title">Private Sandbox Evaluation</div>
+            <div class="card-desc">Deploy a standalone evaluation instance inside OMC's test subnet in under 15 minutes to verify responsiveness and developer workflows.</div>
+          </div>
+
+          <div class="card" style="border-top: 4px solid #3b82f6;">
+            <div style="font-size: 13px; font-weight: 700; color: #3b82f6; margin-bottom: 6px;">STEP 02</div>
+            <div class="card-title">Technical &amp; Security Review</div>
+            <div class="card-desc">Meet with ProGit principal engineers to audit container security, verify Active Directory integration, and review automated backup scripts.</div>
+          </div>
+
+          <div class="card" style="border-top: 4px solid #8b5cf6;">
+            <div style="font-size: 13px; font-weight: 700; color: #8b5cf6; margin-bottom: 6px;">STEP 03</div>
+            <div class="card-title">Vendor Governance Workshop</div>
+            <div class="card-desc">Define repository structures, branch protection policies, and code escrow workflows for external software contractors and internal teams.</div>
+          </div>
+        </div>
+
+        <div class="card" style="background: var(--accent-soft); border-color: rgba(16, 185, 129, 0.4); text-align: center; padding: 28px;">
+          <h3 style="font-size: 20px; font-weight: 800; color: var(--text-bright); margin-bottom: 8px;">
+            Empower OMC with Sovereign Digital Infrastructure
+          </h3>
+          <p style="font-size: 14px; color: var(--text-muted); max-width: 650px; margin: 0 auto 18px;">
+            Join modern public sector undertakings protecting their source code, operational algorithms, and vendor deliverables with sovereign on-premise technology.
+          </p>
+          <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <span class="btn-action btn-primary" style="padding: 9px 22px; font-size: 13.5px; cursor: default;">
+              Ready for Sandbox Deployment
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer Navigation Bar -->
+  <footer class="deck-footer">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button class="btn-nav" id="btnPrev" title="Previous Slide (Left Arrow)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button class="btn-nav" id="btnNext" title="Next Slide (Right Arrow or Space)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <span style="font-size: 12px; color: var(--text-muted); margin-left: 6px;">Use <kbd style="font-family: var(--font-mono); background: var(--bg-subtle); padding: 2px 5px; border-radius: 4px; border: 1px solid var(--border);">←</kbd> <kbd style="font-family: var(--font-mono); background: var(--bg-subtle); padding: 2px 5px; border-radius: 4px; border: 1px solid var(--border);">→</kbd> or <kbd style="font-family: var(--font-mono); background: var(--bg-subtle); padding: 2px 5px; border-radius: 4px; border: 1px solid var(--border);">Space</kbd></span>
+    </div>
+
+    <div class="deck-progress-container">
+      <div class="deck-progress-bar" id="progressBar"></div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="font-size: 12px; color: var(--text-muted);">ProGit for OMC • v1.2</span>
+    </div>
+  </footer>
+
+  <!-- Slide Overview Grid Overlay -->
+  <div class="overview-overlay" id="overviewOverlay">
+    <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto 24px; width: 100%;">
+      <h3 style="font-size: 20px; font-weight: 800; color: white;">OMC Presentation Slide Navigator</h3>
+      <button class="btn-action" id="btnCloseOverview">Close (Esc)</button>
+    </div>
+    <div class="overview-grid" id="overviewGrid"></div>
+  </div>
+
+  <script>
+    // State
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const totalSlides = slides.length;
+    let currentSlide = 0;
+
+    // Elements
+    const slideIndicator = document.getElementById('slideIndicator');
+    const slideCategoryTitle = document.getElementById('slideCategoryTitle');
+    const progressBar = document.getElementById('progressBar');
+    const btnPrev = document.getElementById('btnPrev');
+    const btnNext = document.getElementById('btnNext');
+    const btnToggleTheme = document.getElementById('btnToggleTheme');
+    const btnFullscreen = document.getElementById('btnFullscreen');
+    const btnToggleOverview = document.getElementById('btnToggleOverview');
+    const btnCloseOverview = document.getElementById('btnCloseOverview');
+    const overviewOverlay = document.getElementById('overviewOverlay');
+    const overviewGrid = document.getElementById('overviewGrid');
+
+    function updateSlide(newIndex) {
+      if (newIndex < 0 || newIndex >= totalSlides) return;
+      slides[currentSlide].classList.remove('active');
+      if (newIndex > currentSlide) {
+        slides[currentSlide].classList.add('prev');
+      } else {
+        slides[currentSlide].classList.remove('prev');
+      }
+
+      currentSlide = newIndex;
+      slides.forEach((s, idx) => {
+        if (idx === currentSlide) {
+          s.classList.add('active');
+          s.classList.remove('prev');
+        } else if (idx < currentSlide) {
+          s.classList.add('prev');
+          s.classList.remove('active');
+        } else {
+          s.classList.remove('active', 'prev');
+        }
+      });
+
+      // Update counters & UI
+      const slideNum = (currentSlide + 1).toString().padStart(2, '0');
+      const totalNum = totalSlides.toString().padStart(2, '0');
+      slideIndicator.textContent = `${slideNum} / ${totalNum}`;
+      slideCategoryTitle.textContent = slides[currentSlide].dataset.category || 'Executive Presentation';
+
+      const progress = ((currentSlide + 1) / totalSlides) * 100;
+      progressBar.style.width = `${progress}%`;
+
+      btnPrev.disabled = currentSlide === 0;
+      btnNext.disabled = currentSlide === totalSlides - 1;
+
+      // Update active card in overview grid
+      document.querySelectorAll('.thumb-card').forEach((card, idx) => {
+        card.classList.toggle('active', idx === currentSlide);
+      });
+    }
+
+    btnPrev.addEventListener('click', () => updateSlide(currentSlide - 1));
+    btnNext.addEventListener('click', () => updateSlide(currentSlide + 1));
+
+    // Keyboard Navigation
+    window.addEventListener('keydown', (e) => {
+      if (overviewOverlay.classList.contains('open')) {
+        if (e.key === 'Escape') toggleOverview(false);
+        return;
+      }
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        e.preventDefault();
+        updateSlide(currentSlide + 1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        updateSlide(currentSlide - 1);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        updateSlide(0);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        updateSlide(totalSlides - 1);
+      } else if (e.key === 'Escape') {
+        toggleOverview(true);
+      } else if (e.key.toLowerCase() === 'f') {
+        toggleFullscreen();
+      }
+    });
+
+    // Theme Toggle
+    btnToggleTheme.addEventListener('click', () => {
+      const isDark = document.body.getAttribute('data-theme') === 'dark';
+      document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    });
+
+    // Fullscreen Toggle
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      }
+    }
+    btnFullscreen.addEventListener('click', toggleFullscreen);
+
+    // Overview Grid Construction
+    slides.forEach((slide, idx) => {
+      const title = slide.querySelector('.slide-title')?.textContent || `Slide ${idx + 1}`;
+      const cat = slide.dataset.category || 'Topic';
+      const card = document.createElement('div');
+      card.className = `thumb-card ${idx === 0 ? 'active' : ''}`;
+      card.innerHTML = `
+        <span class="thumb-num">${(idx + 1).toString().padStart(2, '0')} • ${cat}</span>
+        <span class="thumb-title">${title}</span>
+      `;
+      card.addEventListener('click', () => {
+        updateSlide(idx);
+        toggleOverview(false);
+      });
+      overviewGrid.appendChild(card);
+    });
+
+    function toggleOverview(open) {
+      overviewOverlay.classList.toggle('open', open);
+    }
+    btnToggleOverview.addEventListener('click', () => toggleOverview(true));
+    btnCloseOverview.addEventListener('click', () => toggleOverview(false));
+
+    // Initial setup
+    updateSlide(0);
+  </script>
+</body>
+</html>
