@@ -139,7 +139,173 @@ podman compose up -d
 
 ---
 
-## 4. Verification & Health Monitoring
+## 4. Manual Installation Guide for Red Hat Enterprise Linux 9 (RHEL 9)
+
+This section provides a complete, production-grade manual installation procedure specifically tailored for **RHEL 9**, **Rocky Linux 9**, and **AlmaLinux 9** enterprise servers using native Podman, SELinux enforcement, and firewalld.
+
+### 4.1 Step 1: Verify Host Architecture
+Before pulling any container image, verify whether your RHEL 9 server is running on **x86_64** (Intel/AMD 64-bit) or **aarch64** (ARM 64-bit):
+
+```bash
+uname -m
+```
+
+| Output of `uname -m` | Server Architecture | Correct Container Image Tag |
+| :--- | :--- | :--- |
+| `x86_64` | Intel / AMD 64-bit (Standard Enterprise Servers) | `ghcr.io/sanjeevsenapati/progit:1.2.0-linux-amd64` (or `:1.2.0`) |
+| `aarch64` | ARM 64-bit (AWS Graviton, Ampere Altra) | `ghcr.io/sanjeevsenapati/progit:1.2.0-linux-arm64` (or `:1.2.0`) |
+
+> [!WARNING]
+> **Architecture Mismatch Warning**:
+> Pulling an `arm64` image on an `x86_64` RHEL 9 server will result in an immediate `exec /progit: exec format error` crash (container exit code `126` or `139`). Always use the matching architecture tag or the multi-arch tag `:1.2.0`.
+
+---
+
+### 4.2 Step 2: Install Podman & Configure Firewall on RHEL 9
+
+1. Install Podman using DNF:
+```bash
+sudo dnf install -y podman
+```
+
+2. Open the required ports in `firewalld`:
+```bash
+# Allow HTTPS (3443), HTTP redirect (3000), and Git SSH (2222)
+sudo firewall-cmd --permanent --add-port=3443/tcp
+sudo firewall-cmd --permanent --add-port=3000/tcp
+sudo firewall-cmd --permanent --add-port=2222/tcp
+
+# Reload firewalld to apply changes
+sudo firewall-cmd --reload
+
+# Verify opened ports
+sudo firewall-cmd --list-ports
+```
+
+*(Optional: If you intend to bind directly to privileged ports `443` and `80` without root, execute: `sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80` and persist by adding `net.ipv4.ip_unprivileged_port_start = 80` into `/etc/sysctl.d/99-podman-ports.conf`).*
+
+---
+
+### 4.3 Step 3: Configure SELinux & Create Persistent Volumes
+
+RHEL 9 enforces SELinux in `Enforcing` mode by default. Podman requires the `:Z` volume flag to automatically assign the `container_file_t` SELinux context to the volume mount points. Without `:Z`, the container will encounter `Permission Denied` errors when writing to the SQLite database and Git repository storage.
+
+Create the dedicated Podman named volumes:
+```bash
+podman volume create progit-data
+podman volume create progit-repositories
+podman volume create progit-config
+podman volume create progit-logs
+```
+
+Verify volume creation:
+```bash
+podman volume ls
+```
+
+---
+
+### 4.4 Step 4: Pull the Image & Launch the Container
+
+1. Pull the appropriate image for your RHEL 9 server (example for standard `x86_64`):
+```bash
+# For x86_64 servers:
+podman pull ghcr.io/sanjeevsenapati/progit:1.2.0-linux-amd64
+
+# (Or pull the multi-arch manifest tag which auto-selects x86_64 or aarch64):
+podman pull ghcr.io/sanjeevsenapati/progit:1.2.0
+```
+
+2. Run the container manually with background daemon mode (`-d`), persistent volumes with `:Z`, and automatic restart:
+```bash
+podman run -d \
+  --name progit \
+  --restart=unless-stopped \
+  -p 3443:3443 \
+  -p 3000:3000 \
+  -p 2222:2222 \
+  -v progit-data:/data/db:Z \
+  -v progit-repositories:/data/repositories:Z \
+  -v progit-config:/data/config:Z \
+  -v progit-logs:/data/logs:Z \
+  ghcr.io/sanjeevsenapati/progit:1.2.0-linux-amd64
+```
+
+---
+
+### 4.5 Step 5: Configure Systemd Auto-Start on RHEL 9 (Production)
+
+To ensure ProGit restarts automatically upon server reboot without requiring manual intervention, integrate it with `systemd`:
+
+#### For Rootless Deployment (Recommended on RHEL 9):
+1. Enable lingering so user containers start on server boot even before login:
+```bash
+loginctl enable-linger $USER
+```
+
+2. Generate the systemd unit file:
+```bash
+mkdir -p ~/.config/systemd/user/
+podman generate systemd --name progit --files --new
+mv container-progit.service ~/.config/systemd/user/
+```
+
+3. Reload and enable the service:
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now container-progit.service
+systemctl --user status container-progit.service
+```
+
+#### For Root / System-Wide Deployment:
+```bash
+sudo podman generate systemd --name progit --files --new
+sudo mv container-progit.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now container-progit.service
+```
+
+---
+
+### 4.6 Step 6: Verification & Health Checks
+
+Verify that ProGit is operating cleanly:
+
+```bash
+# 1. Check container runtime status
+podman ps -a
+
+# 2. Inspect runtime logs
+podman logs progit
+
+# 3. Test the built-in HTTPS health endpoint
+curl -k https://localhost:3443/api/health
+```
+
+Expected output:
+```json
+{"status":"healthy","version":"1.2.0"}
+```
+
+Access the web interface via browser:
+- **HTTPS Web UI**: `https://<your-server-ip-or-hostname>:3443`
+- **HTTP Redirect**: `http://<your-server-ip-or-hostname>:3000`
+- **Git SSH Remote**: `ssh://git@<your-server-ip-or-hostname>:2222/<owner>/<repo>.git`
+
+---
+
+### 4.7 RHEL 9 Troubleshooting Checklist
+
+| Symptom / Error | Root Cause | Solution |
+| :--- | :--- | :--- |
+| `exec /progit: exec format error` | Pulled an `arm64` image on an `x86_64` CPU. | Remove image (`podman rmi ...`) and pull `ghcr.io/sanjeevsenapati/progit:1.2.0-linux-amd64`. |
+| `permission denied` writing to SQLite or `/data` | Missing `:Z` flag on SELinux in Enforcing mode. | Re-run `podman run` ensuring each volume has `:Z` suffix (e.g. `-v progit-data:/data/db:Z`). |
+| Connection refused or timed out from remote client | `firewalld` blocking ports `3443`, `3000`, or `2222`. | Run `sudo firewall-cmd --permanent --add-port=3443/tcp --add-port=3000/tcp --add-port=2222/tcp && sudo firewall-cmd --reload`. |
+| Container stops after user logs out | Rootless Podman user session terminated. | Enable lingering: `loginctl enable-linger $USER`. |
+
+---
+
+## 5. Verification & Health Monitoring
 
 Verify container health and TLS encryption:
 ```bash
@@ -158,15 +324,15 @@ podman logs -f progit
 
 ---
 
-## 5. Backups & Disaster Recovery
+## 6. Backups & Disaster Recovery
 
-### 5.1 Hot Snapshot Backup
+### 6.1 Hot Snapshot Backup
 Back up the database and repository volumes safely while ProGit is running:
 ```bash
 podman exec -t progit /usr/local/bin/progit backup
 ```
 
-### 5.2 Volume Snapshot
+### 6.2 Volume Snapshot
 ```bash
 podman volume export progit-data > progit-data-$(date +%F).tar
 podman volume export progit-repositories > progit-repos-$(date +%F).tar

@@ -1106,6 +1106,57 @@ podman run -d --name progit \
           </table>
         </div>
 
+        <h2>Manual RHEL 9 / Rocky Linux 9 Installation Process</h2>
+        <p>For enterprise Red Hat Enterprise Linux 9 (RHEL 9), Rocky Linux 9, or AlmaLinux 9 environments, follow this manual step-by-step procedure:</p>
+        
+        <h3>1. Verify Server Architecture</h3>
+        <p>Ensure you pull the container matching your server's CPU architecture:</p>
+        <pre><code># Check host architecture
+uname -m
+# If output is 'x86_64': use ghcr.io/sanjeevsenapati/progit:1.2.0-linux-amd64
+# If output is 'aarch64': use ghcr.io/sanjeevsenapati/progit:1.2.0-linux-arm64</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <div class="callout callout-warning">
+          <div class="callout-title">Architecture Mismatch Warning</div>
+          <p>Running an ARM64 image on an x86_64 CPU produces an immediate <code>exec format error</code> crash. On x86_64 servers, pull <code>1.2.0-linux-amd64</code> or the multi-arch tag <code>1.2.0</code>.</p>
+        </div>
+
+        <h3>2. Configure Firewalld Ports</h3>
+        <pre><code>sudo firewall-cmd --permanent --add-port=3443/tcp --add-port=3000/tcp --add-port=2222/tcp
+sudo firewall-cmd --reload</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h3>3. Create Volumes &amp; Run Container with SELinux (:Z)</h3>
+        <p>On RHEL 9, SELinux runs in <code>Enforcing</code> mode. The <code>:Z</code> flag assigns the <code>container_file_t</code> context to prevent permission denied errors on SQLite and Git repositories:</p>
+        <pre><code># Create named volumes
+podman volume create progit-data
+podman volume create progit-repositories
+podman volume create progit-config
+podman volume create progit-logs
+
+# Launch container manually
+podman run -d \
+  --name progit \
+  --restart=unless-stopped \
+  -p 3443:3443 \
+  -p 3000:3000 \
+  -p 2222:2222 \
+  -v progit-data:/data/db:Z \
+  -v progit-repositories:/data/repositories:Z \
+  -v progit-config:/data/config:Z \
+  -v progit-logs:/data/logs:Z \
+  ghcr.io/sanjeevsenapati/progit:1.2.0-linux-amd64</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h3>4. Enable Systemd Auto-Start on Boot</h3>
+        <pre><code># Enable lingering for rootless user
+loginctl enable-linger $USER
+
+# Generate and enable systemd service unit
+mkdir -p ~/.config/systemd/user/
+podman generate systemd --name progit --files --new
+mv container-progit.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now container-progit.service</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
         <h2>Docker Compose Example</h2>
         <pre><code>version: '3.8'
 services:

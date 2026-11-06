@@ -25,10 +25,17 @@ ProGit publishes official multi-architecture container images to GitHub Containe
 # 1. Map local domain in /etc/hosts
 echo "127.0.0.1 progit.local" | sudo tee -a /etc/hosts
 
-# 2. Pull official image
+# 2. Check server architecture (x86_64 vs aarch64)
+uname -m
+
+# 3. Pull official image matching your host architecture
+# For standard Intel/AMD (x86_64) servers:
+podman pull ghcr.io/sanjeevsenapati/progit:1.2.0-linux-amd64
+
+# (Or pull the multi-architecture manifest tag):
 podman pull ghcr.io/sanjeevsenapati/progit:latest
 
-# 3. Launch with persistent storage and standard ports
+# 4. Launch with persistent storage and standard ports
 podman run -d \
   --name progit \
   --restart=unless-stopped \
@@ -41,8 +48,14 @@ podman run -d \
   -v progit-repositories:/data/repositories:Z \
   -v progit-config:/data/config:Z \
   -v progit-logs:/data/logs:Z \
-  ghcr.io/sanjeevsenapati/progit:latest
+  ghcr.io/sanjeevsenapati/progit:1.2.0-linux-amd64
 ```
+
+> [!NOTE]
+> **RHEL 9 / Rocky Linux 9 Quick Setup**:
+> - Open firewall ports: `sudo firewall-cmd --permanent --add-port={3443,3000,2222}/tcp && sudo firewall-cmd --reload`
+> - SELinux in Enforcing mode requires the `:Z` volume flag (included in the command above) to avoid `permission denied` errors.
+> - Detailed guide available in [PODMAN_DEPLOYMENT.md](PODMAN_DEPLOYMENT.md#4-manual-installation-guide-for-red-hat-enterprise-linux-9-rhel-9).
 
 Open **`https://progit.local`** (or `https://progit.local:3443`) in your web browser.
 
