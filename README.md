@@ -26,6 +26,7 @@
   - Issues & Labels, Milestones, and threaded Markdown comments.
   - Pull Requests with live syntax diffing, comparison, and native Git merges (Merge Commit, Squash, Rebase).
   - Branch protection, forks, stars, and activity feeds.
+- **OpenID Connect (OIDC) & OAuth2 SSO**: Native single sign-on with Google Workspace, GitHub, Microsoft 365, Keycloak, and generic OIDC providers with Just-In-Time (JIT) provisioning and corporate domain whitelisting.
 - **Self-Hosted Administration**: First-run setup installation wizard, Super Admin management panel, runtime telemetry, and database WAL maintenance.
 
 ---
