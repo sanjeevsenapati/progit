@@ -1331,18 +1331,67 @@ func Test10DevelopersMessagingWorkflow(t *testing.T) {
 		tokens[name] = tokStr
 	}
 
-	// 1. Test GET /api/v1/developers returns 10 developers
-	reqDevs := httptest.NewRequest("GET", "/api/v1/developers", nil)
-	recDevs := httptest.NewRecorder()
-	router.ServeHTTP(recDevs, reqDevs)
-
-	if recDevs.Code != http.StatusOK {
-		t.Fatalf("expected 200 OK for developers list, got %d: %s", recDevs.Code, recDevs.Body.String())
+	// 1. Test Security: unauthenticated GET /api/v1/developers must return 401
+	reqDevsUnauth := httptest.NewRequest("GET", "/api/v1/developers", nil)
+	recDevsUnauth := httptest.NewRecorder()
+	router.ServeHTTP(recDevsUnauth, reqDevsUnauth)
+	if recDevsUnauth.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 Unauthorized without auth, got %d", recDevsUnauth.Code)
 	}
-	var devList []*database.User
-	_ = json.Unmarshal(recDevs.Body.Bytes(), &devList)
-	if len(devList) != 10 {
-		t.Fatalf("expected 10 developers, got %d", len(devList))
+
+	// Test Security: authenticated query without ?q returns empty array to prevent enumeration
+	reqDevsNoQ := httptest.NewRequest("GET", "/api/v1/developers", nil)
+	reqDevsNoQ.Header.Set("Authorization", "Bearer "+tokens["dev_alice"])
+	recDevsNoQ := httptest.NewRecorder()
+	router.ServeHTTP(recDevsNoQ, reqDevsNoQ)
+	if recDevsNoQ.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for empty query, got %d: %s", recDevsNoQ.Code, recDevsNoQ.Body.String())
+	}
+	var emptyDevList []*database.User
+	_ = json.Unmarshal(recDevsNoQ.Body.Bytes(), &emptyDevList)
+	if len(emptyDevList) != 0 {
+		t.Fatalf("expected empty array when no query param provided, got %d", len(emptyDevList))
+	}
+
+	// Test Search: query for "bob"
+	reqDevsBob := httptest.NewRequest("GET", "/api/v1/developers?q=bob", nil)
+	reqDevsBob.Header.Set("Authorization", "Bearer "+tokens["dev_alice"])
+	recDevsBob := httptest.NewRecorder()
+	router.ServeHTTP(recDevsBob, reqDevsBob)
+	if recDevsBob.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for developer search, got %d", recDevsBob.Code)
+	}
+	var devBobList []*database.User
+	_ = json.Unmarshal(recDevsBob.Body.Bytes(), &devBobList)
+	if len(devBobList) == 0 || devBobList[0].Username != "dev_bob" {
+		t.Fatalf("expected to find dev_bob in search results, got %+v", devBobList)
+	}
+
+	// Test Search: nonexistent user
+	reqDevsNone := httptest.NewRequest("GET", "/api/v1/developers?q=nonexistent_xyz", nil)
+	reqDevsNone.Header.Set("Authorization", "Bearer "+tokens["dev_alice"])
+	recDevsNone := httptest.NewRecorder()
+	router.ServeHTTP(recDevsNone, reqDevsNone)
+	var devNoneList []*database.User
+	_ = json.Unmarshal(recDevsNone.Body.Bytes(), &devNoneList)
+	if len(devNoneList) != 0 {
+		t.Fatalf("expected 0 results for nonexistent query, got %d", len(devNoneList))
+	}
+
+	// Send message to nonexistent user -> 404 User does not exist
+	msgBad := map[string]string{
+		"recipient_username": "nonexistent_xyz",
+		"subject":            "Hi",
+		"content":            "Hello",
+	}
+	mbBad, _ := json.Marshal(msgBad)
+	reqMsgBad := httptest.NewRequest("POST", "/api/v1/messages", bytes.NewReader(mbBad))
+	reqMsgBad.Header.Set("Authorization", "Bearer "+tokens["dev_alice"])
+	reqMsgBad.Header.Set("Content-Type", "application/json")
+	recMsgBad := httptest.NewRecorder()
+	router.ServeHTTP(recMsgBad, reqMsgBad)
+	if recMsgBad.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 User does not exist, got %d: %s", recMsgBad.Code, recMsgBad.Body.String())
 	}
 
 	// 2. dev_alice sends message to dev_bob
@@ -1366,6 +1415,9 @@ func Test10DevelopersMessagingWorkflow(t *testing.T) {
 	if createdMsg1.SenderUsername != "dev_alice" || createdMsg1.RecipientUsername != "dev_bob" {
 		t.Errorf("message sender/recipient mismatch: %+v", createdMsg1)
 	}
+	if createdMsg1.Status != "pending" {
+		t.Errorf("expected initial status to be pending, got %s", createdMsg1.Status)
+	}
 
 	// 3. dev_bob checks unread count -> 1
 	reqUnreadBob := httptest.NewRequest("GET", "/api/v1/messages/unread-count", nil)
@@ -1377,6 +1429,20 @@ func Test10DevelopersMessagingWorkflow(t *testing.T) {
 	_ = json.Unmarshal(recUnreadBob.Body.Bytes(), &unreadData)
 	if unreadData["unread_count"] != 1 {
 		t.Errorf("expected 1 unread message for dev_bob, got %d", unreadData["unread_count"])
+	}
+
+	// dev_bob accepts message request
+	reqAccept := httptest.NewRequest("POST", fmt.Sprintf("/api/v1/messages/%d/accept", createdMsg1.ID), nil)
+	reqAccept.Header.Set("Authorization", "Bearer "+tokens["dev_bob"])
+	recAccept := httptest.NewRecorder()
+	router.ServeHTTP(recAccept, reqAccept)
+	if recAccept.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for accept message, got %d: %s", recAccept.Code, recAccept.Body.String())
+	}
+	var acceptedMsg database.Message
+	_ = json.Unmarshal(recAccept.Body.Bytes(), &acceptedMsg)
+	if acceptedMsg.Status != "accepted" {
+		t.Errorf("expected status 'accepted', got %s", acceptedMsg.Status)
 	}
 
 	// 4. dev_bob checks inbox
@@ -1448,6 +1514,67 @@ func Test10DevelopersMessagingWorkflow(t *testing.T) {
 
 	if recDelMsg.Code != http.StatusOK {
 		t.Errorf("expected 200 OK for delete message, got %d", recDelMsg.Code)
+	}
+
+	// 9. Rejection and Notification Workflow:
+	// dev_charlie sends message to dev_bob
+	msgCharlieToBob := map[string]string{
+		"recipient_username": "dev_bob",
+		"subject":            "Spam or unsolicited request",
+		"content":            "Buy my products!",
+	}
+	mbC, _ := json.Marshal(msgCharlieToBob)
+	reqMsgC := httptest.NewRequest("POST", "/api/v1/messages", bytes.NewReader(mbC))
+	reqMsgC.Header.Set("Authorization", "Bearer "+tokens["dev_charlie"])
+	reqMsgC.Header.Set("Content-Type", "application/json")
+	recMsgC := httptest.NewRecorder()
+	router.ServeHTTP(recMsgC, reqMsgC)
+	if recMsgC.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created, got %d: %s", recMsgC.Code, recMsgC.Body.String())
+	}
+	var createdMsgCharlie database.Message
+	_ = json.Unmarshal(recMsgC.Body.Bytes(), &createdMsgCharlie)
+
+	// dev_bob rejects the request
+	reqReject := httptest.NewRequest("POST", fmt.Sprintf("/api/v1/messages/%d/reject", createdMsgCharlie.ID), nil)
+	reqReject.Header.Set("Authorization", "Bearer "+tokens["dev_bob"])
+	recReject := httptest.NewRecorder()
+	router.ServeHTTP(recReject, reqReject)
+	if recReject.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for reject message, got %d: %s", recReject.Code, recReject.Body.String())
+	}
+	var rejectedMsg database.Message
+	_ = json.Unmarshal(recReject.Body.Bytes(), &rejectedMsg)
+	if rejectedMsg.Status != "rejected" {
+		t.Errorf("expected status 'rejected', got %s", rejectedMsg.Status)
+	}
+
+	// dev_charlie should have received rejection notification in inbox
+	reqInboxCharlie := httptest.NewRequest("GET", "/api/v1/messages/inbox", nil)
+	reqInboxCharlie.Header.Set("Authorization", "Bearer "+tokens["dev_charlie"])
+	recInboxCharlie := httptest.NewRecorder()
+	router.ServeHTTP(recInboxCharlie, reqInboxCharlie)
+	var charlieInbox []*database.Message
+	_ = json.Unmarshal(recInboxCharlie.Body.Bytes(), &charlieInbox)
+	foundDeclined := false
+	for _, m := range charlieInbox {
+		if strings.HasPrefix(m.Subject, "Declined:") {
+			foundDeclined = true
+			break
+		}
+	}
+	if !foundDeclined {
+		t.Errorf("expected dev_charlie to receive declined notification in inbox, got: %+v", charlieInbox)
+	}
+
+	// dev_charlie attempts to message dev_bob again -> must be blocked (403 Forbidden)
+	reqMsgC2 := httptest.NewRequest("POST", "/api/v1/messages", bytes.NewReader(mbC))
+	reqMsgC2.Header.Set("Authorization", "Bearer "+tokens["dev_charlie"])
+	reqMsgC2.Header.Set("Content-Type", "application/json")
+	recMsgC2 := httptest.NewRecorder()
+	router.ServeHTTP(recMsgC2, reqMsgC2)
+	if recMsgC2.Code != http.StatusForbidden {
+		t.Errorf("expected 403 Forbidden when sending message after rejection, got %d: %s", recMsgC2.Code, recMsgC2.Body.String())
 	}
 }
 

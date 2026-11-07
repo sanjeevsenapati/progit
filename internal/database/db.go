@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -349,6 +350,7 @@ func runMigrations(db *sql.DB) error {
 		recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		subject TEXT NOT NULL DEFAULT '',
 		content TEXT NOT NULL,
+		status TEXT NOT NULL DEFAULT 'pending',
 		is_read BOOLEAN NOT NULL DEFAULT 0,
 		read_at DATETIME,
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -410,6 +412,7 @@ func runMigrations(db *sql.DB) error {
 	}
 
 	// Migration columns for existing databases
+	_, _ = db.Exec(`ALTER TABLE messages ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'`)
 	_, _ = db.Exec(`ALTER TABLE issues ADD COLUMN assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL`)
 	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_issues_assignee ON issues(assignee_id)`)
 	_, _ = db.Exec(`ALTER TABLE repositories ADD COLUMN enable_wiki BOOLEAN NOT NULL DEFAULT 1`)
@@ -2477,8 +2480,8 @@ func SendMessage(senderID, recipientID int64, subject, content string) (*Message
 	}
 
 	res, err := DB.Exec(`
-		INSERT INTO messages (sender_id, recipient_id, subject, content)
-		VALUES (?, ?, ?, ?)
+		INSERT INTO messages (sender_id, recipient_id, subject, content, status)
+		VALUES (?, ?, ?, ?, 'pending')
 	`, senderID, recipientID, subject, content)
 	if err != nil {
 		return nil, err
@@ -2491,7 +2494,7 @@ func ListInboxMessages(userID int64) ([]Message, error) {
 	rows, err := DB.Query(`
 		SELECT m.id, m.sender_id, su.username, su.full_name, su.avatar_url,
 		       m.recipient_id, ru.username, ru.full_name, ru.avatar_url,
-		       m.subject, m.content, m.is_read, m.read_at, m.created_at
+		       m.subject, m.content, m.status, m.is_read, m.read_at, m.created_at
 		FROM messages m
 		JOIN users su ON su.id = m.sender_id
 		JOIN users ru ON ru.id = m.recipient_id
@@ -2508,7 +2511,7 @@ func ListInboxMessages(userID int64) ([]Message, error) {
 		var m Message
 		if err := rows.Scan(&m.ID, &m.SenderID, &m.SenderUsername, &m.SenderFullName, &m.SenderAvatarURL,
 			&m.RecipientID, &m.RecipientUsername, &m.RecipientFullName, &m.RecipientAvatarURL,
-			&m.Subject, &m.Content, &m.IsRead, &m.ReadAt, &m.CreatedAt); err != nil {
+			&m.Subject, &m.Content, &m.Status, &m.IsRead, &m.ReadAt, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, m)
@@ -2520,7 +2523,7 @@ func ListSentMessages(userID int64) ([]Message, error) {
 	rows, err := DB.Query(`
 		SELECT m.id, m.sender_id, su.username, su.full_name, su.avatar_url,
 		       m.recipient_id, ru.username, ru.full_name, ru.avatar_url,
-		       m.subject, m.content, m.is_read, m.read_at, m.created_at
+		       m.subject, m.content, m.status, m.is_read, m.read_at, m.created_at
 		FROM messages m
 		JOIN users su ON su.id = m.sender_id
 		JOIN users ru ON ru.id = m.recipient_id
@@ -2537,7 +2540,7 @@ func ListSentMessages(userID int64) ([]Message, error) {
 		var m Message
 		if err := rows.Scan(&m.ID, &m.SenderID, &m.SenderUsername, &m.SenderFullName, &m.SenderAvatarURL,
 			&m.RecipientID, &m.RecipientUsername, &m.RecipientFullName, &m.RecipientAvatarURL,
-			&m.Subject, &m.Content, &m.IsRead, &m.ReadAt, &m.CreatedAt); err != nil {
+			&m.Subject, &m.Content, &m.Status, &m.IsRead, &m.ReadAt, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, m)
@@ -2550,14 +2553,14 @@ func GetMessageByID(messageID, userID int64) (*Message, error) {
 	err := DB.QueryRow(`
 		SELECT m.id, m.sender_id, su.username, su.full_name, su.avatar_url,
 		       m.recipient_id, ru.username, ru.full_name, ru.avatar_url,
-		       m.subject, m.content, m.is_read, m.read_at, m.created_at
+		       m.subject, m.content, m.status, m.is_read, m.read_at, m.created_at
 		FROM messages m
 		JOIN users su ON su.id = m.sender_id
 		JOIN users ru ON ru.id = m.recipient_id
 		WHERE m.id = ? AND (m.sender_id = ? OR m.recipient_id = ?)
 	`, messageID, userID, userID).Scan(&m.ID, &m.SenderID, &m.SenderUsername, &m.SenderFullName, &m.SenderAvatarURL,
 		&m.RecipientID, &m.RecipientUsername, &m.RecipientFullName, &m.RecipientAvatarURL,
-		&m.Subject, &m.Content, &m.IsRead, &m.ReadAt, &m.CreatedAt)
+		&m.Subject, &m.Content, &m.Status, &m.IsRead, &m.ReadAt, &m.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -2571,6 +2574,49 @@ func GetMessageByID(messageID, userID int64) (*Message, error) {
 	}
 
 	return &m, nil
+}
+
+func AcceptMessage(messageID, recipientID int64) (*Message, error) {
+	res, err := DB.Exec(`
+		UPDATE messages SET status = 'accepted'
+		WHERE id = ? AND recipient_id = ?
+	`, messageID, recipientID)
+	if err != nil {
+		return nil, err
+	}
+	rowsAff, _ := res.RowsAffected()
+	if rowsAff == 0 {
+		return nil, fmt.Errorf("message not found or unauthorized")
+	}
+	return GetMessageByID(messageID, recipientID)
+}
+
+func RejectMessage(messageID, recipientID int64) (*Message, error) {
+	msg, err := GetMessageByID(messageID, recipientID)
+	if err != nil || msg == nil {
+		return nil, fmt.Errorf("message not found or unauthorized")
+	}
+
+	_, err = DB.Exec(`
+		UPDATE messages SET status = 'rejected'
+		WHERE id = ? AND recipient_id = ?
+	`, messageID, recipientID)
+	if err != nil {
+		return nil, err
+	}
+
+	msg.Status = "rejected"
+
+	// Create rejection notification & system notice for sender
+	declineContent := fmt.Sprintf("Your direct message request regarding \"%s\" was declined by @%s. Further replies are blocked.", msg.Subject, msg.RecipientUsername)
+	_, _ = DB.Exec(`
+		INSERT INTO messages (sender_id, recipient_id, subject, content, status, is_read)
+		VALUES (?, ?, ?, ?, 'rejected', 0)
+	`, recipientID, msg.SenderID, "Declined: "+msg.Subject, declineContent)
+
+	CreateActivity(recipientID, msg.RecipientUsername, nil, "", "message_declined", fmt.Sprintf("Declined message request from @%s", msg.SenderUsername))
+
+	return msg, nil
 }
 
 func MarkMessageRead(messageID, recipientID int64) error {
@@ -2593,6 +2639,54 @@ func CountUnreadMessages(userID int64) (int, error) {
 	var count int
 	err := DB.QueryRow(`SELECT COUNT(*) FROM messages WHERE recipient_id = ? AND is_read = 0`, userID).Scan(&count)
 	return count, err
+}
+
+func SearchActiveDevelopers(excludeUserID int64, query string, limit int) ([]User, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 10
+	}
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return []User{}, nil
+	}
+
+	var parsedID int64 = -1
+	if id, err := strconv.ParseInt(query, 10, 64); err == nil {
+		parsedID = id
+	}
+
+	pattern := "%" + query + "%"
+	rows, err := DB.Query(`
+		SELECT id, username, full_name, avatar_url, is_active, is_admin, created_at
+		FROM users
+		WHERE is_active = 1 AND id != ? AND (username LIKE ? OR id = ? OR full_name LIKE ?)
+		ORDER BY 
+			CASE 
+				WHEN LOWER(username) = LOWER(?) THEN 0
+				WHEN id = ? THEN 1
+				WHEN LOWER(username) LIKE LOWER(?) THEN 2
+				ELSE 3
+			END,
+			username ASC
+		LIMIT ?
+	`, excludeUserID, pattern, parsedID, pattern, query, parsedID, query+"%", limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Username, &u.FullName, &u.AvatarURL, &u.IsActive, &u.IsAdmin, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	if users == nil {
+		users = []User{}
+	}
+	return users, nil
 }
 
 func ListActiveDevelopers(limit int) ([]User, error) {

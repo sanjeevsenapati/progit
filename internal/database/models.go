@@ -313,6 +313,7 @@ type Message struct {
 	RecipientAvatarURL string     `json:"recipient_avatar_url,omitempty"`
 	Subject            string     `json:"subject"`
 	Content            string     `json:"content"`
+	Status             string     `json:"status"` // 'pending', 'accepted', 'rejected'
 	IsRead             bool       `json:"is_read"`
 	ReadAt             *time.Time `json:"read_at,omitempty"`
 	CreatedAt          time.Time  `json:"created_at"`

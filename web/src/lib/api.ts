@@ -298,6 +298,7 @@ export interface Message {
   recipient_avatar_url?: string;
   subject: string;
   content: string;
+  status: 'pending' | 'accepted' | 'rejected';
   is_read: boolean;
   read_at?: string;
   created_at: string;
@@ -1226,8 +1227,28 @@ export const api = {
     });
   },
 
-  async listDevelopers(limit = 100) {
-    return fetchJSON<User[]>(`/api/v1/developers?limit=${limit}`);
+  async acceptMessage(id: number) {
+    return fetchJSON<Message>(`/api/v1/messages/${id}/accept`, {
+      method: 'POST',
+    });
+  },
+
+  async rejectMessage(id: number) {
+    return fetchJSON<Message>(`/api/v1/messages/${id}/reject`, {
+      method: 'POST',
+    });
+  },
+
+  async searchDevelopers(query: string, limit = 10) {
+    const q = query.trim();
+    if (!q) return [];
+    return fetchJSON<User[]>(`/api/v1/developers?q=${encodeURIComponent(q)}&limit=${limit}`);
+  },
+
+  async listDevelopers(query = '', limit = 10) {
+    const q = query.trim();
+    if (!q) return [];
+    return fetchJSON<User[]>(`/api/v1/developers?q=${encodeURIComponent(q)}&limit=${limit}`);
   },
 
   // P0 & P1 & P2 & P3 Features

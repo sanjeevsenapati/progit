@@ -11,9 +11,15 @@ import {
   Plus, 
   X, 
   Search, 
-  CheckCheck, 
   MessageSquare,
-  AlertCircle
+  AlertCircle,
+  Check,
+  ShieldAlert,
+  ShieldCheck,
+  User as UserIcon,
+  Loader2,
+  Clock,
+  Ban
 } from 'lucide-react';
 
 export const Messages: React.FC = () => {
@@ -22,18 +28,23 @@ export const Messages: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [developers, setDevelopers] = useState<Developer[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Compose Modal State
   const [showCompose, setShowCompose] = useState(false);
   const [recipient, setRecipient] = useState('');
+  const [selectedDev, setSelectedDev] = useState<Developer | null>(null);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [userSearchResults, setUserSearchResults] = useState<Developer[]>([]);
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+  const [hasSearchedUsers, setHasSearchedUsers] = useState(false);
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
   const [sending, setSending] = useState(false);
   const [composeError, setComposeError] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
 
-  // Load message list and developers
+  // Load message list
   const loadMessages = async () => {
     try {
       setLoading(true);
@@ -53,23 +64,13 @@ export const Messages: React.FC = () => {
   };
 
   useEffect(() => {
-    async function init() {
-      try {
-        const devs = await api.listDevelopers();
-        setDevelopers(devs || []);
-      } catch (err) {
-        console.error(err);
-      }
-      
-      // Check query params for `?to=username`
-      const params = new URLSearchParams(window.location.search);
-      const toUser = params.get('to');
-      if (toUser) {
-        setRecipient(toUser);
-        setShowCompose(true);
-      }
+    // Check query params for `?to=username`
+    const params = new URLSearchParams(window.location.search);
+    const toUser = params.get('to');
+    if (toUser) {
+      setRecipient(toUser);
+      setShowCompose(true);
     }
-    init();
   }, []);
 
   useEffect(() => {
@@ -88,10 +89,57 @@ export const Messages: React.FC = () => {
     }
   }, [selectedId, tab]);
 
+  // Dynamic user search with debounce
+  useEffect(() => {
+    const q = userSearchQuery.trim();
+    if (!q) {
+      setUserSearchResults([]);
+      setHasSearchedUsers(false);
+      setIsSearchingUsers(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setIsSearchingUsers(true);
+        const results = await api.searchDevelopers(q);
+        // Exclude current user from search results
+        const filtered = (results || []).filter(u => !user || u.username !== user.username);
+        setUserSearchResults(filtered);
+        setHasSearchedUsers(true);
+      } catch (err) {
+        console.error('Search developers failed:', err);
+        setUserSearchResults([]);
+        setHasSearchedUsers(true);
+      } finally {
+        setIsSearchingUsers(false);
+      }
+    }, 280);
+
+    return () => clearTimeout(timer);
+  }, [userSearchQuery, user]);
+
+  const handleSelectDeveloper = (dev: Developer) => {
+    setRecipient(dev.username);
+    setSelectedDev(dev);
+    setUserSearchQuery('');
+    setUserSearchResults([]);
+    setHasSearchedUsers(false);
+    setComposeError('');
+  };
+
+  const handleClearRecipient = () => {
+    setRecipient('');
+    setSelectedDev(null);
+    setUserSearchQuery('');
+    setUserSearchResults([]);
+    setHasSearchedUsers(false);
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!recipient.trim() || !subject.trim() || !content.trim()) {
-      setComposeError('Please fill in all fields');
+      setComposeError('Please select a recipient and fill in all fields');
       return;
     }
 
@@ -105,10 +153,10 @@ export const Messages: React.FC = () => {
       });
 
       setShowCompose(false);
-      setRecipient('');
+      handleClearRecipient();
       setSubject('');
       setContent('');
-      showToast('Message sent successfully', 'success');
+      showToast('Message request sent successfully', 'success');
 
       if (tab === 'sent') {
         await loadMessages();
@@ -119,6 +167,41 @@ export const Messages: React.FC = () => {
       setComposeError(err.message || 'Failed to send message');
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleAcceptMessage = async (msgId: number) => {
+    try {
+      setActionLoading(true);
+      const updated = await api.acceptMessage(msgId);
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status: 'accepted' } : m));
+      showToast('Message request accepted. You can now reply.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to accept message', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectMessage = async (msgId: number) => {
+    const confirmed = await showModalConfirm({
+      title: 'Decline Message Request',
+      message: 'Are you sure you want to decline this message request? The sender will be notified and further messages from them will be blocked.',
+      confirmText: 'Decline Request',
+      cancelText: 'Cancel',
+      isDanger: true,
+    });
+    if (!confirmed) return;
+
+    try {
+      setActionLoading(true);
+      await api.rejectMessage(msgId);
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status: 'rejected' } : m));
+      showToast('Message request declined. Sender has been notified.', 'info');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to decline message', 'error');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -145,7 +228,18 @@ export const Messages: React.FC = () => {
   };
 
   const handleReply = (msg: Message) => {
-    setRecipient(tab === 'inbox' ? msg.sender_username : msg.recipient_username);
+    if (msg.status === 'pending') {
+      showToast('Please accept the message request before replying.', 'info');
+      return;
+    }
+    if (msg.status === 'rejected') {
+      showToast('This message request was declined.', 'error');
+      return;
+    }
+
+    const replyUser = tab === 'inbox' ? msg.sender_username : msg.recipient_username;
+    setRecipient(replyUser);
+    setSelectedDev(null);
     setSubject(msg.subject.startsWith('Re:') ? msg.subject : `Re: ${msg.subject}`);
     setContent(`\n\n--- Original message from @${msg.sender_username} ---\n${msg.content}`);
     setShowCompose(true);
@@ -189,13 +283,13 @@ export const Messages: React.FC = () => {
             <span>Developer Messages</span>
           </h1>
           <p className="text-xs text-gray-500 dark:text-dark-muted mt-1">
-            Send private, direct messages and collaborate with other developers on ProGit.
+            Send private, direct messages and collaborate with other developers on ProGit securely.
           </p>
         </div>
 
         <button
           onClick={() => {
-            setRecipient('');
+            handleClearRecipient();
             setSubject('');
             setContent('');
             setShowCompose(true);
@@ -218,7 +312,7 @@ export const Messages: React.FC = () => {
                 setTab('inbox');
                 setSelectedId(null);
               }}
-              className={`flex-1 flex items-center justify-center space-x-1.5 py-2 rounded-lg transition-colors ${
+              className={`flex-1 flex items-center justify-center space-x-1.5 py-2 rounded-lg transition-colors cursor-pointer ${
                 tab === 'inbox'
                   ? 'bg-white dark:bg-dark-surface shadow-xs text-emerald-600 dark:text-emerald-400'
                   : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
@@ -238,7 +332,7 @@ export const Messages: React.FC = () => {
                 setTab('sent');
                 setSelectedId(null);
               }}
-              className={`flex-1 flex items-center justify-center space-x-1.5 py-2 rounded-lg transition-colors ${
+              className={`flex-1 flex items-center justify-center space-x-1.5 py-2 rounded-lg transition-colors cursor-pointer ${
                 tab === 'sent'
                   ? 'bg-white dark:bg-dark-surface shadow-xs text-emerald-600 dark:text-emerald-400'
                   : 'text-gray-600 dark:text-dark-muted hover:text-gray-900'
@@ -255,7 +349,7 @@ export const Messages: React.FC = () => {
               <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search messages..."
+                placeholder="Filter messages..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
@@ -280,6 +374,7 @@ export const Messages: React.FC = () => {
                 const isSelected = msg.id === selectedId;
                 const otherUser = tab === 'inbox' ? msg.sender_username : msg.recipient_username;
                 const isUnread = tab === 'inbox' && !msg.is_read;
+                const status = msg.status || 'pending';
 
                 return (
                   <div
@@ -302,14 +397,35 @@ export const Messages: React.FC = () => {
                           {tab === 'inbox' ? `From: @${otherUser}` : `To: @${otherUser}`}
                         </span>
                       </div>
-                      <span className="text-gray-400 font-normal flex-shrink-0">
+                      <span className="text-gray-400 font-normal flex-shrink-0 text-[10px]">
                         {new Date(msg.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                       </span>
                     </div>
 
-                    <h4 className={`text-xs truncate ${isUnread ? 'font-bold text-gray-900 dark:text-white' : 'text-gray-700 dark:text-dark-text'}`}>
-                      {msg.subject}
-                    </h4>
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className={`text-xs truncate ${isUnread ? 'font-bold text-gray-900 dark:text-white' : 'text-gray-700 dark:text-dark-text'}`}>
+                        {msg.subject}
+                      </h4>
+                      {/* Status indicator pills */}
+                      {status === 'pending' && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 flex-shrink-0 flex items-center space-x-0.5">
+                          <Clock className="w-2.5 h-2.5" />
+                          <span>{tab === 'inbox' ? 'Request' : 'Pending'}</span>
+                        </span>
+                      )}
+                      {status === 'accepted' && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 flex-shrink-0 flex items-center space-x-0.5">
+                          <Check className="w-2.5 h-2.5" />
+                          <span>Accepted</span>
+                        </span>
+                      )}
+                      {status === 'rejected' && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300 flex-shrink-0 flex items-center space-x-0.5">
+                          <Ban className="w-2.5 h-2.5" />
+                          <span>Declined</span>
+                        </span>
+                      )}
+                    </div>
 
                     <p className="text-[11px] text-gray-400 dark:text-dark-muted truncate mt-0.5">
                       {msg.content}
@@ -326,11 +442,32 @@ export const Messages: React.FC = () => {
           {activeMessage ? (
             <div className="flex-1 flex flex-col">
               {/* Header Actions */}
-              <div className="p-4 border-b border-gray-200 dark:border-dark-border flex items-center justify-between">
+              <div className="p-4 border-b border-gray-200 dark:border-dark-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="space-y-1">
-                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                    {activeMessage.subject}
-                  </h2>
+                  <div className="flex items-center space-x-2">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                      {activeMessage.subject}
+                    </h2>
+                    {activeMessage.status === 'pending' && (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 flex items-center space-x-1">
+                        <Clock className="w-3 h-3" />
+                        <span>{tab === 'inbox' ? 'Request Pending' : 'Pending Recipient Acceptance'}</span>
+                      </span>
+                    )}
+                    {activeMessage.status === 'accepted' && (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 flex items-center space-x-1">
+                        <ShieldCheck className="w-3 h-3" />
+                        <span>Accepted</span>
+                      </span>
+                    )}
+                    {activeMessage.status === 'rejected' && (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300 flex items-center space-x-1">
+                        <Ban className="w-3 h-3" />
+                        <span>Declined</span>
+                      </span>
+                    )}
+                  </div>
+
                   <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-dark-muted">
                     <span>
                       {tab === 'inbox' ? 'From' : 'To'}:{' '}
@@ -343,15 +480,22 @@ export const Messages: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleReply(activeMessage)}
-                    className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-hover text-xs font-semibold text-gray-700 dark:text-dark-text transition-colors cursor-pointer"
-                    title="Reply"
-                  >
-                    <Reply className="w-3.5 h-3.5" />
-                    <span>Reply</span>
-                  </button>
+                <div className="flex items-center space-x-2 self-end sm:self-auto">
+                  {/* Reply button is only active when message is accepted */}
+                  {activeMessage.status === 'accepted' ? (
+                    <button
+                      onClick={() => handleReply(activeMessage)}
+                      className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                      title="Reply"
+                    >
+                      <Reply className="w-3.5 h-3.5" />
+                      <span>Reply</span>
+                    </button>
+                  ) : activeMessage.status === 'pending' && tab === 'inbox' ? (
+                    <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium italic">
+                      Accept request below to reply
+                    </span>
+                  ) : null}
 
                   <button
                     onClick={() => handleDeleteMessage(activeMessage.id)}
@@ -365,8 +509,46 @@ export const Messages: React.FC = () => {
 
               {/* Message Body */}
               <div className="p-6 flex-1 overflow-y-auto">
+                {/* Accept / Decline Action Bar for Received Pending Messages */}
+                {tab === 'inbox' && activeMessage.status === 'pending' && (
+                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/80 rounded-xl p-4 mb-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start sm:items-center space-x-3">
+                      <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300">
+                        <ShieldAlert className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                          Message Request from @{activeMessage.sender_username}
+                        </h4>
+                        <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-0.5">
+                          You must accept this request before you can reply. Declining will notify the sender and prevent future unsolicited messages.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2 flex-shrink-0">
+                      <button
+                        onClick={() => handleAcceptMessage(activeMessage.id)}
+                        disabled={actionLoading}
+                        className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Accept Request</span>
+                      </button>
+                      <button
+                        onClick={() => handleRejectMessage(activeMessage.id)}
+                        disabled={actionLoading}
+                        className="px-3.5 py-1.5 rounded-lg border border-red-300 dark:border-red-800/80 bg-white dark:bg-dark-surface hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 font-semibold text-xs flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Decline</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sender Avatar & Info */}
                 <div className="flex items-center space-x-3 mb-6 pb-4 border-b border-gray-100 dark:border-dark-border/40">
-                  <div className="w-10 h-10 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-sm">
+                  <div className="w-10 h-10 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-sm shadow-xs">
                     {activeMessage.sender_username.charAt(0).toUpperCase()}
                   </div>
                   <div>
@@ -389,7 +571,7 @@ export const Messages: React.FC = () => {
               <Mail className="w-12 h-12 text-gray-300 dark:text-dark-muted mb-3" />
               <h3 className="text-sm font-bold text-gray-700 dark:text-dark-text">No message selected</h3>
               <p className="text-xs text-gray-500 dark:text-dark-muted max-w-sm mt-1">
-                Select a message from the list on the left to read its contents, reply, or manage it.
+                Select a message from the list on the left to read its contents, accept requests, or reply.
               </p>
             </div>
           )}
@@ -404,12 +586,12 @@ export const Messages: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <Send className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <h3 className="font-bold text-base text-gray-900 dark:text-white">
-                  Send Message to Developer
+                  Send Message Request
                 </h3>
               </div>
               <button
                 onClick={() => setShowCompose(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text p-1"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text p-1 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -423,27 +605,97 @@ export const Messages: React.FC = () => {
             )}
 
             <form onSubmit={handleSendMessage} className="space-y-4">
+              {/* Recipient Search & Selection */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
                   Recipient Developer *
                 </label>
-                <div className="relative">
-                  <select
-                    required
-                    value={recipient}
-                    onChange={e => setRecipient(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  >
-                    <option value="">-- Choose developer --</option>
-                    {developers
-                      .filter(d => !user || d.username !== user.username)
-                      .map(dev => (
-                        <option key={dev.id} value={dev.username}>
-                          @{dev.username} {dev.full_name ? `(${dev.full_name})` : ''}
-                        </option>
-                      ))}
-                  </select>
-                </div>
+
+                {recipient ? (
+                  /* Selected Recipient Card */
+                  <div className="flex items-center justify-between p-2.5 rounded-lg border border-emerald-500/50 bg-emerald-50/40 dark:bg-emerald-950/20">
+                    <div className="flex items-center space-x-2.5">
+                      <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
+                        {recipient.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-xs font-bold text-gray-900 dark:text-white">@{recipient}</span>
+                          {selectedDev?.full_name && (
+                            <span className="text-[11px] text-gray-500 dark:text-dark-muted">({selectedDev.full_name})</span>
+                          )}
+                        </div>
+                        {selectedDev?.id && (
+                          <span className="text-[10px] text-gray-400">User ID #{selectedDev.id}</span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleClearRecipient}
+                      className="px-2 py-1 text-[11px] font-semibold text-gray-500 hover:text-red-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-dark-hover rounded transition-colors cursor-pointer"
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : (
+                  /* Interactive Recipient Search */
+                  <div className="relative space-y-1.5">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
+                      <input
+                        type="text"
+                        value={userSearchQuery}
+                        onChange={e => setUserSearchQuery(e.target.value)}
+                        placeholder="Search by username or user ID..."
+                        autoFocus
+                        className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                      {isSearchingUsers && (
+                        <Loader2 className="w-3.5 h-3.5 absolute right-3 top-2.5 text-emerald-600 animate-spin" />
+                      )}
+                    </div>
+
+                    <p className="text-[10px] text-gray-400 dark:text-dark-muted">
+                      Usernames are protected. Search by username or user ID to find a developer.
+                    </p>
+
+                    {/* Search Results Dropdown */}
+                    {hasSearchedUsers && !isSearchingUsers && userSearchResults.length > 0 && (
+                      <div className="max-h-44 overflow-y-auto rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-lg divide-y divide-gray-100 dark:divide-dark-border/40">
+                        {userSearchResults.map(dev => (
+                          <button
+                            key={dev.id}
+                            type="button"
+                            onClick={() => handleSelectDeveloper(dev)}
+                            className="w-full text-left p-2.5 hover:bg-emerald-50/50 dark:hover:bg-dark-hover flex items-center justify-between transition-colors cursor-pointer"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-[10px]">
+                                {dev.username.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <span className="text-xs font-bold text-gray-900 dark:text-white">@{dev.username}</span>
+                                {dev.full_name && (
+                                  <span className="text-[11px] text-gray-500 dark:text-dark-muted ml-1.5">({dev.full_name})</span>
+                                )}
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-gray-400">ID #{dev.id}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* User Does Not Exist Banner */}
+                    {hasSearchedUsers && !isSearchingUsers && userSearchResults.length === 0 && userSearchQuery.trim() !== '' && (
+                      <div className="p-2.5 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/60 text-xs text-red-600 dark:text-red-400 flex items-center space-x-2">
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>User does not exist</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -455,7 +707,7 @@ export const Messages: React.FC = () => {
                   required
                   value={subject}
                   onChange={e => setSubject(e.target.value)}
-                  placeholder="Subject of your message..."
+                  placeholder="Subject of your message request..."
                   className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -469,7 +721,7 @@ export const Messages: React.FC = () => {
                   rows={5}
                   value={content}
                   onChange={e => setContent(e.target.value)}
-                  placeholder="Write your message..."
+                  placeholder="Write your message... The receiver will review and accept this request before replying."
                   className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none font-sans"
                 />
               </div>
@@ -478,16 +730,16 @@ export const Messages: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowCompose(false)}
-                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50"
+                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={sending}
+                  disabled={sending || !recipient}
                   className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
                 >
-                  {sending ? 'Sending...' : 'Send Message'}
+                  {sending ? 'Sending Request...' : 'Send Request'}
                 </button>
               </div>
             </form>

@@ -295,6 +295,8 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("GET /api/v1/messages/unread-count", r.handleGetUnreadMessageCount)
 	r.mux.HandleFunc("GET /api/v1/messages/{id}", r.handleGetMessage)
 	r.mux.HandleFunc("PATCH /api/v1/messages/{id}/read", r.handleMarkMessageRead)
+	r.mux.HandleFunc("POST /api/v1/messages/{id}/accept", r.handleAcceptMessage)
+	r.mux.HandleFunc("POST /api/v1/messages/{id}/reject", r.handleRejectMessage)
 	r.mux.HandleFunc("DELETE /api/v1/messages/{id}", r.handleDeleteMessage)
 	r.mux.HandleFunc("GET /api/v1/developers", r.handleListDevelopers)
 
@@ -5763,13 +5765,34 @@ func (r *Router) handleSendMessage(w http.ResponseWriter, req *http.Request) {
 
 	body.RecipientUsername = strings.TrimSpace(body.RecipientUsername)
 	if body.RecipientUsername == "" {
-		jsonError(w, http.StatusBadRequest, "Recipient username is required")
+		jsonError(w, http.StatusBadRequest, "Recipient username or ID is required")
 		return
 	}
 
 	recipientUser, err := database.GetUserByUsername(body.RecipientUsername)
 	if err != nil || recipientUser == nil {
-		jsonError(w, http.StatusNotFound, "Recipient developer not found")
+		if id, errConv := strconv.ParseInt(body.RecipientUsername, 10, 64); errConv == nil {
+			recipientUser, _ = database.GetUserByID(id)
+		}
+	}
+	if recipientUser == nil {
+		jsonError(w, http.StatusNotFound, "User does not exist")
+		return
+	}
+
+	if recipientUser.ID == user.ID {
+		jsonError(w, http.StatusBadRequest, "You cannot send a message to yourself")
+		return
+	}
+
+	// Anti-harassment: If the recipient previously rejected message requests from this sender, block them
+	var rejectedCount int
+	_ = database.DB.QueryRow(`
+		SELECT COUNT(*) FROM messages 
+		WHERE sender_id = ? AND recipient_id = ? AND status = 'rejected'
+	`, recipientUser.ID, user.ID).Scan(&rejectedCount)
+	if rejectedCount > 0 {
+		jsonError(w, http.StatusForbidden, "The recipient previously declined message requests from your account. Further messages cannot be sent.")
 		return
 	}
 
@@ -5896,14 +5919,73 @@ func (r *Router) handleDeleteMessage(w http.ResponseWriter, req *http.Request) {
 	jsonResponse(w, http.StatusOK, map[string]string{"message": "Message deleted successfully"})
 }
 
+func (r *Router) handleAcceptMessage(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	idStr := req.PathValue("id")
+	msgID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid message ID")
+		return
+	}
+
+	msg, err := database.AcceptMessage(msgID, user.ID)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, msg)
+}
+
+func (r *Router) handleRejectMessage(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	idStr := req.PathValue("id")
+	msgID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid message ID")
+		return
+	}
+
+	msg, err := database.RejectMessage(msgID, user.ID)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, msg)
+}
+
 func (r *Router) handleListDevelopers(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	q := strings.TrimSpace(req.URL.Query().Get("q"))
+	if q == "" {
+		// Security & Privacy: Do not list or enumerate all accounts without a search query
+		jsonResponse(w, http.StatusOK, []database.User{})
+		return
+	}
+
 	limitStr := req.URL.Query().Get("limit")
-	limit := 100
-	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+	limit := 10
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 50 {
 		limit = l
 	}
 
-	developers, err := database.ListActiveDevelopers(limit)
+	developers, err := database.SearchActiveDevelopers(user.ID, q, limit)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
