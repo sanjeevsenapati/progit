@@ -119,6 +119,7 @@ function parseDiffPatch(patch: string): ParsedDiffLine[] {
 export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, index }) => {
   const { user } = useAuth();
   const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
+  const [canWriteRepo, setCanWriteRepo] = useState(false);
   const [pull, setPull] = useState<PullRequest | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [reviews, setReviews] = useState<PullReview[]>([]);
@@ -165,6 +166,7 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
       ]);
 
       setRepoData(r.repository);
+      setCanWriteRepo(Boolean(r.can_write || r.permissions?.write || r.permissions?.admin));
       setPull(p);
       setComments(cList || []);
       setReviews(revList || []);
@@ -267,6 +269,26 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
   const changeRequests = reviews.filter(r => r.state === 'CHANGES_REQUESTED');
   const totalAdditions = files.reduce((acc, f) => acc + (f.additions || 0), 0);
   const totalDeletions = files.reduce((acc, f) => acc + (f.deletions || 0), 0);
+
+  // Permission Check: pull request & merge options visible to logged in repo members or requester
+  const isRepoMember = Boolean(
+    user && (
+      canWriteRepo ||
+      repoData?.owner_id === user.id ||
+      repoData?.owner_name === user.username
+    )
+  );
+
+  const isRequester = Boolean(
+    user && (
+      issue?.poster_id === user.id ||
+      issue?.poster_name === user.username ||
+      pull?.issue?.poster_id === user.id ||
+      pull?.issue?.poster_name === user.username
+    )
+  );
+
+  const canMerge = Boolean(user && (isRepoMember || isRequester));
 
   return (
     <div>
@@ -444,57 +466,77 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
 
             {/* Merge Action Box */}
             {!pull.is_merged && !issue.is_closed && (
-              <div className="p-5 rounded-xl border border-emerald-300 dark:border-emerald-800/80 bg-emerald-50/50 dark:bg-emerald-950/20 shadow-sm space-y-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center flex-shrink-0">
-                    <ShieldCheck className="w-5 h-5" />
+              canMerge ? (
+                <div className="p-5 rounded-xl border border-emerald-300 dark:border-emerald-800/80 bg-emerald-50/50 dark:bg-emerald-950/20 shadow-sm space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center flex-shrink-0">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-gray-900 dark:text-white">This branch has no conflicts with the base branch</h3>
+                      <p className="text-xs text-gray-500 dark:text-dark-muted">Merging can be performed automatically.</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-gray-900 dark:text-white">This branch has no conflicts with the base branch</h3>
-                    <p className="text-xs text-gray-500 dark:text-dark-muted">Merging can be performed automatically.</p>
+
+                  {/* Review status summary inside merge box */}
+                  <div className="px-3 py-2 rounded-lg bg-white/70 dark:bg-dark-surface/60 border border-emerald-200 dark:border-emerald-900/60 text-xs flex flex-wrap items-center gap-3">
+                    {changeRequests.length > 0 ? (
+                      <div className="flex items-center text-red-600 dark:text-red-400 font-semibold space-x-1.5">
+                        <AlertCircle className="w-4 h-4" />
+                        <span>Changes requested by {changeRequests.map(r => r.reviewer_name).join(', ')}</span>
+                      </div>
+                    ) : approvals.length > 0 ? (
+                      <div className="flex items-center text-emerald-600 dark:text-emerald-400 font-semibold space-x-1.5">
+                        <Check className="w-4 h-4" />
+                        <span>Approved by {approvals.map(r => r.reviewer_name).join(', ')}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center text-gray-500 dark:text-dark-muted space-x-1.5">
+                        <Clock className="w-4 h-4" />
+                        <span>No reviews yet</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-2 border-t border-emerald-200 dark:border-emerald-900/50">
+                    <select
+                      value={mergeStyle}
+                      onChange={e => setMergeStyle(e.target.value as any)}
+                      className="px-3 py-2 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-xs font-semibold text-gray-800 dark:text-white"
+                    >
+                      <option value="merge">Create a merge commit</option>
+                      <option value="squash">Squash and merge</option>
+                      <option value="rebase">Rebase and merge</option>
+                    </select>
+
+                    <button
+                      onClick={() => setShowMergeConfirmModal(true)}
+                      disabled={merging}
+                      className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs shadow-sm transition-colors cursor-pointer"
+                    >
+                      {merging ? 'Merging commits...' : `Merge pull request (${mergeStyle})`}
+                    </button>
                   </div>
                 </div>
-
-                {/* Review status summary inside merge box */}
-                <div className="px-3 py-2 rounded-lg bg-white/70 dark:bg-dark-surface/60 border border-emerald-200 dark:border-emerald-900/60 text-xs flex flex-wrap items-center gap-3">
-                  {changeRequests.length > 0 ? (
-                    <div className="flex items-center text-red-600 dark:text-red-400 font-semibold space-x-1.5">
-                      <AlertCircle className="w-4 h-4" />
-                      <span>Changes requested by {changeRequests.map(r => r.reviewer_name).join(', ')}</span>
-                    </div>
-                  ) : approvals.length > 0 ? (
-                    <div className="flex items-center text-emerald-600 dark:text-emerald-400 font-semibold space-x-1.5">
-                      <Check className="w-4 h-4" />
-                      <span>Approved by {approvals.map(r => r.reviewer_name).join(', ')}</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center text-gray-500 dark:text-dark-muted space-x-1.5">
-                      <Clock className="w-4 h-4" />
-                      <span>No reviews yet</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-2 border-t border-emerald-200 dark:border-emerald-900/50">
-                  <select
-                    value={mergeStyle}
-                    onChange={e => setMergeStyle(e.target.value as any)}
-                    className="px-3 py-2 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-xs font-semibold text-gray-800 dark:text-white"
+              ) : !user ? (
+                <div className="p-4 rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50/70 dark:bg-dark-surface shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center space-x-2.5 text-gray-600 dark:text-dark-muted">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span>Pull requests are open for public viewing. Sign in to merge or review this pull request.</span>
+                  </div>
+                  <a
+                    href="/login"
+                    className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs text-center self-start sm:self-auto transition-colors"
                   >
-                    <option value="merge">Create a merge commit</option>
-                    <option value="squash">Squash and merge</option>
-                    <option value="rebase">Rebase and merge</option>
-                  </select>
-
-                  <button
-                    onClick={() => setShowMergeConfirmModal(true)}
-                    disabled={merging}
-                    className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs shadow-sm transition-colors cursor-pointer"
-                  >
-                    {merging ? 'Merging commits...' : `Merge pull request (${mergeStyle})`}
-                  </button>
+                    Sign in to merge
+                  </a>
                 </div>
-              </div>
+              ) : (
+                <div className="p-4 rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50/70 dark:bg-dark-surface text-xs text-gray-500 dark:text-dark-muted flex items-center space-x-2.5">
+                  <AlertCircle className="w-4 h-4 text-gray-400 shrink-0" />
+                  <span>Merge options are restricted to repository members and the pull request author.</span>
+                </div>
+              )
             )}
 
             {/* Post-Merge: Delete Branch Banner */}
@@ -607,18 +649,19 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
                   </button>
                 </div>
 
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowReviewPanel(!showReviewPanel)}
-                    className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm transition-colors cursor-pointer"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Review changes</span>
-                    <ChevronDown className="w-3.5 h-3.5 ml-0.5" />
-                  </button>
+                {user && (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowReviewPanel(!showReviewPanel)}
+                      className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm transition-colors cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Review changes</span>
+                      <ChevronDown className="w-3.5 h-3.5 ml-0.5" />
+                    </button>
 
-                {showReviewPanel && (
+                  {showReviewPanel && (
                   <div className="absolute right-0 mt-2 w-96 z-40 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl shadow-2xl p-5 space-y-4">
                     <div className="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-dark-border">
                       <h4 className="text-sm font-bold text-gray-900 dark:text-white">Submit your review</h4>
@@ -709,7 +752,8 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
                     </form>
                   </div>
                 )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
 

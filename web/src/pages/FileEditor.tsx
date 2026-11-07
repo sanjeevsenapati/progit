@@ -26,8 +26,32 @@ import {
   Copy,
   Check,
   History,
-  Clock
+  Clock,
+  Palette
 } from 'lucide-react';
+
+const SUPPORTED_LANGUAGES = [
+  { id: 'auto', label: 'Auto Detect' },
+  { id: 'typescript', label: 'TypeScript' },
+  { id: 'javascript', label: 'JavaScript' },
+  { id: 'tsx', label: 'React TSX' },
+  { id: 'jsx', label: 'React JSX' },
+  { id: 'go', label: 'Go' },
+  { id: 'python', label: 'Python' },
+  { id: 'rust', label: 'Rust' },
+  { id: 'c', label: 'C' },
+  { id: 'cpp', label: 'C++' },
+  { id: 'java', label: 'Java' },
+  { id: 'bash', label: 'Shell / Bash' },
+  { id: 'json', label: 'JSON' },
+  { id: 'yaml', label: 'YAML' },
+  { id: 'sql', label: 'SQL' },
+  { id: 'markup', label: 'HTML / XML' },
+  { id: 'css', label: 'CSS' },
+  { id: 'markdown', label: 'Markdown' },
+  { id: 'docker', label: 'Dockerfile' },
+  { id: 'ini', label: 'INI / Config' },
+];
 
 interface FileEditorProps {
   owner: string;
@@ -82,7 +106,36 @@ export const FileEditor: React.FC<FileEditorProps> = ({
   // Editor Settings
   const [tabSize, setTabSize] = useState<number>(2);
   const [formatNotice, setFormatNotice] = useState<string | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('auto');
+  const [syntaxHighlighting, setSyntaxHighlighting] = useState<boolean>(true);
+  const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const highlightRef = useRef<HTMLPreElement>(null);
+  const gutterRef = useRef<HTMLDivElement>(null);
+
+  const effectiveLanguage = selectedLanguage === 'auto' ? detectLanguage(pathInput) : selectedLanguage;
+
+  const updateCursorPos = () => {
+    if (!textareaRef.current) return;
+    const selStart = textareaRef.current.selectionStart;
+    const textBefore = content.substring(0, selStart);
+    const linesBefore = textBefore.split('\n');
+    const line = linesBefore.length;
+    const col = linesBefore[linesBefore.length - 1].length + 1;
+    setCursorPos({ line, col });
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+    const { scrollTop, scrollLeft } = e.currentTarget;
+    if (highlightRef.current) {
+      highlightRef.current.scrollTop = scrollTop;
+      highlightRef.current.scrollLeft = scrollLeft;
+    }
+    if (gutterRef.current) {
+      gutterRef.current.scrollTop = scrollTop;
+    }
+  };
 
   useEffect(() => {
     async function load() {
@@ -174,7 +227,7 @@ export const FileEditor: React.FC<FileEditorProps> = ({
 
   // Prettier Formatting
   const handleFormatCode = () => {
-    const lang = detectLanguage(pathInput);
+    const lang = effectiveLanguage;
     const { formatted, changed, error: formatErr } = formatWithPrettier(content, lang, tabSize);
     if (formatErr) {
       setFormatNotice(`⚠️ ${formatErr}`);
@@ -207,6 +260,7 @@ export const FileEditor: React.FC<FileEditorProps> = ({
 
       setTimeout(() => {
         textarea.selectionStart = textarea.selectionEnd = start + tabSize;
+        updateCursorPos();
       }, 0);
     }
   };
@@ -409,15 +463,16 @@ export const FileEditor: React.FC<FileEditorProps> = ({
             <div className="rounded-xl border border-gray-200 dark:border-dark-border shadow-xs overflow-hidden bg-white dark:bg-dark-surface">
               {/* Editor Sub-toolbar */}
               <div className="px-4 py-2 bg-gray-50 dark:bg-[#14161f] border-b border-gray-200 dark:border-dark-border flex flex-wrap items-center justify-between gap-3 text-xs">
-                {/* Left: File info & Indent Size */}
-                <div className="flex items-center space-x-3 text-xs text-gray-600 dark:text-dark-muted font-mono">
+                {/* Left: File info, Indent Size, Language, and Syntax Toggle */}
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-gray-600 dark:text-dark-muted font-mono">
                   <span className="font-bold text-gray-900 dark:text-white">{pathInput.split('/').pop() || 'Untitled'}</span>
                   <span>•</span>
                   <span>{lines.length} lines</span>
                   <span>•</span>
                   <span>{(approxSize / 1024).toFixed(1)} KB</span>
 
-                  <div className="flex items-center space-x-1 pl-2 font-sans">
+                  {/* Indentation Selector */}
+                  <div className="flex items-center space-x-1 pl-1 font-sans">
                     <span className="text-gray-500 dark:text-dark-muted font-medium">Indent:</span>
                     <button
                       type="button"
@@ -427,9 +482,40 @@ export const FileEditor: React.FC<FileEditorProps> = ({
                       {tabSize} spaces
                     </button>
                   </div>
+
+                  {/* Language Selector */}
+                  <div className="flex items-center space-x-1 pl-1 font-sans">
+                    <span className="text-gray-500 dark:text-dark-muted font-medium">Language:</span>
+                    <select
+                      value={selectedLanguage}
+                      onChange={(e) => setSelectedLanguage(e.target.value)}
+                      className="px-2 py-0.5 rounded text-[11px] font-sans border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-800 dark:text-dark-text cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    >
+                      {SUPPORTED_LANGUAGES.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Colorful Syntax Highlighting Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setSyntaxHighlighting(!syntaxHighlighting)}
+                    className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded text-[11px] font-sans font-semibold border transition-all cursor-pointer ${
+                      syntaxHighlighting
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 shadow-2xs'
+                        : 'bg-gray-100 dark:bg-dark-hover border-gray-300 dark:border-dark-border text-gray-600 dark:text-dark-muted'
+                    }`}
+                    title="Toggle live colorful syntax highlighting"
+                  >
+                    <Palette className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>Syntax: {syntaxHighlighting ? 'Colorful' : 'Plain'}</span>
+                  </button>
                 </div>
 
-                {/* Right: Prettier Format Button (Notice: No Theme Selector!) */}
+                {/* Right: Prettier Format Button */}
                 <div className="flex items-center space-x-3">
                   {formatNotice && (
                     <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 animate-pulse">
@@ -451,15 +537,21 @@ export const FileEditor: React.FC<FileEditorProps> = ({
 
               {/* Editor Body */}
               {activeTab === 'edit' ? (
-                <div className={`flex min-h-[460px] transition-colors ${autoEditorTheme}`}>
-                  {/* Line Numbers */}
+                <div
+                  className={`flex h-[560px] min-h-[460px] relative transition-colors ${
+                    theme === 'dark' ? 'prettier-theme-dark prettier-dark' : 'prettier-theme-light prettier-light'
+                  }`}
+                >
+                  {/* Line Numbers Gutter */}
                   <div
-                    className={`select-none py-4 px-3 text-right text-xs font-mono border-r ${
-                      autoEditorTheme === 'prettier-light'
-                        ? 'border-gray-200 bg-gray-100/70 text-gray-400'
-                        : 'border-white/10 bg-black/20 text-gray-500'
+                    ref={gutterRef}
+                    className={`select-none py-4 px-3 text-right text-xs font-mono border-r overflow-hidden shrink-0 ${
+                      theme === 'dark'
+                        ? 'border-white/10 bg-black/20 text-gray-500'
+                        : 'border-gray-200 bg-gray-100/70 text-gray-400'
                     }`}
-                    style={{ minWidth: '3.5rem' }}
+                    style={{ minWidth: '3.75rem' }}
+                    aria-hidden="true"
                   >
                     {lines.map((_, i) => (
                       <div key={i} className="leading-6">
@@ -468,27 +560,71 @@ export const FileEditor: React.FC<FileEditorProps> = ({
                     ))}
                   </div>
 
-                  {/* Code Textarea */}
-                  <textarea
-                    ref={textareaRef}
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Type your code or documentation here..."
-                    rows={Math.max(20, lines.length + 3)}
-                    spellCheck={false}
-                    className={`flex-1 p-4 font-mono text-xs leading-6 bg-transparent focus:outline-none resize-y ${
-                      autoEditorTheme === 'prettier-light' ? 'text-gray-900' : 'text-gray-100'
-                    }`}
-                    style={{ tabSize }}
-                  />
+                  {/* Synchronized Code Area: Pre Highlight Underlay + Textarea Overlay */}
+                  <div className="relative flex-1 min-w-0 h-full overflow-hidden">
+                    {/* Colorful Syntax Highlighting Layer */}
+                    {syntaxHighlighting && (
+                      <pre
+                        ref={highlightRef}
+                        aria-hidden="true"
+                        className={`pointer-events-none absolute inset-0 m-0 p-4 font-mono text-xs leading-6 whitespace-pre overflow-hidden select-none ${
+                          theme === 'dark' ? 'prettier-theme-dark prettier-dark' : 'prettier-theme-light prettier-light'
+                        }`}
+                        style={{
+                          tabSize,
+                          fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
+                        }}
+                      >
+                        <code
+                          dangerouslySetInnerHTML={{
+                            __html: highlightCode(content + (content.endsWith('\n') ? ' ' : ''), effectiveLanguage),
+                          }}
+                        />
+                      </pre>
+                    )}
+
+                    {/* Interactive Textarea Layer */}
+                    <textarea
+                      ref={textareaRef}
+                      value={content}
+                      onChange={(e) => {
+                        setContent(e.target.value);
+                        updateCursorPos();
+                      }}
+                      onScroll={handleScroll}
+                      onKeyDown={handleKeyDown}
+                      onKeyUp={updateCursorPos}
+                      onClick={updateCursorPos}
+                      onSelect={updateCursorPos}
+                      placeholder="Type your code or documentation here..."
+                      spellCheck={false}
+                      autoCapitalize="off"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      className={`code-editor-textarea absolute inset-0 w-full h-full m-0 p-4 font-mono text-xs leading-6 bg-transparent resize-none border-0 outline-none focus:ring-0 whitespace-pre overflow-auto ${
+                        syntaxHighlighting
+                          ? 'syntax-highlight-active'
+                          : theme === 'dark'
+                          ? 'text-gray-100'
+                          : 'text-gray-900'
+                      }`}
+                      style={{
+                        tabSize,
+                        fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
+                      }}
+                    />
+                  </div>
                 </div>
               ) : (
-                <div className="p-6 min-h-[460px]">
+                <div className="p-6 min-h-[460px] overflow-auto">
                   {isMarkdown ? (
                     <MarkdownViewer content={content || '*No content to preview*'} />
                   ) : (
-                    <div className={`rounded-lg overflow-x-auto p-4 border border-gray-200 dark:border-white/10 ${autoEditorTheme}`}>
+                    <div
+                      className={`rounded-lg overflow-x-auto p-4 border border-gray-200 dark:border-white/10 ${
+                        theme === 'dark' ? 'prettier-theme-dark prettier-dark' : 'prettier-theme-light prettier-light'
+                      }`}
+                    >
                       <div className="flex">
                         <div className="select-none pr-4 text-right text-xs font-mono text-gray-400/60 leading-6 border-r border-white/10 mr-4">
                           {lines.map((_, i) => (
@@ -498,7 +634,7 @@ export const FileEditor: React.FC<FileEditorProps> = ({
                         <pre className="text-xs font-mono leading-6 flex-1 overflow-x-auto">
                           <code
                             dangerouslySetInnerHTML={{
-                              __html: highlightCode(content || '// Empty file', language),
+                              __html: highlightCode(content || '// Empty file', effectiveLanguage),
                             }}
                           />
                         </pre>
@@ -509,13 +645,24 @@ export const FileEditor: React.FC<FileEditorProps> = ({
               )}
 
               {/* Status Footer */}
-              <div className="px-4 py-1.5 bg-gray-50 dark:bg-[#14161f] border-t border-gray-200 dark:border-dark-border flex items-center justify-between text-[11px] text-gray-500 dark:text-dark-muted font-mono">
+              <div className="px-4 py-1.5 bg-gray-50 dark:bg-[#14161f] border-t border-gray-200 dark:border-dark-border flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500 dark:text-dark-muted font-mono">
                 <div className="flex items-center space-x-3">
+                  <span className="font-semibold text-gray-700 dark:text-dark-text">
+                    Ln {cursorPos.line}, Col {cursorPos.col}
+                  </span>
+                  <span>•</span>
                   <span>{lines.length} lines</span>
                   <span>•</span>
                   <span>{content.length} characters</span>
                   <span>•</span>
-                  <span className="capitalize">{language}</span>
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
+                    {effectiveLanguage}
+                  </span>
+                  {syntaxHighlighting && (
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-sans font-semibold">
+                      (Live Syntax Active)
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center space-x-3">
                   <span>UTF-8</span>

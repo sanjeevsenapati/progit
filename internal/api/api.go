@@ -299,6 +299,7 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("POST /api/v1/messages/{id}/reject", r.handleRejectMessage)
 	r.mux.HandleFunc("DELETE /api/v1/messages/{id}", r.handleDeleteMessage)
 	r.mux.HandleFunc("GET /api/v1/developers", r.handleListDevelopers)
+	r.mux.HandleFunc("GET /api/v1/features", r.handleGetFeatures)
 
 	// Static Pages Web Hosting
 	r.mux.HandleFunc("GET /pages/{owner}/{repo}", r.handleServePagesRedirect)
@@ -2516,14 +2517,17 @@ func (r *Router) handleMergePull(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if !database.CanUserAccessRepo(user, repo, true) {
-		jsonError(w, http.StatusForbidden, "Write permission required to merge pull requests")
-		return
-	}
-
 	issue, err := database.GetIssueByIndex(repo.ID, index)
 	if err != nil || issue == nil || !issue.IsPull {
 		jsonError(w, http.StatusNotFound, "Pull request not found")
+		return
+	}
+
+	// Permission: Only repository collaborators (write access) OR the pull request author (requester) can merge
+	isRepoMember := database.CanUserAccessRepo(user, repo, true)
+	isRequester := (issue.PosterID == user.ID)
+	if !isRepoMember && !isRequester {
+		jsonError(w, http.StatusForbidden, "Only repository collaborators or the pull request author can merge this pull request")
 		return
 	}
 
@@ -5747,6 +5751,11 @@ func (r *Router) handleDeleteProjectCard(w http.ResponseWriter, req *http.Reques
 // Direct Messaging Handlers (Developer Communication)
 
 func (r *Router) handleSendMessage(w http.ResponseWriter, req *http.Request) {
+	if !r.cfg.Features.EnableMessaging {
+		jsonError(w, http.StatusForbidden, "Direct messaging feature is disabled on this server")
+		return
+	}
+
 	user := auth.AuthenticateRequest(req)
 	if user == nil {
 		jsonError(w, http.StatusUnauthorized, "Unauthorized")
@@ -5806,6 +5815,11 @@ func (r *Router) handleSendMessage(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Router) handleListInboxMessages(w http.ResponseWriter, req *http.Request) {
+	if !r.cfg.Features.EnableMessaging {
+		jsonError(w, http.StatusForbidden, "Direct messaging feature is disabled on this server")
+		return
+	}
+
 	user := auth.AuthenticateRequest(req)
 	if user == nil {
 		jsonError(w, http.StatusUnauthorized, "Unauthorized")
@@ -5824,6 +5838,11 @@ func (r *Router) handleListInboxMessages(w http.ResponseWriter, req *http.Reques
 }
 
 func (r *Router) handleListSentMessages(w http.ResponseWriter, req *http.Request) {
+	if !r.cfg.Features.EnableMessaging {
+		jsonError(w, http.StatusForbidden, "Direct messaging feature is disabled on this server")
+		return
+	}
+
 	user := auth.AuthenticateRequest(req)
 	if user == nil {
 		jsonError(w, http.StatusUnauthorized, "Unauthorized")
@@ -5842,6 +5861,11 @@ func (r *Router) handleListSentMessages(w http.ResponseWriter, req *http.Request
 }
 
 func (r *Router) handleGetUnreadMessageCount(w http.ResponseWriter, req *http.Request) {
+	if !r.cfg.Features.EnableMessaging {
+		jsonResponse(w, http.StatusOK, map[string]any{"unread_count": 0, "messaging_enabled": false})
+		return
+	}
+
 	user := auth.AuthenticateRequest(req)
 	if user == nil {
 		jsonResponse(w, http.StatusOK, map[string]int{"unread_count": 0})
@@ -5853,6 +5877,11 @@ func (r *Router) handleGetUnreadMessageCount(w http.ResponseWriter, req *http.Re
 }
 
 func (r *Router) handleGetMessage(w http.ResponseWriter, req *http.Request) {
+	if !r.cfg.Features.EnableMessaging {
+		jsonError(w, http.StatusForbidden, "Direct messaging feature is disabled on this server")
+		return
+	}
+
 	user := auth.AuthenticateRequest(req)
 	if user == nil {
 		jsonError(w, http.StatusUnauthorized, "Unauthorized")
@@ -5876,6 +5905,11 @@ func (r *Router) handleGetMessage(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Router) handleMarkMessageRead(w http.ResponseWriter, req *http.Request) {
+	if !r.cfg.Features.EnableMessaging {
+		jsonError(w, http.StatusForbidden, "Direct messaging feature is disabled on this server")
+		return
+	}
+
 	user := auth.AuthenticateRequest(req)
 	if user == nil {
 		jsonError(w, http.StatusUnauthorized, "Unauthorized")
@@ -5898,6 +5932,11 @@ func (r *Router) handleMarkMessageRead(w http.ResponseWriter, req *http.Request)
 }
 
 func (r *Router) handleDeleteMessage(w http.ResponseWriter, req *http.Request) {
+	if !r.cfg.Features.EnableMessaging {
+		jsonError(w, http.StatusForbidden, "Direct messaging feature is disabled on this server")
+		return
+	}
+
 	user := auth.AuthenticateRequest(req)
 	if user == nil {
 		jsonError(w, http.StatusUnauthorized, "Unauthorized")
@@ -5920,6 +5959,11 @@ func (r *Router) handleDeleteMessage(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Router) handleAcceptMessage(w http.ResponseWriter, req *http.Request) {
+	if !r.cfg.Features.EnableMessaging {
+		jsonError(w, http.StatusForbidden, "Direct messaging feature is disabled on this server")
+		return
+	}
+
 	user := auth.AuthenticateRequest(req)
 	if user == nil {
 		jsonError(w, http.StatusUnauthorized, "Unauthorized")
@@ -5943,6 +5987,11 @@ func (r *Router) handleAcceptMessage(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Router) handleRejectMessage(w http.ResponseWriter, req *http.Request) {
+	if !r.cfg.Features.EnableMessaging {
+		jsonError(w, http.StatusForbidden, "Direct messaging feature is disabled on this server")
+		return
+	}
+
 	user := auth.AuthenticateRequest(req)
 	if user == nil {
 		jsonError(w, http.StatusUnauthorized, "Unauthorized")
@@ -5966,6 +6015,11 @@ func (r *Router) handleRejectMessage(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Router) handleListDevelopers(w http.ResponseWriter, req *http.Request) {
+	if !r.cfg.Features.EnableMessaging {
+		jsonError(w, http.StatusForbidden, "Direct messaging feature is disabled on this server")
+		return
+	}
+
 	user := auth.AuthenticateRequest(req)
 	if user == nil {
 		jsonError(w, http.StatusUnauthorized, "Unauthorized")
@@ -5995,6 +6049,12 @@ func (r *Router) handleListDevelopers(w http.ResponseWriter, req *http.Request) 
 	}
 
 	jsonResponse(w, http.StatusOK, developers)
+}
+
+func (r *Router) handleGetFeatures(w http.ResponseWriter, req *http.Request) {
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"messaging_enabled": r.cfg.Features.EnableMessaging,
+	})
 }
 
 // ============================================================================

@@ -1207,8 +1207,12 @@ export const api = {
     return fetchJSON<Message[]>('/api/v1/messages/sent');
   },
 
+  async getFeatures() {
+    return fetchJSON<{ messaging_enabled: boolean }>('/api/v1/features');
+  },
+
   async getUnreadMessageCount() {
-    return fetchJSON<{ unread_count: number }>('/api/v1/messages/unread-count');
+    return fetchJSON<{ unread_count: number; messaging_enabled?: boolean }>('/api/v1/messages/unread-count');
   },
 
   async getMessage(id: number) {

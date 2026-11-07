@@ -1038,6 +1038,40 @@ func TestPullReviewsAPI(t *testing.T) {
 		t.Errorf("expected 1 comment on line 10 src/main.go, got %v", comments)
 	}
 
+	// 5. Test Public Pull Request Visibility (without login)
+	reqPublicPulls := httptest.NewRequest("GET", "/api/v1/repos/alice_pr/pr-repo/pulls", nil)
+	recPublicPulls := httptest.NewRecorder()
+	router.ServeHTTP(recPublicPulls, reqPublicPulls)
+	if recPublicPulls.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for public unauthenticated pulls list, got %d", recPublicPulls.Code)
+	}
+
+	reqPublicPullDetail := httptest.NewRequest("GET", "/api/v1/repos/alice_pr/pr-repo/pulls/1", nil)
+	recPublicPullDetail := httptest.NewRecorder()
+	router.ServeHTTP(recPublicPullDetail, reqPublicPullDetail)
+	if recPublicPullDetail.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for public unauthenticated pull detail, got %d", recPublicPullDetail.Code)
+	}
+
+	// 6. Test Merge Permissions
+	// 6.1 Unauthenticated user cannot merge -> 401
+	reqMergeAnon := httptest.NewRequest("POST", "/api/v1/repos/alice_pr/pr-repo/pulls/1/merge", bytes.NewReader([]byte(`{"merge_style":"merge"}`)))
+	recMergeAnon := httptest.NewRecorder()
+	router.ServeHTTP(recMergeAnon, reqMergeAnon)
+	if recMergeAnon.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 Unauthorized for anonymous merge attempt, got %d", recMergeAnon.Code)
+	}
+
+	// 6.2 Non-collaborator, non-requester user cannot merge -> 403
+	reqMergeBob := httptest.NewRequest("POST", "/api/v1/repos/alice_pr/pr-repo/pulls/1/merge", bytes.NewReader([]byte(`{"merge_style":"merge"}`)))
+	reqMergeBob.Header.Set("Authorization", "Bearer "+tokenBob)
+	reqMergeBob.Header.Set("Content-Type", "application/json")
+	recMergeBob := httptest.NewRecorder()
+	router.ServeHTTP(recMergeBob, reqMergeBob)
+	if recMergeBob.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden for non-collaborator/non-requester merge attempt, got %d: %s", recMergeBob.Code, recMergeBob.Body.String())
+	}
+
 	_ = pr
 }
 
@@ -1330,6 +1364,33 @@ func Test10DevelopersMessagingWorkflow(t *testing.T) {
 		_, _ = database.CreateAccessToken(u.ID, "tok", tokStr, "repo,user")
 		tokens[name] = tokStr
 	}
+
+	// 0. Test Feature Flag Endpoint & Toggle
+	reqFeatures := httptest.NewRequest("GET", "/api/v1/features", nil)
+	recFeatures := httptest.NewRecorder()
+	router.ServeHTTP(recFeatures, reqFeatures)
+	if recFeatures.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for GET /api/v1/features, got %d", recFeatures.Code)
+	}
+	var featMap map[string]any
+	_ = json.Unmarshal(recFeatures.Body.Bytes(), &featMap)
+	if featMap["messaging_enabled"] != true {
+		t.Errorf("expected messaging_enabled to be true by default, got %v", featMap["messaging_enabled"])
+	}
+
+	// Test disabling messaging feature flag
+	router.cfg.Features.EnableMessaging = false
+	reqDisabledMsg := httptest.NewRequest("POST", "/api/v1/messages", bytes.NewReader([]byte(`{"recipient_username":"dev_bob","subject":"hi","content":"test"}`)))
+	reqDisabledMsg.Header.Set("Authorization", "Bearer "+tokens["dev_alice"])
+	reqDisabledMsg.Header.Set("Content-Type", "application/json")
+	recDisabledMsg := httptest.NewRecorder()
+	router.ServeHTTP(recDisabledMsg, reqDisabledMsg)
+	if recDisabledMsg.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden when messaging is disabled, got %d", recDisabledMsg.Code)
+	}
+
+	// Re-enable messaging for remainder of workflow test
+	router.cfg.Features.EnableMessaging = true
 
 	// 1. Test Security: unauthenticated GET /api/v1/developers must return 401
 	reqDevsUnauth := httptest.NewRequest("GET", "/api/v1/developers", nil)

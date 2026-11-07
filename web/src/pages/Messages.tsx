@@ -28,6 +28,7 @@ export const Messages: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [messagingEnabled, setMessagingEnabled] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Compose Modal State
@@ -64,6 +65,12 @@ export const Messages: React.FC = () => {
   };
 
   useEffect(() => {
+    api.getFeatures().then(f => {
+      if (f && f.messaging_enabled !== undefined) {
+        setMessagingEnabled(f.messaging_enabled);
+      }
+    }).catch(() => {});
+
     // Check query params for `?to=username`
     const params = new URLSearchParams(window.location.search);
     const toUser = params.get('to');
@@ -256,6 +263,22 @@ export const Messages: React.FC = () => {
   });
 
   const unreadCount = messages.filter(m => !m.is_read).length;
+
+  if (!messagingEnabled) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-20 text-center space-y-4">
+        <Mail className="w-12 h-12 text-gray-400 mx-auto" />
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Direct Messaging Disabled</h2>
+        <p className="text-sm text-gray-500 dark:text-dark-muted">Direct messaging is currently disabled by administrator configuration on this ProGit server.</p>
+        <a
+          href="/"
+          className="inline-block px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-sm"
+        >
+          Return Home
+        </a>
+      </div>
+    );
+  }
 
   if (!user) {
     return (

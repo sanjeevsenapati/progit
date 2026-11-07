@@ -29,6 +29,7 @@ export const Navbar: React.FC = () => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [messagingEnabled, setMessagingEnabled] = useState(true);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -138,16 +139,29 @@ export const Navbar: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!user) return;
+    api.getFeatures().then(res => {
+      if (res && res.messaging_enabled !== undefined) {
+        setMessagingEnabled(res.messaging_enabled);
+      }
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!user || !messagingEnabled) return;
     const fetchUnread = () => {
       api.getUnreadMessageCount().then(data => {
-        setUnreadCount(data?.unread_count || 0);
+        if (data?.messaging_enabled === false) {
+          setMessagingEnabled(false);
+          setUnreadCount(0);
+        } else {
+          setUnreadCount(data?.unread_count || 0);
+        }
       }).catch(() => {});
     };
     fetchUnread();
     const timer = setInterval(fetchUnread, 30000);
     return () => clearInterval(timer);
-  }, [user]);
+  }, [user, messagingEnabled]);
 
   return (
     <nav className="border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface sticky top-0 z-50 transition-colors">
@@ -328,7 +342,7 @@ export const Navbar: React.FC = () => {
               {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-gray-600" />}
             </button>
 
-            {user && (
+            {user && messagingEnabled && (
               <a
                 href="/messages"
                 className="relative p-2 rounded-lg text-gray-500 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-dark-hover transition-colors"
@@ -405,17 +419,19 @@ export const Navbar: React.FC = () => {
                           <Building2 className="w-4 h-4 mr-2.5 text-gray-400" />
                           <span>Your Organizations</span>
                         </a>
-                        <a href="/messages" className="flex items-center justify-between px-4 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
-                          <div className="flex items-center">
-                            <Mail className="w-4 h-4 mr-2.5 text-gray-400" />
-                            <span>Messages</span>
-                          </div>
-                          {unreadCount > 0 && (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-xs font-bold">
-                              {unreadCount}
-                            </span>
-                          )}
-                        </a>
+                        {messagingEnabled && (
+                          <a href="/messages" className="flex items-center justify-between px-4 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+                            <div className="flex items-center">
+                              <Mail className="w-4 h-4 mr-2.5 text-gray-400" />
+                              <span>Messages</span>
+                            </div>
+                            {unreadCount > 0 && (
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-xs font-bold">
+                                {unreadCount}
+                              </span>
+                            )}
+                          </a>
+                        )}
                         <a href="/settings" className="flex items-center px-4 py-2 text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
                           <Settings className="w-4 h-4 mr-2.5 text-gray-400" />
                           <span>Settings</span>

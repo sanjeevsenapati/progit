@@ -13,6 +13,12 @@ import 'prismjs/components/prism-bash';
 import 'prismjs/components/prism-yaml';
 import 'prismjs/components/prism-sql';
 import 'prismjs/components/prism-markdown';
+import 'prismjs/components/prism-c';
+import 'prismjs/components/prism-cpp';
+import 'prismjs/components/prism-java';
+import 'prismjs/components/prism-rust';
+import 'prismjs/components/prism-docker';
+import 'prismjs/components/prism-ini';
 
 export type PrettierTheme = 'prettier-dark' | 'prettier-light' | 'prettier-midnight';
 
@@ -26,7 +32,12 @@ export const PRETTIER_THEMES: { id: PrettierTheme; label: string; bg: string; is
  * Detect language string for Prism from file path / extension
  */
 export function detectLanguage(filePath: string): string {
-  const ext = filePath.split('.').pop()?.toLowerCase() || '';
+  const fileName = filePath.split('/').pop()?.toLowerCase() || '';
+  if (fileName === 'dockerfile' || fileName === 'containerfile') {
+    return 'docker';
+  }
+
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
   switch (ext) {
     case 'js':
     case 'mjs':
@@ -54,6 +65,18 @@ export function detectLanguage(filePath: string): string {
       return 'go';
     case 'py':
       return 'python';
+    case 'c':
+    case 'h':
+      return 'c';
+    case 'cpp':
+    case 'cc':
+    case 'cxx':
+    case 'hpp':
+      return 'cpp';
+    case 'java':
+      return 'java';
+    case 'rs':
+      return 'rust';
     case 'sh':
     case 'bash':
     case 'zsh':
@@ -63,6 +86,12 @@ export function detectLanguage(filePath: string): string {
       return 'yaml';
     case 'sql':
       return 'sql';
+    case 'ini':
+    case 'conf':
+    case 'toml':
+      return 'ini';
+    case 'dockerfile':
+      return 'docker';
     case 'md':
     case 'markdown':
       return 'markdown';

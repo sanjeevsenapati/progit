@@ -17,6 +17,12 @@ type Config struct {
 	SSH        SSHConfig
 	Log        LogConfig
 	OIDC       OIDCConfig
+	Features   FeaturesConfig
+}
+
+// FeaturesConfig holds optional platform feature toggles.
+type FeaturesConfig struct {
+	EnableMessaging bool
 }
 
 // OIDCConfig holds OpenID Connect and OAuth2 Single Sign-On parameters.
@@ -147,6 +153,9 @@ func DefaultConfig() *Config {
 			DisplayName:   "Sign in with Google",
 			Scopes:        "openid email profile",
 			AutoProvision: true,
+		},
+		Features: FeaturesConfig{
+			EnableMessaging: true,
 		},
 	}
 }
@@ -311,6 +320,12 @@ func Load(configPath string) (*Config, error) {
 		cfg.OIDC.Enabled = true
 	}
 
+	if val := os.Getenv("PROGIT_ENABLE_MESSAGING"); val != "" {
+		cfg.Features.EnableMessaging = strings.ToLower(val) == "true" || val == "1"
+	} else if val := os.Getenv("PROGIT_FEATURES_ENABLE_MESSAGING"); val != "" {
+		cfg.Features.EnableMessaging = strings.ToLower(val) == "true" || val == "1"
+	}
+
 	// Ensure storage paths are absolute
 	if absRoot, err := filepath.Abs(cfg.Repository.Root); err == nil {
 		cfg.Repository.Root = absRoot
@@ -473,6 +488,11 @@ func parseINIFile(path string, cfg *Config) error {
 			case "AUTO_PROVISION":
 				cfg.OIDC.AutoProvision = val == "true" || val == "1"
 			}
+		case "features":
+			switch key {
+			case "ENABLE_MESSAGING", "MESSAGING_ENABLED":
+				cfg.Features.EnableMessaging = val == "true" || val == "1"
+			}
 		}
 	}
 	return scanner.Err()
@@ -544,6 +564,9 @@ func Save(configPath string, cfg *Config) error {
 		sb.WriteString(fmt.Sprintf("ALLOWED_DOMAINS = %s\n", cfg.OIDC.AllowedDomains))
 		sb.WriteString(fmt.Sprintf("AUTO_PROVISION = %v\n", cfg.OIDC.AutoProvision))
 	}
+
+	sb.WriteString("[features]\n")
+	sb.WriteString(fmt.Sprintf("ENABLE_MESSAGING = %v\n\n", cfg.Features.EnableMessaging))
 
 	return os.WriteFile(configPath, []byte(sb.String()), 0644)
 }

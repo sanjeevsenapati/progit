@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, Repository, PullRequest } from '../lib/api';
+import { useAuth } from '../lib/theme';
 import { RepoNav } from '../components/RepoNav';
 import { GitPullRequest, CheckCircle2, GitMerge, Plus } from 'lucide-react';
 
@@ -9,6 +10,7 @@ interface PullsListProps {
 }
 
 export const PullsList: React.FC<PullsListProps> = ({ owner, repo: repoName }) => {
+  const { user } = useAuth();
   const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
   const [pulls, setPulls] = useState<PullRequest[]>([]);
   const [stateFilter, setStateFilter] = useState<'open' | 'closed'>('open');
@@ -70,13 +72,22 @@ export const PullsList: React.FC<PullsListProps> = ({ owner, repo: repoName }) =
             </button>
           </div>
 
-          <a
-            href={`/${owner}/${repoName}/compare`}
-            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New pull request</span>
-          </a>
+          {user ? (
+            <a
+              href={`/${owner}/${repoName}/compare`}
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>New pull request</span>
+            </a>
+          ) : (
+            <a
+              href="/login"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text font-semibold text-xs shadow-xs transition-colors"
+            >
+              <span>Sign in to open pull request</span>
+            </a>
+          )}
         </div>
 
         <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-sm divide-y divide-gray-100 dark:divide-dark-border overflow-hidden">
