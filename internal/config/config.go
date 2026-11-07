@@ -271,9 +271,6 @@ func Load(configPath string) (*Config, error) {
 	}
 
 	// OpenID Connect (OIDC) & OAuth2 environment overrides
-	if val := os.Getenv("PROGIT_OIDC_ENABLED"); val != "" {
-		cfg.OIDC.Enabled = strings.ToLower(val) == "true" || val == "1"
-	}
 	if val := os.Getenv("PROGIT_OIDC_PROVIDER"); val != "" {
 		cfg.OIDC.Provider = strings.ToLower(val)
 	}
@@ -282,7 +279,6 @@ func Load(configPath string) (*Config, error) {
 	}
 	if val := os.Getenv("PROGIT_OIDC_CLIENT_ID"); val != "" {
 		cfg.OIDC.ClientID = val
-		cfg.OIDC.Enabled = true
 	}
 	if val := os.Getenv("PROGIT_OIDC_CLIENT_SECRET"); val != "" {
 		cfg.OIDC.ClientSecret = val
@@ -307,6 +303,12 @@ func Load(configPath string) (*Config, error) {
 	}
 	if val := os.Getenv("PROGIT_OIDC_AUTO_PROVISION"); val != "" {
 		cfg.OIDC.AutoProvision = strings.ToLower(val) == "true" || val == "1"
+	}
+	// Explicit PROGIT_OIDC_ENABLED flag takes precedence
+	if val := os.Getenv("PROGIT_OIDC_ENABLED"); val != "" {
+		cfg.OIDC.Enabled = strings.ToLower(val) == "true" || val == "1"
+	} else if cfg.OIDC.ClientID != "" {
+		cfg.OIDC.Enabled = true
 	}
 
 	// Ensure storage paths are absolute
@@ -454,7 +456,6 @@ func parseINIFile(path string, cfg *Config) error {
 				cfg.OIDC.DisplayName = val
 			case "CLIENT_ID":
 				cfg.OIDC.ClientID = val
-				cfg.OIDC.Enabled = true
 			case "CLIENT_SECRET":
 				cfg.OIDC.ClientSecret = val
 			case "ISSUER_URL":

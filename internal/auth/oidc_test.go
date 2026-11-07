@@ -29,6 +29,33 @@ func TestOIDCDomainAllowed(t *testing.T) {
 	}
 }
 
+func TestOIDCDisabledFlag(t *testing.T) {
+	cfg := config.OIDCConfig{
+		Enabled:      false, // Explicitly disabled
+		Provider:     "google",
+		ClientID:     "google-client-id-123",
+		ClientSecret: "google-secret",
+	}
+
+	if err := InitOIDC(cfg); err != nil {
+		t.Fatalf("InitOIDC failed: %v", err)
+	}
+
+	if IsOIDCEnabled() {
+		t.Errorf("Expected OIDC to be disabled when Enabled=false, but got true")
+	}
+
+	enabled, _, _ := GetOIDCInfo()
+	if enabled {
+		t.Errorf("Expected GetOIDCInfo enabled to be false")
+	}
+
+	_, err := BuildAuthURL("https://git.local/callback", "state123")
+	if err == nil {
+		t.Errorf("Expected BuildAuthURL to return error when OIDC is disabled")
+	}
+}
+
 func TestOIDCInitAndBuildAuthURL(t *testing.T) {
 	cfg := config.OIDCConfig{
 		Enabled:        true,
