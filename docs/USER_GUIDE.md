@@ -293,17 +293,29 @@ ProGit features interactive Kanban project boards for repositories to organize s
 
 ---
 
-## 11. Developer Direct Messaging
+## 11. Developer Direct Messaging & Collaboration
 
-ProGit includes an integrated messaging portal allowing developers to communicate directly without external tooling:
+ProGit includes a secure, privacy-preserving messaging portal allowing developers to collaborate directly without external tooling:
 
-### 11.1 Sending and Managing Messages
-- **Accessing Messages**: Click the **Messages** envelope icon in the top navigation header or navigate directly to `/messages`.
-- **Unread Notification Badge**: The navigation envelope badge displays a live counter of unread messages.
-- **Compose**: Click **New Message**, select a recipient developer from the active developer list, enter a subject line, and draft your message in Markdown.
-- **Threaded Replies**: Open any message from your Inbox and click **Reply** to respond with automated subject quoting (`Re: ...`).
-- **Inbox & Sent Tabs**: Switch between your received **Inbox** and sent **Outbox** items.
-- **Delete / Cleanup**: Delete messages from your view with a single click.
+### 11.1 Recipient Discovery & Anti-Enumeration Protection
+To safeguard user privacy and prevent account harvesting or credential scraping:
+- **No Account Dumps**: ProGit strictly disallows bulk account listing. User directories are never enumerated in dropdowns.
+- **Dynamic Search**: When composing a message, enter a username or numeric User ID. The system dynamically matches active developers and displays a search dropdown.
+- **Account Verification**: If a developer account exists, their profile chip and user ID are shown for selection. If no match is found, an explicit `"User does not exist"` alert is presented.
+- **Privacy Enforcement**: Unauthenticated requests to developer search endpoints are rejected (`401 Unauthorized`), and queries without search criteria return empty lists.
+
+### 11.2 Message Request & Acceptance Workflow
+Direct messages between developers require mutual consent to prevent unsolicited spam and harassment:
+1. **Initial Message Request**: When Developer A sends an initial message to Developer B, it enters the **Pending Request** state (`status = 'pending'`).
+2. **Review & Consent**: Developer B receives an action banner in their Inbox:
+   - **Accept Request**: Confirms the conversation (`status = 'accepted'`), unlocks the **Reply** button, and enables bidirectional messaging.
+   - **Decline Request**: Rejects the conversation (`status = 'rejected'`). Developer A is automatically sent a notification that their message request was declined, and further messages from Developer A to Developer B are strictly blocked (`403 Forbidden`).
+3. **Status Badges**: Conversations clearly display their state:
+   - `Request Pending` (Amber) - Awaiting receiver review.
+   - `Accepted` (Emerald) - Mutual conversation active; replies allowed.
+   - `Declined` (Red) - Request declined; replies blocked.
+4. **Threaded Replies**: Once accepted, either party can reply with automated subject quoting (`Re: ...`).
+5. **Inbox & Sent Mailboxes**: Switch between received and sent messages, and delete messages with confirmation.
 
 ---
 

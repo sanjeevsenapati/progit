@@ -130,10 +130,14 @@ Headers dispatched on deliveries:
   - Body: `{"new_owner": "dev_alice"}`
 - `DELETE /api/v1/repos/:owner/:repo` - Permanently delete repository and its bare Git storage.
 
-### 2.11 Developer Direct Messaging
-- `GET /api/v1/developers` - List all active platform developers for message targeting.
-- `POST /api/v1/messages` - Send a direct message to a developer.
+### 2.11 Developer Direct Messaging & Consent
+- `GET /api/v1/developers?q={query}` - Secure search for active platform developers by username or ID (requires authentication; returns `[]` if `q` is empty to prevent account enumeration).
+- `POST /api/v1/messages` - Send a message request to a developer by username or numeric ID.
   - Body: `{"recipient_username": "dev_bob", "subject": "Sprint Targets", "content": "Let's review the API spec."}`
+  - Returns `404 Not Found: "User does not exist"` if recipient not found.
+  - Returns `403 Forbidden` if recipient previously declined message requests from this account.
+- `POST /api/v1/messages/:id/accept` - Accept a pending message request (recipient only), unlocking reply capabilities.
+- `POST /api/v1/messages/:id/reject` - Decline a message request (recipient only). Automatically notifies sender and blocks future unsolicited messages.
 - `GET /api/v1/messages/inbox` - List received messages.
 - `GET /api/v1/messages/sent` - List sent messages outbox.
 - `GET /api/v1/messages/unread-count` - Get count of unread messages (`{"unread_count": N}`).
