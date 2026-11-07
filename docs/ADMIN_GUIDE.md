@@ -166,3 +166,72 @@ ACME_DIR = /data/config/https/acme
 REDIRECT_OTHER_PORT = true
 ```
 ProGit automatically responds to ACME challenges, issues certificates, and handles renewals.
+
+---
+
+## 5. OpenID Connect (OIDC) & OAuth2 Single Sign-On (SSO)
+
+ProGit features built-in support for OpenID Connect (OIDC) and OAuth2 identity providers, allowing developers to authenticate using their corporate Google Workspace, GitHub, Microsoft 365, or Keycloak credentials with automated Just-In-Time (JIT) account provisioning.
+
+### 5.1 Provider Presets & Configuration
+
+ProGit supports built-in presets for major identity providers or standard OIDC auto-discovery via `/.well-known/openid-configuration`:
+
+| Provider Preset | Parameter `PROVIDER` | Discovery / Auth Flow | Notes |
+| :--- | :--- | :--- | :--- |
+| **Google Workspace** | `google` | Auto-configured endpoints (`accounts.google.com`) | Ideal for corporate Google accounts |
+| **GitHub** | `github` | OAuth2 (`github.com/login/oauth/authorize`) | Standard developer OAuth2 login |
+| **Microsoft 365** | `microsoft` | Multi-tenant OIDC (`login.microsoftonline.com/common`) | Azure AD / Entra ID |
+| **Keycloak / Okta / Generic** | `keycloak` or `generic` | Auto-discovery via `ISSUER_URL` (`/.well-known/openid-configuration`) | Self-hosted or enterprise IDP |
+
+### 5.2 Configuration via `app.ini`
+
+Add the `[oidc]` section to `/data/config/app.ini`:
+
+```ini
+[oidc]
+ENABLED = true
+PROVIDER = google
+CLIENT_ID = your-client-id.apps.googleusercontent.com
+CLIENT_SECRET = your-google-client-secret
+DISPLAY_NAME = Google Workspace
+ALLOWED_DOMAINS = yourcompany.com,subsidiary.com
+AUTO_PROVISION = true
+```
+
+#### Generic OIDC / Keycloak Example:
+```ini
+[oidc]
+ENABLED = true
+PROVIDER = generic
+CLIENT_ID = progit-client
+CLIENT_SECRET = your-keycloak-secret
+ISSUER_URL = https://idp.yourcompany.com/realms/master
+DISPLAY_NAME = Corporate SSO
+ALLOWED_DOMAINS = yourcompany.com
+AUTO_PROVISION = true
+```
+
+### 5.3 Configuration via Environment Variables
+
+For container and cloud deployments, configure OIDC via `PROGIT_OIDC_*` environment variables:
+
+```bash
+PROGIT_OIDC_ENABLED="true"
+PROGIT_OIDC_PROVIDER="google"
+PROGIT_OIDC_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+PROGIT_OIDC_CLIENT_SECRET="your-client-secret"
+PROGIT_OIDC_DISPLAY_NAME="Google Workspace"
+PROGIT_OIDC_ALLOWED_DOMAINS="yourcompany.com"
+PROGIT_OIDC_AUTO_PROVISION="true"
+```
+
+> [!TIP]
+> **Explicit Disable**: To temporarily disable OIDC without removing credentials from environment files, set `PROGIT_OIDC_ENABLED="false"`. The explicit disable flag takes precedence over configured client credentials.
+
+### 5.4 Security & Domain Whitelisting
+
+- **Domain Restriction**: Setting `ALLOWED_DOMAINS` strictly rejects authentication attempts from email addresses outside authorized domain suffixes (e.g., blocks personal `@gmail.com` when only `@yourcompany.com` is whitelisted).
+- **Cryptographic State Protection**: Authentication requests generate a cryptographically random 32-byte CSRF token stored in a `SameSite=Lax`, `HttpOnly`, `Secure` cookie (`progit_oidc_state`). Mismatched or missing states are immediately rejected.
+- **Fail-Safe Local Authentication**: Standard database credentials remain active alongside SSO, ensuring administrators can access the system even during third-party IDP outages.
+

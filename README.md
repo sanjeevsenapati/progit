@@ -28,7 +28,7 @@ This static documentation suite is served via GitHub Pages with custom domain bi
 | :--- | :--- | :--- |
 | **[5-Minute Quickstart](docs/PODMAN_DEPLOYMENT.md)** | Instant deployment using official GHCR multi-arch container images | Everyone / DevOps |
 | **[Production Deployment](docs/DEPLOYMENT.md)** | Standalone binary, systemd, rootless Podman, and reverse proxies | System Administrators |
-| **[Admin & Configuration](docs/ADMIN_GUIDE.md)** | Super Admin setup, live base URL updates, and SSL/TLS configuration | Administrators |
+| **[Admin & SSO Configuration](docs/ADMIN_GUIDE.md)** | Super Admin setup, Google Workspace/OIDC SSO, and SSL/TLS configuration | Administrators |
 | **[User & Collaboration](docs/USER_GUIDE.md)** | Fast SPA workflows, Git Smart HTTP, native SSH, wikis, and pages | Software Developers |
 | **[System Architecture](docs/ARCHITECTURE.md)** | Pure-Go modular monolith, zero-CGO SQLite, and React 19 SPA | Architects & Engineers |
 | **[Enterprise HA & Commercial Model](docs/ENTERPRISE_HA_AND_BUSINESS_MODEL.md)** | Multi-node clustering, Patroni HA, CephFS/S3, and commercial tiers | Enterprise & IT Leads |

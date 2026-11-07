@@ -28,3 +28,10 @@ ProGit follows a **secure-by-default** model across application layers:
 - No elevated capabilities (`--cap-drop=ALL`).
 - Read-only container root with mounted writable volumes for `/data`.
 
+### 1.5 OpenID Connect (OIDC) & SSO Security
+- **Cryptographic CSRF Prevention**: The OIDC authorization flow generates a cryptographically secure 32-byte random `state` token using `crypto/rand`. This state is stored in an encrypted, `HttpOnly`, `SameSite=Lax`, `Secure` cookie (`progit_oidc_state`) with a 10-minute expiration. Callbacks with missing or mismatched states are immediately rejected.
+- **TLS-Only Token Exchange**: Authorization code exchange and ID token validation occur exclusively over outbound TLS connections directly between the ProGit server and the identity provider's token endpoint, preventing browser token interception.
+- **Corporate Domain Whitelisting**: Email addresses retrieved from the IDP are verified against the configured `ALLOWED_DOMAINS` whitelist. Attempts by users outside authorized organization domains are blocked before session creation.
+- **Fail-Safe Local Recovery**: Disabling OIDC via `PROGIT_OIDC_ENABLED=false` immediately takes precedence, and local administrator database credentials remain active to prevent lockouts during third-party identity provider outages.
+
+

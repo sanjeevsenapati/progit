@@ -22,6 +22,9 @@ Authentication endpoints (`/api/v1/auth/login`, `/api/v1/auth/register`) are rat
 ## 2. API Endpoints
 
 ### 2.1 Authentication & Profile
+- `GET /api/v1/auth/providers` - Get status of configured authentication providers (e.g. `{"local": true, "oidc": {"enabled": true, "provider": "google", "display_name": "Google Workspace"}}`).
+- `GET /api/v1/auth/oidc/login` - Initiate OpenID Connect SSO authentication flow. Generates secure CSRF `state` and redirects (HTTP 307) client to the identity provider authorization URL.
+- `GET /api/v1/auth/oidc/callback?code={code}&state={state}` - Handles OIDC / OAuth2 callback, validates cryptographic `state` against cookie, exchanges authorization code for user info, performs JIT provisioning, and sets session cookie.
 - `POST /api/v1/auth/register` - Create a new user account.
   - Body: `{"username": "alice", "email": "alice@example.com", "password": "securepassword", "full_name": "Alice Dev"}`
 - `POST /api/v1/auth/login` - Authenticate and create a session.
