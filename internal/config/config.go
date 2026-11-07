@@ -16,6 +16,23 @@ type Config struct {
 	Security   SecurityConfig
 	SSH        SSHConfig
 	Log        LogConfig
+	OIDC       OIDCConfig
+}
+
+// OIDCConfig holds OpenID Connect and OAuth2 Single Sign-On parameters.
+type OIDCConfig struct {
+	Enabled        bool
+	Provider       string // "google", "github", "microsoft", "keycloak", "generic"
+	DisplayName    string // Button label e.g. "Google Workspace", "Company SSO"
+	IssuerURL      string // e.g. "https://accounts.google.com" or "https://auth.example.com/realms/master"
+	ClientID       string
+	ClientSecret   string
+	Scopes         string // Defaults to "openid email profile"
+	AuthURL        string
+	TokenURL       string
+	UserInfoURL    string
+	AllowedDomains string // Comma-separated whitelist (e.g. "company.com,omc.co.in")
+	AutoProvision  bool
 }
 
 type ServerConfig struct {
@@ -123,6 +140,13 @@ func DefaultConfig() *Config {
 		Log: LogConfig{
 			Mode:  "console",
 			Level: "info",
+		},
+		OIDC: OIDCConfig{
+			Enabled:       false,
+			Provider:      "google",
+			DisplayName:   "Sign in with Google",
+			Scopes:        "openid email profile",
+			AutoProvision: true,
 		},
 	}
 }
@@ -244,6 +268,45 @@ func Load(configPath string) (*Config, error) {
 		cfg.Security.CookieSecure = strings.ToLower(val) == "true" || val == "1"
 	} else if cfg.Server.Protocol == "https" {
 		cfg.Security.CookieSecure = true
+	}
+
+	// OpenID Connect (OIDC) & OAuth2 environment overrides
+	if val := os.Getenv("PROGIT_OIDC_ENABLED"); val != "" {
+		cfg.OIDC.Enabled = strings.ToLower(val) == "true" || val == "1"
+	}
+	if val := os.Getenv("PROGIT_OIDC_PROVIDER"); val != "" {
+		cfg.OIDC.Provider = strings.ToLower(val)
+	}
+	if val := os.Getenv("PROGIT_OIDC_DISPLAY_NAME"); val != "" {
+		cfg.OIDC.DisplayName = val
+	}
+	if val := os.Getenv("PROGIT_OIDC_CLIENT_ID"); val != "" {
+		cfg.OIDC.ClientID = val
+		cfg.OIDC.Enabled = true
+	}
+	if val := os.Getenv("PROGIT_OIDC_CLIENT_SECRET"); val != "" {
+		cfg.OIDC.ClientSecret = val
+	}
+	if val := os.Getenv("PROGIT_OIDC_ISSUER_URL"); val != "" {
+		cfg.OIDC.IssuerURL = val
+	}
+	if val := os.Getenv("PROGIT_OIDC_AUTH_URL"); val != "" {
+		cfg.OIDC.AuthURL = val
+	}
+	if val := os.Getenv("PROGIT_OIDC_TOKEN_URL"); val != "" {
+		cfg.OIDC.TokenURL = val
+	}
+	if val := os.Getenv("PROGIT_OIDC_USERINFO_URL"); val != "" {
+		cfg.OIDC.UserInfoURL = val
+	}
+	if val := os.Getenv("PROGIT_OIDC_SCOPES"); val != "" {
+		cfg.OIDC.Scopes = val
+	}
+	if val := os.Getenv("PROGIT_OIDC_ALLOWED_DOMAINS"); val != "" {
+		cfg.OIDC.AllowedDomains = val
+	}
+	if val := os.Getenv("PROGIT_OIDC_AUTO_PROVISION"); val != "" {
+		cfg.OIDC.AutoProvision = strings.ToLower(val) == "true" || val == "1"
 	}
 
 	// Ensure storage paths are absolute
@@ -381,6 +444,34 @@ func parseINIFile(path string, cfg *Config) error {
 			case "LEVEL":
 				cfg.Log.Level = val
 			}
+		case "oidc", "oauth2":
+			switch key {
+			case "ENABLED":
+				cfg.OIDC.Enabled = val == "true" || val == "1"
+			case "PROVIDER":
+				cfg.OIDC.Provider = strings.ToLower(val)
+			case "DISPLAY_NAME":
+				cfg.OIDC.DisplayName = val
+			case "CLIENT_ID":
+				cfg.OIDC.ClientID = val
+				cfg.OIDC.Enabled = true
+			case "CLIENT_SECRET":
+				cfg.OIDC.ClientSecret = val
+			case "ISSUER_URL":
+				cfg.OIDC.IssuerURL = val
+			case "AUTH_URL":
+				cfg.OIDC.AuthURL = val
+			case "TOKEN_URL":
+				cfg.OIDC.TokenURL = val
+			case "USERINFO_URL":
+				cfg.OIDC.UserInfoURL = val
+			case "SCOPES":
+				cfg.OIDC.Scopes = val
+			case "ALLOWED_DOMAINS":
+				cfg.OIDC.AllowedDomains = val
+			case "AUTO_PROVISION":
+				cfg.OIDC.AutoProvision = val == "true" || val == "1"
+			}
 		}
 	}
 	return scanner.Err()
@@ -435,7 +526,23 @@ func Save(configPath string, cfg *Config) error {
 
 	sb.WriteString("[log]\n")
 	sb.WriteString(fmt.Sprintf("MODE = %s\n", cfg.Log.Mode))
-	sb.WriteString(fmt.Sprintf("LEVEL = %s\n", cfg.Log.Level))
+	sb.WriteString(fmt.Sprintf("LEVEL = %s\n\n", cfg.Log.Level))
+
+	if cfg.OIDC.Enabled {
+		sb.WriteString("[oidc]\n")
+		sb.WriteString(fmt.Sprintf("ENABLED = %v\n", cfg.OIDC.Enabled))
+		sb.WriteString(fmt.Sprintf("PROVIDER = %s\n", cfg.OIDC.Provider))
+		sb.WriteString(fmt.Sprintf("DISPLAY_NAME = %s\n", cfg.OIDC.DisplayName))
+		sb.WriteString(fmt.Sprintf("CLIENT_ID = %s\n", cfg.OIDC.ClientID))
+		sb.WriteString(fmt.Sprintf("CLIENT_SECRET = %s\n", cfg.OIDC.ClientSecret))
+		sb.WriteString(fmt.Sprintf("ISSUER_URL = %s\n", cfg.OIDC.IssuerURL))
+		sb.WriteString(fmt.Sprintf("AUTH_URL = %s\n", cfg.OIDC.AuthURL))
+		sb.WriteString(fmt.Sprintf("TOKEN_URL = %s\n", cfg.OIDC.TokenURL))
+		sb.WriteString(fmt.Sprintf("USERINFO_URL = %s\n", cfg.OIDC.UserInfoURL))
+		sb.WriteString(fmt.Sprintf("SCOPES = %s\n", cfg.OIDC.Scopes))
+		sb.WriteString(fmt.Sprintf("ALLOWED_DOMAINS = %s\n", cfg.OIDC.AllowedDomains))
+		sb.WriteString(fmt.Sprintf("AUTO_PROVISION = %v\n", cfg.OIDC.AutoProvision))
+	}
 
 	return os.WriteFile(configPath, []byte(sb.String()), 0644)
 }

@@ -135,6 +135,11 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("GET /api/ready", r.handleReady)
 	r.mux.HandleFunc("GET /api/v1/server/cert", r.handleDownloadCert)
 
+	// OIDC / OAuth2 SSO Endpoints
+	r.mux.HandleFunc("GET /api/v1/auth/providers", r.handleAuthProviders)
+	r.mux.HandleFunc("GET /api/v1/auth/oidc/login", r.handleOIDCLogin)
+	r.mux.HandleFunc("GET /api/v1/auth/oidc/callback", r.handleOIDCCallback)
+
 	// Auth Endpoints
 	r.mux.HandleFunc("POST /api/v1/auth/register", r.handleRegister)
 	r.mux.HandleFunc("POST /api/v1/auth/login", r.handleLogin)
@@ -520,6 +525,166 @@ func (r *Router) handleMe(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	jsonResponse(w, http.StatusOK, user)
+}
+
+func (r *Router) handleAuthProviders(w http.ResponseWriter, req *http.Request) {
+	enabled, provider, displayName := auth.GetOIDCInfo()
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"local": true,
+		"oidc": map[string]any{
+			"enabled":      enabled,
+			"provider":     provider,
+			"display_name": displayName,
+		},
+	})
+}
+
+func (r *Router) handleOIDCLogin(w http.ResponseWriter, req *http.Request) {
+	if !auth.IsOIDCEnabled() {
+		http.Redirect(w, req, "/login?error=oidc_disabled", http.StatusTemporaryRedirect)
+		return
+	}
+
+	state := auth.GenerateState()
+	http.SetCookie(w, &http.Cookie{
+		Name:     "progit_oidc_state",
+		Value:    state,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.cfg.Security.CookieSecure,
+		MaxAge:   600, // 10 minutes
+	})
+
+	rootURL := strings.TrimRight(r.cfg.Server.RootURL, "/")
+	redirectURI := fmt.Sprintf("%s/api/v1/auth/oidc/callback", rootURL)
+
+	authURL, err := auth.BuildAuthURL(redirectURI, state)
+	if err != nil {
+		http.Redirect(w, req, "/login?error=oidc_config_error", http.StatusTemporaryRedirect)
+		return
+	}
+
+	http.Redirect(w, req, authURL, http.StatusTemporaryRedirect)
+}
+
+func (r *Router) handleOIDCCallback(w http.ResponseWriter, req *http.Request) {
+	if !auth.IsOIDCEnabled() {
+		http.Redirect(w, req, "/login?error=oidc_disabled", http.StatusTemporaryRedirect)
+		return
+	}
+
+	cookie, err := req.Cookie("progit_oidc_state")
+	stateParam := req.URL.Query().Get("state")
+	if err != nil || cookie.Value == "" || cookie.Value != stateParam {
+		http.Redirect(w, req, "/login?error=invalid_state", http.StatusTemporaryRedirect)
+		return
+	}
+
+	// Invalidate state cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "progit_oidc_state",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+	})
+
+	code := req.URL.Query().Get("code")
+	if code == "" {
+		http.Redirect(w, req, "/login?error=missing_code", http.StatusTemporaryRedirect)
+		return
+	}
+
+	rootURL := strings.TrimRight(r.cfg.Server.RootURL, "/")
+	redirectURI := fmt.Sprintf("%s/api/v1/auth/oidc/callback", rootURL)
+
+	userInfo, err := auth.ExchangeCode(req.Context(), code, redirectURI)
+	if err != nil {
+		log.Printf("[OIDC] Token exchange error: %v", err)
+		if strings.Contains(err.Error(), "not authorized") {
+			http.Redirect(w, req, "/login?error=domain_not_allowed", http.StatusTemporaryRedirect)
+		} else {
+			http.Redirect(w, req, "/login?error=exchange_failed", http.StatusTemporaryRedirect)
+		}
+		return
+	}
+
+	user, err := database.GetUserByEmail(userInfo.Email)
+	if err != nil || user == nil {
+		if !r.cfg.OIDC.AutoProvision {
+			http.Redirect(w, req, "/login?error=user_not_provisioned", http.StatusTemporaryRedirect)
+			return
+		}
+
+		// Derive username
+		baseUsername := userInfo.PreferredUsername
+		if baseUsername == "" {
+			parts := strings.Split(userInfo.Email, "@")
+			baseUsername = parts[0]
+		}
+		baseUsername = strings.ToLower(baseUsername)
+
+		var cleanBuilder strings.Builder
+		for _, c := range baseUsername {
+			if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' {
+				cleanBuilder.WriteRune(c)
+			}
+		}
+		username := cleanBuilder.String()
+		if username == "" {
+			username = "user"
+		}
+
+		origUsername := username
+		counter := 1
+		for {
+			existing, _ := database.GetUserByUsername(username)
+			if existing == nil {
+				break
+			}
+			counter++
+			username = fmt.Sprintf("%s%d", origUsername, counter)
+		}
+
+		name := userInfo.Name
+		if name == "" {
+			name = username
+		}
+
+		placeholderHash, _ := auth.HashPassword(username + "-oidc-sso-pwd")
+		user, err = database.CreateUser(username, userInfo.Email, placeholderHash, name, false)
+		if err != nil {
+			log.Printf("[OIDC] Failed to provision user %s: %v", userInfo.Email, err)
+			http.Redirect(w, req, "/login?error=provision_failed", http.StatusTemporaryRedirect)
+			return
+		}
+		log.Printf("[OIDC] Provisioned new user '%s' (%s) via OpenID Connect", user.Username, user.Email)
+	}
+
+	if !user.IsActive {
+		http.Redirect(w, req, "/login?error=account_suspended", http.StatusTemporaryRedirect)
+		return
+	}
+
+	sess, err := auth.CreateSession(user.ID, user.Username)
+	if err != nil {
+		http.Redirect(w, req, "/login?error=session_failed", http.StatusTemporaryRedirect)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     auth.SessionCookieName,
+		Value:    sess.Token,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.cfg.Security.CookieSecure,
+		Expires:  sess.ExpiresAt,
+	})
+
+	log.Printf("[OIDC] User '%s' logged in via OpenID Connect", user.Username)
+	http.Redirect(w, req, "/dashboard", http.StatusTemporaryRedirect)
 }
 
 // User Dashboard & Exploration

@@ -73,6 +73,14 @@ func runWeb(args []string) {
 	}
 	log.Printf("[ProGit] SQLite database initialized successfully (WAL mode enabled)")
 
+	// Initialize OpenID Connect (OIDC) SSO Provider
+	if err := auth.InitOIDC(cfg.OIDC); err != nil {
+		log.Printf("[ProGit] Warning: Failed to initialize OIDC provider: %v", err)
+	} else if auth.IsOIDCEnabled() {
+		log.Printf("[ProGit] OpenID Connect (OIDC) SSO enabled (Provider: %s, Display: %s)",
+			cfg.OIDC.Provider, cfg.OIDC.DisplayName)
+	}
+
 	// Auto-initialize Super Admin from environment if configured
 	if adminUser := os.Getenv("PROGIT_ADMIN_USER"); adminUser != "" {
 		adminEmail := os.Getenv("PROGIT_ADMIN_EMAIL")
