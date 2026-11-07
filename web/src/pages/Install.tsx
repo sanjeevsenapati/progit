@@ -26,7 +26,11 @@ export const Install: React.FC = () => {
     async function checkStatus() {
       try {
         const s = await api.getInstallStatus();
-        setInstallLocked(s.install_locked);
+        if (s.install_locked) {
+          navigate('/login');
+          return;
+        }
+        setInstallLocked(false);
         if (s.app_name) setAppName(s.app_name);
         if (s.domain) setDomain(s.domain);
         if (s.protocol && (s.protocol === 'http' || s.protocol === 'https')) {
@@ -35,8 +39,8 @@ export const Install: React.FC = () => {
         if (s.http_port) setHttpPort(s.http_port);
         if (s.https_port) setHttpsPort(s.https_port);
         if (s.root_url) setRootUrl(s.root_url);
-      } catch (err) {
-        console.error(err);
+      } catch {
+        navigate('/login');
       } finally {
         setLoading(false);
       }
@@ -121,24 +125,12 @@ export const Install: React.FC = () => {
 
   if (installLocked) {
     return (
-      <div className="max-w-xl mx-auto my-16 px-4">
-        <div className="bg-white dark:bg-dark-surface p-8 rounded-xl border border-gray-200 dark:border-dark-border shadow-sm text-center space-y-4">
-          <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center">
-            <CheckCircle2 className="w-6 h-6" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">ProGit Is Already Installed</h2>
-          <p className="text-sm text-gray-600 dark:text-dark-muted">
-            The installation has already been completed and locked. You can sign in using your Super Administrator account.
-          </p>
-          <div className="pt-2">
-            <a
-              href="/login"
-              className="inline-block px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-colors shadow-sm"
-            >
-              Go to Sign In
-            </a>
-          </div>
-        </div>
+      <div className="py-24 text-center space-y-3">
+        <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white">404</h1>
+        <p className="text-sm text-gray-500 dark:text-dark-muted">The requested page does not exist.</p>
+        <a href="/login" className="inline-block text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
+          Return to Sign In
+        </a>
       </div>
     );
   }

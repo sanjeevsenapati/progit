@@ -178,6 +178,22 @@ func TestInstallAndSuperAdminWorkflow(t *testing.T) {
 		t.Fatalf("expected user to be admin, got %v", uMap)
 	}
 
+	// 2.1 Verify install endpoints are strictly LOCKED once installed
+	reqStatusLocked := httptest.NewRequest("GET", "/api/v1/install/status", nil)
+	recStatusLocked := httptest.NewRecorder()
+	router.ServeHTTP(recStatusLocked, reqStatusLocked)
+	if recStatusLocked.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden for install status after installation, got %d", recStatusLocked.Code)
+	}
+
+	reqInstallLocked := httptest.NewRequest("POST", "/api/v1/install", bytes.NewReader(installBytes))
+	reqInstallLocked.Header.Set("Content-Type", "application/json")
+	recInstallLocked := httptest.NewRecorder()
+	router.ServeHTTP(recInstallLocked, reqInstallLocked)
+	if recInstallLocked.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden for POST install after installation, got %d", recInstallLocked.Code)
+	}
+
 	// 3. Admin creates another user
 	createUserBody := map[string]any{
 		"username":  "dev_user",

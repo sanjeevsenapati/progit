@@ -3852,11 +3852,14 @@ func htmlEscape(s string) string {
 
 func (r *Router) handleInstallStatus(w http.ResponseWriter, req *http.Request) {
 	userCount, _ := database.CountUsers()
-	locked := r.cfg.Security.InstallLock && userCount > 0
+	if r.cfg.Security.InstallLock || userCount > 0 {
+		jsonError(w, http.StatusForbidden, "Installation wizard is permanently locked and disabled")
+		return
+	}
 
 	jsonResponse(w, http.StatusOK, map[string]any{
-		"install_locked":    locked,
-		"users_count":       userCount,
+		"install_locked":    false,
+		"users_count":       0,
 		"app_name":          r.cfg.Server.AppName,
 		"domain":            r.cfg.Server.Domain,
 		"http_port":         r.cfg.Server.HTTPPort,
@@ -3871,8 +3874,8 @@ func (r *Router) handleInstallStatus(w http.ResponseWriter, req *http.Request) {
 
 func (r *Router) handleInstall(w http.ResponseWriter, req *http.Request) {
 	userCount, _ := database.CountUsers()
-	if r.cfg.Security.InstallLock && userCount > 0 {
-		jsonError(w, http.StatusForbidden, "Installation is already completed and locked")
+	if r.cfg.Security.InstallLock || userCount > 0 {
+		jsonError(w, http.StatusForbidden, "Installation wizard is permanently locked and disabled")
 		return
 	}
 

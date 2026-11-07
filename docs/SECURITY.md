@@ -34,4 +34,11 @@ ProGit follows a **secure-by-default** model across application layers:
 - **Corporate Domain Whitelisting**: Email addresses retrieved from the IDP are verified against the configured `ALLOWED_DOMAINS` whitelist. Attempts by users outside authorized organization domains are blocked before session creation.
 - **Fail-Safe Local Recovery**: Disabling OIDC via `PROGIT_OIDC_ENABLED=false` immediately takes precedence, and local administrator database credentials remain active to prevent lockouts during third-party identity provider outages.
 
+### 1.6 Installation Wizard Lockdown & Account Takeover Prevention
+- **Automatic Install Locking**: On startup and immediately following the initial setup wizard, ProGit checks if any user accounts exist in the database. If detected, `INSTALL_LOCK = true` is permanently enforced and written to `app.ini`.
+- **Browser Route Disabling**: Direct browser navigation to `/install` or `/install/` immediately triggers an HTTP 307 redirect to `/login` or renders a clean 404 page, preventing attackers or curious users from seeing the installation form.
+- **API Information Cloaking**: When locked, `GET /api/v1/install/status` and `POST /api/v1/install` return an immediate HTTP 403 Forbidden without leaking database paths, repository directories, internal ports, or user counts.
+- **Ops CLI Exclusivity**: Post-installation user provisioning, password resets, and admin privilege grants are performed exclusively via authenticated admin sessions or the host/container CLI (`progit admin reset-password`, `progit admin make-admin`, `progit admin create-user`).
+
+
 

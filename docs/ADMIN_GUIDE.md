@@ -31,22 +31,47 @@ PROGIT_ADMIN_PASSWORD="YourSecurePassword123!"
 ```
 On startup, ProGit automatically verifies if the Super Admin user exists; if not, it initializes the account with `is_admin = true`.
 
-### Method C: Command-Line Interface (CLI)
-At any time, you can create a Super Admin user directly from the host or inside a container:
+### Method C: Command-Line Interface (CLI Operations)
+At any time, the Ops team can manage administrators and users directly from the command line without using the web browser:
 
-**Inside Podman Container:**
+**1. Create a New Administrator:**
 ```bash
+# Inside Podman Container
 podman exec -it progit /usr/local/bin/progit admin create-user \
-  --username="admin" \
-  --email="admin@example.com" \
+  --username="opsadmin" \
+  --email="ops@example.com" \
   --password="SecurePassword123!" \
   --admin
+
+# Using Local Binary
+./progit admin create-user --username="opsadmin" --email="ops@example.com" --password="SecurePassword123!" --admin
 ```
 
-**Using the Local Binary / Script:**
+**2. Reset an Administrator / User Password:**
 ```bash
-./progit admin create-user --username="admin" --email="admin@example.com" --password="SecurePassword123!" --admin
+podman exec -it progit /usr/local/bin/progit admin reset-password \
+  --username="admin" \
+  --password="NewSecurePassword456!"
 ```
+
+**3. Promote an Existing User to Administrator:**
+```bash
+podman exec -it progit /usr/local/bin/progit admin make-admin --username="developer1"
+```
+
+**4. List All Users & Administrative Roles:**
+```bash
+podman exec -it progit /usr/local/bin/progit admin list-users
+```
+
+**5. Permanently Lock the Web Installation Wizard:**
+```bash
+podman exec -it progit /usr/local/bin/progit admin lock-install
+```
+
+> [!IMPORTANT]
+> **Automatic Defense-in-Depth Installation Locking**:
+> Once an administrator or any user account exists in the database, ProGit automatically locks the installation wizard (`INSTALL_LOCK = true`) and persists it to `app.ini`. All subsequent web browser requests to `/install` are immediately redirected to `/login` (returning HTTP 403 / 404 to API clients) to prevent account hijacking or unauthorized reconfiguration.
 
 ---
 

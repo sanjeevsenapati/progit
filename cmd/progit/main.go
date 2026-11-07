@@ -100,6 +100,13 @@ func runWeb(args []string) {
 		}
 	}
 
+	// Security: If any users exist in the database, automatically enforce INSTALL_LOCK
+	if userCount, _ := database.CountUsers(); userCount > 0 && !cfg.Security.InstallLock {
+		cfg.Security.InstallLock = true
+		_ = config.Save(*configPath, cfg)
+		log.Printf("[Security] Users detected (%d). Automatically enforced INSTALL_LOCK = true", userCount)
+	}
+
 	// Start built-in SSH Server
 	var sshServer *ssh.Server
 	if cfg.SSH.Enabled {
@@ -130,6 +137,15 @@ func runWeb(args []string) {
 		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/pages/") || r.URL.Path == "/pages" {
 			apiRouter.ServeHTTP(w, r)
 			return
+		}
+
+		// Security: Immediately redirect browser requests for /install to /login once ProGit is installed
+		if r.URL.Path == "/install" || r.URL.Path == "/install/" {
+			userCount, _ := database.CountUsers()
+			if cfg.Security.InstallLock || userCount > 0 {
+				http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+				return
+			}
 		}
 
 		// 3. Fallback to Web UI SPA
@@ -256,38 +272,185 @@ func runWeb(args []string) {
 
 func runAdmin(args []string) {
 	if len(args) == 0 {
-		fmt.Println("Usage: progit admin create-user --username=<user> --email=<email> --password=<pass> [--admin]")
+		fmt.Println("ProGit Admin CLI:")
+		fmt.Println("  progit admin create-user --username=<user> --email=<email> --password=<pass> [--admin]")
+		fmt.Println("  progit admin reset-password --username=<user> --password=<new-pass>")
+		fmt.Println("  progit admin make-admin --username=<user>")
+		fmt.Println("  progit admin list-users")
+		fmt.Println("  progit admin lock-install")
 		return
 	}
 
-	fs := flag.NewFlagSet("create-user", flag.ExitOnError)
-	configPath := fs.String("config", "", "Custom configuration file path")
-	username := fs.String("username", "", "Username")
-	email := fs.String("email", "", "Email address")
-	password := fs.String("password", "", "Password")
-	isAdmin := fs.Bool("admin", false, "Grant administrator permissions")
-	_ = fs.Parse(args[1:])
+	subcmd := args[0]
+	switch subcmd {
+	case "create-user":
+		fs := flag.NewFlagSet("create-user", flag.ExitOnError)
+		configPath := fs.String("config", "", "Custom configuration file path")
+		username := fs.String("username", "", "Username")
+		email := fs.String("email", "", "Email address")
+		password := fs.String("password", "", "Password")
+		isAdmin := fs.Bool("admin", false, "Grant administrator permissions")
+		_ = fs.Parse(args[1:])
 
-	cfg, _ := config.Load(*configPath)
-	if err := database.Init(cfg); err != nil {
-		log.Fatalf("Database initialization failed: %v", err)
+		cfg, _ := config.Load(*configPath)
+		if err := database.Init(cfg); err != nil {
+			log.Fatalf("Database initialization failed: %v", err)
+		}
+
+		if *username == "" || *email == "" || *password == "" {
+			log.Fatal("Username, email, and password are required")
+		}
+
+		hash, err := auth.HashPassword(*password)
+		if err != nil {
+			log.Fatalf("Failed to hash password: %v", err)
+		}
+
+		u, err := database.CreateUser(*username, *email, hash, *username, *isAdmin)
+		if err != nil {
+			log.Fatalf("Failed to create user: %v", err)
+		}
+
+		// Automatically lock installation once an admin or user is created via CLI
+		if !cfg.Security.InstallLock {
+			cfg.Security.InstallLock = true
+			_ = config.Save(*configPath, cfg)
+		}
+
+		fmt.Printf("User '%s' (ID: %d, Admin: %v) created successfully\n", u.Username, u.ID, u.IsAdmin)
+
+	case "reset-password":
+		fs := flag.NewFlagSet("reset-password", flag.ExitOnError)
+		configPath := fs.String("config", "", "Custom configuration file path")
+		username := fs.String("username", "", "Username to reset password for")
+		password := fs.String("password", "", "New password")
+		_ = fs.Parse(args[1:])
+
+		if *username == "" || *password == "" {
+			log.Fatal("Both --username and --password are required")
+		}
+		if len(*password) < 6 {
+			log.Fatal("Password must be at least 6 characters")
+		}
+
+		cfg, _ := config.Load(*configPath)
+		if err := database.Init(cfg); err != nil {
+			log.Fatalf("Database initialization failed: %v", err)
+		}
+
+		u, err := database.GetUserByUsername(*username)
+		if err != nil || u == nil {
+			log.Fatalf("User '%s' not found", *username)
+		}
+
+		hash, err := auth.HashPassword(*password)
+		if err != nil {
+			log.Fatalf("Failed to hash password: %v", err)
+		}
+
+		if err := database.UpdateUserPasswordHash(u.ID, hash); err != nil {
+			log.Fatalf("Failed to update password: %v", err)
+		}
+
+		fmt.Printf("Password for user '%s' (ID: %d) updated successfully\n", u.Username, u.ID)
+
+	case "make-admin":
+		fs := flag.NewFlagSet("make-admin", flag.ExitOnError)
+		configPath := fs.String("config", "", "Custom configuration file path")
+		username := fs.String("username", "", "Username to promote to administrator")
+		_ = fs.Parse(args[1:])
+
+		if *username == "" {
+			log.Fatal("--username is required")
+		}
+
+		cfg, _ := config.Load(*configPath)
+		if err := database.Init(cfg); err != nil {
+			log.Fatalf("Database initialization failed: %v", err)
+		}
+
+		u, err := database.GetUserByUsername(*username)
+		if err != nil || u == nil {
+			log.Fatalf("User '%s' not found", *username)
+		}
+
+		if err := database.UpdateUserAdmin(u.ID, true); err != nil {
+			log.Fatalf("Failed to promote user: %v", err)
+		}
+
+		fmt.Printf("User '%s' (ID: %d) successfully promoted to Administrator\n", u.Username, u.ID)
+
+	case "list-users":
+		fs := flag.NewFlagSet("list-users", flag.ExitOnError)
+		configPath := fs.String("config", "", "Custom configuration file path")
+		_ = fs.Parse(args[1:])
+
+		cfg, _ := config.Load(*configPath)
+		if err := database.Init(cfg); err != nil {
+			log.Fatalf("Database initialization failed: %v", err)
+		}
+
+		users, err := database.ListUsers(100, 0)
+		if err != nil {
+			log.Fatalf("Failed to list users: %v", err)
+		}
+
+		fmt.Printf("%-6s %-20s %-30s %-10s %-8s\n", "ID", "USERNAME", "EMAIL", "ADMIN", "ACTIVE")
+		fmt.Println(strings.Repeat("-", 80))
+		for _, u := range users {
+			fmt.Printf("%-6d %-20s %-30s %-10t %-8t\n", u.ID, u.Username, u.Email, u.IsAdmin, u.IsActive)
+		}
+
+	case "lock-install":
+		fs := flag.NewFlagSet("lock-install", flag.ExitOnError)
+		configPath := fs.String("config", "", "Custom configuration file path")
+		_ = fs.Parse(args[1:])
+
+		cfg, _ := config.Load(*configPath)
+		cfg.Security.InstallLock = true
+		if err := config.Save(*configPath, cfg); err != nil {
+			log.Fatalf("Failed to lock installation: %v", err)
+		}
+		fmt.Println("ProGit installation wizard is permanently LOCKED in config.")
+
+	default:
+		// Backwards compatibility if user ran `progit admin --username=...`
+		fs := flag.NewFlagSet("create-user", flag.ExitOnError)
+		configPath := fs.String("config", "", "Custom configuration file path")
+		username := fs.String("username", "", "Username")
+		email := fs.String("email", "", "Email address")
+		password := fs.String("password", "", "Password")
+		isAdmin := fs.Bool("admin", false, "Grant administrator permissions")
+		_ = fs.Parse(args)
+
+		cfg, _ := config.Load(*configPath)
+		if err := database.Init(cfg); err != nil {
+			log.Fatalf("Database initialization failed: %v", err)
+		}
+
+		if *username == "" || *email == "" || *password == "" {
+			fmt.Printf("Unknown admin subcommand '%s'\n", subcmd)
+			fmt.Println("Available commands: create-user, reset-password, make-admin, list-users, lock-install")
+			return
+		}
+
+		hash, err := auth.HashPassword(*password)
+		if err != nil {
+			log.Fatalf("Failed to hash password: %v", err)
+		}
+
+		u, err := database.CreateUser(*username, *email, hash, *username, *isAdmin)
+		if err != nil {
+			log.Fatalf("Failed to create user: %v", err)
+		}
+
+		if !cfg.Security.InstallLock {
+			cfg.Security.InstallLock = true
+			_ = config.Save(*configPath, cfg)
+		}
+
+		fmt.Printf("User '%s' (ID: %d, Admin: %v) created successfully\n", u.Username, u.ID, u.IsAdmin)
 	}
-
-	if *username == "" || *email == "" || *password == "" {
-		log.Fatal("Username, email, and password are required")
-	}
-
-	hash, err := auth.HashPassword(*password)
-	if err != nil {
-		log.Fatalf("Failed to hash password: %v", err)
-	}
-
-	u, err := database.CreateUser(*username, *email, hash, *username, *isAdmin)
-	if err != nil {
-		log.Fatalf("Failed to create user: %v", err)
-	}
-
-	fmt.Printf("User '%s' (ID: %d, Admin: %v) created successfully\n", u.Username, u.ID, u.IsAdmin)
 }
 
 func runBackup(args []string) {
