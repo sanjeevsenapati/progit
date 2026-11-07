@@ -106,10 +106,17 @@ ProGit features a GitHub-style two-column file explorer interface:
 - **Clickable Line Anchors & Permalinks**: Click any line number in the code viewer to jump to that line and automatically copy the permalink (`#L42`) to your clipboard.
 - **Git Blame View**: Switch between **Code** and **Blame** tabs to inspect line-by-line history, including commit author, short SHA, commit summary, and relative date.
 
-### 3.1 Online File Creation and Editing
-- **Create New File**: Click **Add file > Create new file** or click the `+` icon in the explorer sidebar. You can type nested paths (e.g. `src/utils/math.js`) and ProGit will automatically create the required directories. Enter your code, format with the **Format with Prettier** button, choose to commit directly or to a new branch, and click **Commit changes**.
+### 3.1 Online File Creation and Colorful Syntax Highlighting Editor
+ProGit features a responsive, full-featured web code editor with live syntax highlighting:
+- **Live Colorful Syntax Highlighting**: Real-time Prism-powered syntax highlighting renders as you type with vibrant token palettes (keywords in purple, strings in green, functions in blue, numbers/booleans in orange, tags/properties in coral, and comments in italic gray).
+- **Synchronized Typography & Line Numbers**: Pixel-perfect alignment between code line numbers, transparent interactive editing textarea, and syntax underlay.
+- **Language Auto-Detection & Override**: The editor automatically detects languages from file extensions (Go, Python, TypeScript, JavaScript, Rust, C, C++, Java, Bash/Shell, SQL, JSON, YAML, HTML, CSS, Markdown, Dockerfile, INI/Config). You can also manually switch syntax highlighters using the **Language** dropdown.
+- **Syntax Highlighting Toggle**: Quickly switch between live colorful syntax highlighting and plain text mode with the 1-click **Syntax: Colorful / Plain** toggle.
+- **Indentation Controls**: Toggle between 2 spaces and 4 spaces indentation on the fly, with automated Tab key capture.
+- **Prettier Code Formatting**: 1-click **Format with Prettier** button standardizes indentation, brackets, JSON syntax, and spacing.
+- **Real-Time Coordinates**: Status footer reports live cursor coordinates (`Ln X, Col Y`), total line count, character count, file size, encoding (UTF-8), and auto light/dark theme adaptation.
+- **Create New File**: Click **Add file > Create new file** or click the `+` icon in the explorer sidebar. You can type nested paths (e.g. `src/utils/math.js`) and ProGit will automatically create the required directories.
 - **Edit Existing File**: In the file view (`FileView`), click the **Edit** (pencil) button. This opens the online editor with the same explorer sidebar, auto-theme matching, line numbers, and a **Preview** tab for Markdown files.
-- **Prettier Code Formatting**: 1-click **Format with Prettier** button automatically formats TypeScript, JavaScript, JSON, CSS, and Markdown.
 
 ### 3.2 Uploading Files and Directories
 - Click **Add file > Upload files** from any repository code view.
@@ -132,15 +139,18 @@ ProGit features a GitHub-style two-column file explorer interface:
 3. Add comments, assign team members, and track status.
 
 ### 4.2 Pull Requests & Merges
-1. Navigate to the **Pull Requests** tab and click **New Pull Request** (or use the 1-click banner on recently pushed branches).
-2. Select your head branch and target base branch.
-3. Review the live diff comparison of files changed.
-4. Click **Create Pull Request**.
-5. **Split Diff vs. Unified Diff**: Use the mode toggle on the review bar to switch between side-by-side **Split Diff** and classic **Unified Diff**.
-6. **Changed Files Sidebar**: Sticky file list on the left displays all changed files with additions and deletions counts; click any file to jump directly to its diff.
-7. **Line-by-Line Review**: Click the `+` icon on any line to leave an inline review comment.
-8. **Auto-Closing Issues**: Referencing issues in PR descriptions or commit messages using `Fixes #X`, `Closes #X`, or `Resolves #X` automatically closes the referenced issues when the PR is merged.
-9. **Post-Merge Branch Deletion**: Once merged, a 1-click **Delete branch** button is displayed to immediately delete the head branch and keep the repository clean.
+- **Public Visibility Without Login**: Pull requests on public repositories are accessible to the public without requiring a login, allowing open-source communities and external developers to browse code reviews, compare diffs, and inspect review comments.
+- **Role-Based Merge & Review Security**: The **Merge pull request** button, merge strategy dropdown (Create merge commit, Squash and merge, Rebase and merge), and review changes panel are strictly protected. They are displayed and operable **only** for authenticated users who are:
+  1. Repository collaborators / members with write permissions, OR
+  2. The original author (requester) of the pull request.
+- **Unauthenticated Visitor Experience**: Anonymous visitors browsing a pull request see the complete conversation and diffs, accompanied by an informational banner: `"Pull requests are open for public viewing. Sign in to merge or review this pull request"`.
+- **Third-Party Logged-In User Experience**: Authenticated users who are not repository collaborators and not the pull request author see a clear notice: `"Merge options are restricted to repository members and the pull request author"`. Direct API merge attempts from unauthorized users are rejected with `403 Forbidden`.
+- **New Pull Request Gating**: The **New pull request** button is visible exclusively to logged-in users. Anonymous visitors see a prompt to log in before creating a pull request.
+- **Split Diff vs. Unified Diff**: Use the mode toggle on the review bar to switch between side-by-side **Split Diff** and classic **Unified Diff**.
+- **Changed Files Sidebar**: Sticky file list on the left displays all changed files with additions and deletions counts; click any file to jump directly to its diff.
+- **Line-by-Line Review**: Logged-in users can click the `+` icon on any line to leave an inline review comment.
+- **Auto-Closing Issues**: Referencing issues in PR descriptions or commit messages using `Fixes #X`, `Closes #X`, or `Resolves #X` automatically closes the referenced issues when the PR is merged.
+- **Post-Merge Branch Deletion**: Once merged, a 1-click **Delete branch** button is displayed to immediately delete the head branch and keep the repository clean.
 
 ---
 
@@ -316,6 +326,18 @@ Direct messages between developers require mutual consent to prevent unsolicited
    - `Declined` (Red) - Request declined; replies blocked.
 4. **Threaded Replies**: Once accepted, either party can reply with automated subject quoting (`Re: ...`).
 5. **Inbox & Sent Mailboxes**: Switch between received and sent messages, and delete messages with confirmation.
+
+### 11.3 Platform Feature Toggle (`ENABLE_MESSAGING`)
+Server administrators can enable or disable direct developer messaging globally:
+- **Configuration**:
+  - `conf/app.ini`: Set `[features] ENABLE_MESSAGING = false`
+  - Environment Variable: Set `PROGIT_ENABLE_MESSAGING=false` (or `PROGIT_FEATURES_ENABLE_MESSAGING=false`)
+- **Seamless UI Adaptation**:
+  - When disabled, the navigation envelope icon and unread polling are completely hidden.
+  - Direct messaging links in user menus are removed.
+  - If a user navigates directly to `/messages`, a dedicated `"Direct Messaging Disabled"` screen is presented.
+  - Backend messaging API endpoints return `403 Forbidden` (`{"error": "Direct messaging feature is disabled on this server"}`).
+- **Default State**: Enabled (`true`) by default for backward compatibility.
 
 ---
 

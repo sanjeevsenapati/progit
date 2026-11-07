@@ -260,3 +260,37 @@ PROGIT_OIDC_AUTO_PROVISION="true"
 - **Cryptographic State Protection**: Authentication requests generate a cryptographically random 32-byte CSRF token stored in a `SameSite=Lax`, `HttpOnly`, `Secure` cookie (`progit_oidc_state`). Mismatched or missing states are immediately rejected.
 - **Fail-Safe Local Authentication**: Standard database credentials remain active alongside SSO, ensuring administrators can access the system even during third-party IDP outages.
 
+---
+
+## 6. Platform Feature Flags & Collaboration Security
+
+### 6.1 Developer Direct Messaging Feature Flag (`ENABLE_MESSAGING`)
+Administrators can enable or disable developer direct messaging globally across the instance:
+
+**Configuration in `conf/app.ini`:**
+```ini
+[features]
+ENABLE_MESSAGING = true   ; Set to false to disable messaging entirely
+```
+
+**Configuration via Environment Variables:**
+```bash
+PROGIT_ENABLE_MESSAGING="false"            # Disables messaging
+# or
+PROGIT_FEATURES_ENABLE_MESSAGING="false"
+```
+
+**Enforcement Behavior:**
+- **Navigation & Polling**: The messages envelope icon is completely removed from the navbar header, unread polling is stopped, and "Messages" is hidden from user menus.
+- **API Guarding**: All messaging endpoints (`POST /api/v1/messages`, `GET /api/v1/messages/inbox`, `GET /api/v1/messages/sent`, `GET /api/v1/developers`, etc.) return `403 Forbidden` with a descriptive error message.
+- **Direct Navigation**: Visiting `/messages` renders a clean "Direct Messaging Disabled" informational screen.
+
+### 6.2 Pull Request Permissions & Public Visibility
+ProGit implements a granular, zero-trust permission model for pull requests on public repositories:
+- **Public Browsing (Anonymous / Unauthenticated)**: Anyone can view pull requests, commit lists, diffs, and review comments on public repositories without logging in.
+- **Restricted Creation**: Only authenticated (logged-in) users can create pull requests.
+- **Restricted Merge Execution**: The **Merge** action and merge strategy selector (Create merge commit, Squash and merge, Rebase and merge) are strictly restricted to:
+  1. Repository collaborators / members with write permissions, OR
+  2. The author (requester) of the pull request.
+- **API Defense**: Direct HTTP POST requests to `/api/v1/repos/{owner}/{repo}/pulls/{index}/merge` require a valid session (`401 Unauthorized` for anonymous requests) and verify that the user is either a repo collaborator or the PR author (`403 Forbidden` for other logged-in users).
+
