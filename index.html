@@ -1855,6 +1855,15 @@ AUTO_PROVISION = true</code><button class="copy-btn" onclick="copyCode(this)">Co
           </table>
         </div>
 
+        <h2>Live Colorful Syntax Highlighting &amp; Language Switcher</h2>
+        <p>The ProGit web editor features an integrated live code engine with real-time syntax tokenization:</p>
+        <ul>
+          <li><strong>Vibrant Token Highlighting</strong>: Syntax is colorized live as you type &mdash; keywords in purple, strings in green, functions in blue, numbers/booleans in orange, tags/properties in coral, and comments in italic gray.</li>
+          <li><strong>Language Auto-Detection &amp; Manual Override</strong>: Automatically detects programming languages from file extensions (TypeScript, JavaScript, Go, Python, Rust, C, C++, Java, Shell, SQL, JSON, YAML, HTML, CSS, Markdown, Dockerfile, INI) or lets you switch parsers from the <strong>Language</strong> dropdown.</li>
+          <li><strong>Live Syntax Toggle</strong>: Switch seamlessly between live colorful syntax highlighting and plain text mode with 1 click.</li>
+          <li><strong>Real-Time Status Coordinates</strong>: Status footer displays live line &amp; column cursor coordinates (<code>Ln X, Col Y</code>), total line count, character count, file size, active language chip, tab indentation selector (2 vs 4 spaces), and auto light/dark theme adaptation.</li>
+        </ul>
+
         <h2>Online Commits</h2>
         <p>Edit any file, provide a custom commit message and optional extended description, and choose between committing directly to the active branch or creating a new feature branch.</p>
 
@@ -1953,6 +1962,15 @@ AUTO_PROVISION = true</code><button class="copy-btn" onclick="copyCode(this)">Co
 
         <h2>Native Git Merges</h2>
         <p>Authorized reviewers and repository owners can execute a native Git merge with a single click. ProGit performs the merge on the server side and commits the merge commit to the target branch.</p>
+
+        <h2>Public Visibility &amp; Role-Based Merge Controls</h2>
+        <p>Pull requests on public repositories are accessible to the public without requiring a login, allowing open-source communities to browse code reviews, compare diffs, and inspect conversations.</p>
+        <ul>
+          <li><strong>Public Viewing</strong>: Unauthenticated visitors can view discussions, commit history, line diffs, and reviews without logging in.</li>
+          <li><strong>Role-Based Merge Gating</strong>: Merge options (Create merge commit, Squash and merge, Rebase and merge) are strictly restricted to repository collaborators with write permissions OR the original author (requester) of the pull request.</li>
+          <li><strong>API Defense</strong>: Direct HTTP POST merge attempts require authentication (<code>401 Unauthorized</code>) and verify collaborator / requester authorization (<code>403 Forbidden</code>). Anonymous visitors see a login prompt, while third-party authenticated users see a restricted notice.</li>
+          <li><strong>Pull Request Creation Gating</strong>: The "New pull request" button is visible exclusively to logged-in users.</li>
+        </ul>
 
         <div class="page-nav-buttons">
           <a href="#feature-branches" class="nav-btn" onclick="navigate('feature-branches')">
@@ -2203,10 +2221,12 @@ def verify_progit_signature(payload_bytes, secret_key, header_signature):
 
         <h2>Key Capabilities</h2>
         <ul>
+          <li><strong>Recipient Discovery &amp; Privacy</strong>: Strict anti-enumeration design &mdash; usernames are never dumped in bulk dropdowns. Developers search by username or numeric User ID, and the system verifies account existence.</li>
+          <li><strong>Mutual Consent &amp; Request Acceptance</strong>: Initial messages arrive as pending requests. Recipients can <strong>Accept</strong> to unlock two-way messaging or <strong>Decline</strong> to block future messages and automatically notify the sender.</li>
+          <li><strong>Platform Feature Toggle (<code>ENABLE_MESSAGING</code>)</strong>: Server administrators can enable or disable direct developer messaging via <code>[features] ENABLE_MESSAGING = false</code> in <code>app.ini</code> or environment variable <code>PROGIT_ENABLE_MESSAGING=false</code>. Disabling hides UI navigation icons, stops polling, and blocks API endpoints with <code>403 Forbidden</code>.</li>
           <li><strong>Real-time Unread Badge</strong>: The top navigation bar displays a live unread message counter that updates as messages arrive.</li>
           <li><strong>Inbox &amp; Outbox</strong>: Clean tabbed interface separating received messages from sent communications.</li>
           <li><strong>One-Click Reply</strong>: Reply directly to sender with automated subject prefixing (<code>Re: ...</code>) and conversation continuity.</li>
-          <li><strong>Quick Developer Directory</strong>: Message composer with auto-population of active platform developers.</li>
           <li><strong>Markdown Formatting</strong>: Messages support rich Markdown text, code blocks, lists, and inline links.</li>
         </ul>
 
