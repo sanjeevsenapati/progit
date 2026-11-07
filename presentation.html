@@ -188,15 +188,16 @@
       padding: 44px 56px;
       opacity: 0;
       visibility: hidden;
+      display: none !important;
       transform: scale(0.96) translateY(20px);
       pointer-events: none;
-      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.35s;
-      display: flex;
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
       flex-direction: column;
       overflow-y: auto;
       scrollbar-width: thin;
     }
     .slide.active {
+      display: flex !important;
       opacity: 1;
       visibility: visible;
       transform: scale(1) translateY(0);
@@ -204,6 +205,7 @@
       z-index: 10;
     }
     .slide.prev {
+      display: none !important;
       opacity: 0;
       visibility: hidden;
       transform: scale(0.96) translateX(-40px);
