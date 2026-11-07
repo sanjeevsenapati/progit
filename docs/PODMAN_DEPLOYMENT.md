@@ -337,3 +337,58 @@ podman exec -t progit /usr/local/bin/progit backup
 podman volume export progit-data > progit-data-$(date +%F).tar
 podman volume export progit-repositories > progit-repos-$(date +%F).tar
 ```
+
+---
+
+## 7. OpenID Connect (OIDC) & Single Sign-On Deployment
+
+ProGit supports turnkey deployment with Google Workspace, GitHub, Microsoft 365, or Keycloak SSO by passing standard environment variables to the Podman container:
+
+### 7.1 Running with Google Workspace SSO
+
+```bash
+podman run -d \
+  --name progit \
+  --restart=unless-stopped \
+  -p 3443:3443 \
+  -p 3000:3000 \
+  -p 2222:2222 \
+  -v progit-data:/data/db:Z \
+  -v progit-repositories:/data/repositories:Z \
+  -v progit-config:/data/config:Z \
+  -e PROGIT_OIDC_ENABLED="true" \
+  -e PROGIT_OIDC_PROVIDER="google" \
+  -e PROGIT_OIDC_CLIENT_ID="123456789-abc.apps.googleusercontent.com" \
+  -e PROGIT_OIDC_CLIENT_SECRET="GOCSPX-your-secret" \
+  -e PROGIT_OIDC_ALLOWED_DOMAINS="yourcompany.com" \
+  -e PROGIT_OIDC_AUTO_PROVISION="true" \
+  ghcr.io/sanjeevsenapati/progit:latest
+```
+
+### 7.2 Running with Keycloak / Okta / Generic OIDC
+
+```bash
+podman run -d \
+  --name progit \
+  --restart=unless-stopped \
+  -p 3443:3443 \
+  -p 3000:3000 \
+  -p 2222:2222 \
+  -v progit-data:/data/db:Z \
+  -v progit-repositories:/data/repositories:Z \
+  -v progit-config:/data/config:Z \
+  -e PROGIT_OIDC_ENABLED="true" \
+  -e PROGIT_OIDC_PROVIDER="generic" \
+  -e PROGIT_OIDC_CLIENT_ID="progit-client" \
+  -e PROGIT_OIDC_CLIENT_SECRET="your-keycloak-client-secret" \
+  -e PROGIT_OIDC_ISSUER_URL="https://idp.yourcompany.com/realms/master" \
+  -e PROGIT_OIDC_DISPLAY_NAME="Company IDP" \
+  -e PROGIT_OIDC_ALLOWED_DOMAINS="yourcompany.com" \
+  -e PROGIT_OIDC_AUTO_PROVISION="true" \
+  ghcr.io/sanjeevsenapati/progit:latest
+```
+
+### 7.3 Disabling SSO
+
+To disable SSO and revert strictly to local database accounts, pass `-e PROGIT_OIDC_ENABLED="false"`. The explicit disable flag takes precedence over any configured client credentials.
+

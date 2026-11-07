@@ -770,6 +770,7 @@
           <li><a href="#config-env-vars" data-target="config-env-vars" onclick="navigate('config-env-vars')">Environment Variables (PROGIT_*)</a></li>
           <li><a href="#config-database" data-target="config-database" onclick="navigate('config-database')">SQLite WAL Mode Database</a></li>
           <li><a href="#config-ssh" data-target="config-ssh" onclick="navigate('config-ssh')">Built-in SSH Server (Port 2222)</a></li>
+          <li><a href="#config-oidc" data-target="config-oidc" onclick="navigate('config-oidc')">Enterprise SSO (OIDC / OAuth2)</a></li>
         </ul>
       </div>
 
@@ -1533,6 +1534,23 @@ ENABLED = true</code><button class="copy-btn" onclick="copyCode(this)">Copy</but
           </table>
         </div>
 
+        <h2>Section: [oidc] (Single Sign-On)</h2>
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Key</th><th>Default</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>ENABLED</code></td><td><code>false</code></td><td>Enable/disable OpenID Connect &amp; OAuth2 SSO</td></tr>
+              <tr><td><code>PROVIDER</code></td><td><code>google</code></td><td>Provider preset: <code>google</code>, <code>github</code>, <code>microsoft</code>, <code>keycloak</code>, or <code>generic</code></td></tr>
+              <tr><td><code>CLIENT_ID</code></td><td><code>""</code></td><td>OAuth2 Client ID issued by your identity provider</td></tr>
+              <tr><td><code>CLIENT_SECRET</code></td><td><code>""</code></td><td>OAuth2 Client Secret</td></tr>
+              <tr><td><code>ISSUER_URL</code></td><td><code>""</code></td><td>OIDC Discovery URL (required for <code>generic</code> / <code>keycloak</code>)</td></tr>
+              <tr><td><code>DISPLAY_NAME</code></td><td><code>""</code></td><td>Custom label on login button (e.g. "Corporate SSO")</td></tr>
+              <tr><td><code>ALLOWED_DOMAINS</code></td><td><code>""</code></td><td>Comma-separated domain whitelist (e.g. <code>company.com,subsidiary.org</code>)</td></tr>
+              <tr><td><code>AUTO_PROVISION</code></td><td><code>true</code></td><td>Automatically provision local user account on first SSO login</td></tr>
+            </tbody>
+          </table>
+        </div>
+
         <div class="page-nav-buttons">
           <a href="#config-cheatsheet" class="nav-btn" onclick="navigate('config-cheatsheet')">
             <span class="dir">&larr; Previous</span>
@@ -1569,6 +1587,14 @@ ENABLED = true</code><button class="copy-btn" onclick="copyCode(this)">Copy</but
               <tr><td><code>PROGIT_REPO_ROOT</code></td><td><code>repository.ROOT</code></td><td><code>/data/repositories</code></td></tr>
               <tr><td><code>PROGIT_SSH_PORT</code></td><td><code>server.SSH_PORT</code></td><td><code>2222</code></td></tr>
               <tr><td><code>PROGIT_SSH_ENABLED</code></td><td><code>server.DISABLE_SSH</code></td><td><code>true</code> (inverts to false)</td></tr>
+              <tr><td><code>PROGIT_OIDC_ENABLED</code></td><td><code>oidc.ENABLED</code></td><td><code>false</code> (explicit disable overrides credentials)</td></tr>
+              <tr><td><code>PROGIT_OIDC_PROVIDER</code></td><td><code>oidc.PROVIDER</code></td><td><code>google</code> (<code>google</code>, <code>github</code>, <code>microsoft</code>, <code>keycloak</code>, <code>generic</code>)</td></tr>
+              <tr><td><code>PROGIT_OIDC_CLIENT_ID</code></td><td><code>oidc.CLIENT_ID</code></td><td><code>""</code> (OAuth2 Client ID)</td></tr>
+              <tr><td><code>PROGIT_OIDC_CLIENT_SECRET</code></td><td><code>oidc.CLIENT_SECRET</code></td><td><code>""</code> (OAuth2 Client Secret)</td></tr>
+              <tr><td><code>PROGIT_OIDC_ISSUER_URL</code></td><td><code>oidc.ISSUER_URL</code></td><td><code>""</code> (OIDC Discovery URL)</td></tr>
+              <tr><td><code>PROGIT_OIDC_ALLOWED_DOMAINS</code></td><td><code>oidc.ALLOWED_DOMAINS</code></td><td><code>""</code> (Comma-separated allowed domains)</td></tr>
+              <tr><td><code>PROGIT_OIDC_AUTO_PROVISION</code></td><td><code>oidc.AUTO_PROVISION</code></td><td><code>true</code></td></tr>
+              <tr><td><code>PROGIT_OIDC_DISPLAY_NAME</code></td><td><code>oidc.DISPLAY_NAME</code></td><td><code>""</code></td></tr>
             </tbody>
           </table>
         </div>
@@ -1646,6 +1672,107 @@ PRAGMA foreign_keys = ON;</code><button class="copy-btn" onclick="copyCode(this)
           <a href="#config-database" class="nav-btn" onclick="navigate('config-database')">
             <span class="dir">&larr; Previous</span>
             <span class="title">SQLite WAL Database</span>
+          </a>
+          <a href="#config-oidc" class="nav-btn" onclick="navigate('config-oidc')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Enterprise SSO (OIDC)</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 16. Configuration: OIDC Single Sign-On -->
+      <article class="doc-page" id="page-config-oidc">
+        <div class="breadcrumbs">
+          <span>Configuration</span>
+          <span>/</span>
+          <span class="current">Enterprise SSO (OIDC / OAuth2)</span>
+        </div>
+        <h1 class="page-title">Enterprise Single Sign-On (OIDC &amp; OAuth2)</h1>
+        <p class="page-subtitle">Enable one-click corporate login via Google Workspace, GitHub, Microsoft 365, Keycloak, or any OpenID Connect identity provider.</p>
+
+        <div class="callout callout-info">
+          <div class="callout-title">Zero Third-Party SaaS Dependencies</div>
+          <div>ProGit contains a pure Go OIDC and OAuth2 authentication engine. No external proxy, sidecar, or paid SaaS subscription is required. All token verification, standard discovery, and JIT provisioning run locally inside ProGit.</div>
+        </div>
+
+        <h2>Supported Identity Providers</h2>
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Provider</th><th>Preset Value</th><th>Default Auth Endpoint</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Google Workspace</strong></td><td><code>google</code></td><td><code>accounts.google.com</code></td><td>One-click Google Workspace login with domain filtering</td></tr>
+              <tr><td><strong>GitHub</strong></td><td><code>github</code></td><td><code>github.com/login/oauth</code></td><td>Standard developer OAuth2 authentication</td></tr>
+              <tr><td><strong>Microsoft 365</strong></td><td><code>microsoft</code></td><td><code>login.microsoftonline.com/common</code></td><td>Azure AD / Entra ID enterprise tenant authentication</td></tr>
+              <tr><td><strong>Keycloak / Okta / Generic</strong></td><td><code>generic</code> or <code>keycloak</code></td><td>Auto-discovered via <code>ISSUER_URL</code></td><td>Standard <code>/.well-known/openid-configuration</code> discovery</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2>Google Workspace Setup Walkthrough</h2>
+        <ol>
+          <li>Navigate to the <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Google Cloud Console &gt; APIs &amp; Services &gt; Credentials</a>.</li>
+          <li>Click <strong>Create Credentials &gt; OAuth client ID</strong>.</li>
+          <li>Select <strong>Application type: Web application</strong>.</li>
+          <li>Add your ProGit server URL to <strong>Authorized JavaScript origins</strong>:
+            <pre><code>https://git.yourcompany.com</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </li>
+          <li>Add the callback URL to <strong>Authorized redirect URIs</strong>:
+            <pre><code>https://git.yourcompany.com/api/v1/auth/oidc/callback</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </li>
+          <li>Copy your <strong>Client ID</strong> and <strong>Client Secret</strong>.</li>
+        </ol>
+
+        <h2>Configuration via app.ini</h2>
+        <p>Add the <code>[oidc]</code> section to <code>/data/config/app.ini</code>:</p>
+        <pre><code>[oidc]
+ENABLED = true
+PROVIDER = google
+CLIENT_ID = 123456789-abcdef.apps.googleusercontent.com
+CLIENT_SECRET = GOCSPX-your-secret-here
+DISPLAY_NAME = Google Workspace
+ALLOWED_DOMAINS = yourcompany.com,subsidiary.org
+AUTO_PROVISION = true</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h2>Configuration via Environment Variables (Podman / Docker)</h2>
+        <pre><code>podman run -d \
+  --name progit \
+  --restart=unless-stopped \
+  -p 3443:3443 -p 3000:3000 -p 2222:2222 \
+  -v progit-data:/data/db:Z \
+  -v progit-repositories:/data/repositories:Z \
+  -v progit-config:/data/config:Z \
+  -e PROGIT_OIDC_ENABLED="true" \
+  -e PROGIT_OIDC_PROVIDER="google" \
+  -e PROGIT_OIDC_CLIENT_ID="123456789-abcdef.apps.googleusercontent.com" \
+  -e PROGIT_OIDC_CLIENT_SECRET="GOCSPX-your-secret-here" \
+  -e PROGIT_OIDC_ALLOWED_DOMAINS="yourcompany.com" \
+  -e PROGIT_OIDC_AUTO_PROVISION="true" \
+  ghcr.io/sanjeevsenapati/progit:latest</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h2>Keycloak / Okta / Generic OIDC Configuration</h2>
+        <p>When using a self-hosted Keycloak realm or Okta domain, provide the <code>ISSUER_URL</code>. ProGit automatically queries <code>/.well-known/openid-configuration</code> on startup to discover authorization, token, and userinfo endpoints:</p>
+        <pre><code>[oidc]
+ENABLED = true
+PROVIDER = generic
+CLIENT_ID = progit-client
+CLIENT_SECRET = your-keycloak-client-secret
+ISSUER_URL = https://idp.yourcompany.com/realms/master
+DISPLAY_NAME = Company Single Sign-On
+ALLOWED_DOMAINS = yourcompany.com
+AUTO_PROVISION = true</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h2>Security &amp; Domain Whitelisting</h2>
+        <ul>
+          <li><strong>Domain Filtering (<code>ALLOWED_DOMAINS</code>)</strong>: Restricts authentication strictly to corporate domains. If an employee attempts to sign in with a personal account (e.g. <code>alice@gmail.com</code>), the login is blocked and an unauthorized domain alert is displayed.</li>
+          <li><strong>Cryptographic CSRF Mitigation</strong>: Every login request generates a random 32-byte <code>state</code> stored in an <code>HttpOnly</code>, <code>SameSite=Lax</code>, <code>Secure</code> cookie. Mismatched or forged callbacks are rejected.</li>
+          <li><strong>Just-In-Time (JIT) Provisioning</strong>: New employees logging in for the first time automatically have their ProGit account created with matching username and email.</li>
+          <li><strong>Emergency Local Login Fallback</strong>: Disabling OIDC via <code>PROGIT_OIDC_ENABLED="false"</code> immediately disables the SSO button, and local database credentials remain available so teams are never locked out during IDP outages.</li>
+        </ul>
+
+        <div class="page-nav-buttons">
+          <a href="#config-ssh" class="nav-btn" onclick="navigate('config-ssh')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Built-in SSH Server</span>
           </a>
           <a href="#feature-git" class="nav-btn" onclick="navigate('feature-git')">
             <span class="dir">Next &rarr;</span>
@@ -3708,6 +3835,7 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
       { id: 'config-env-vars', title: 'Environment Variables (PROGIT_*)', section: 'Configuration', desc: 'Container environment variable overrides for app.ini.' },
       { id: 'config-database', title: 'SQLite WAL Mode Database', section: 'Configuration', desc: 'High-concurrency SQLite configuration, pragmas, and checkpoints.' },
       { id: 'config-ssh', title: 'Built-in SSH Server (Port 2222)', section: 'Configuration', desc: 'Key-based SSH Git cloning and pushing on port 2222.' },
+      { id: 'config-oidc', title: 'Enterprise SSO (OpenID Connect / OAuth2)', section: 'Configuration', desc: 'Google Workspace, GitHub, Microsoft 365, and Keycloak SSO integration with domain whitelisting.' },
       { id: 'feature-git', title: 'Smart HTTP & SSH Git Operations', section: 'Features', desc: 'Git v2 Smart Protocol, clone formats, and Personal Access Tokens.' },
       { id: 'feature-editor', title: 'Online Code Editor & Prettier', section: 'Features', desc: '8 curated syntax themes (Dracula, Nord, Synthwave) and online commits.' },
       { id: 'feature-files', title: 'File Creation & Directory Uploads', section: 'Features', desc: 'In-browser file creation with nested paths and multi-file directory upload.' },

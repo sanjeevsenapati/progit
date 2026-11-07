@@ -24,6 +24,14 @@ ProGit is built as a zero-page reload single-page application (SPA):
 - Dashboard telemetry and repository details are cached in memory for sub-millisecond tab switching.
 - User authentication is persisted in `localStorage` eliminating flash-of-loading screens on page refreshes.
 
+### 1.3 Logging In & Single Sign-On (SSO)
+ProGit supports both standard local database authentication and enterprise Single Sign-On:
+- **Local Login**: Enter your registered username and password to log in directly.
+- **Single Sign-On (OIDC)**: If your administrator has enabled SSO, a branded login button appears on the sign-in page (e.g., **Sign in with Google Workspace**, **Sign in with GitHub**, **Sign in with Microsoft**, or **Sign in with SSO**).
+- **Just-In-Time (JIT) Provisioning**: When signing in via corporate SSO for the first time, ProGit automatically creates your developer profile, maps your corporate email address, and logs you into the dashboard instantly without manual admin intervention.
+- **Domain Restriction**: If domain filtering is enabled, only users with email addresses matching your organization's allowed domains can log in. Attempting to log in with an unauthorized email will present an immediate security alert.
+- **Fail-Safe Access**: Administrators can always use standard credentials to log in even if third-party SSO providers experience temporary upstream downtime.
+
 ---
 
 ## 2. Managing Repositories
