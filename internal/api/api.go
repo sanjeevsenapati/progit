@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -97,6 +98,32 @@ func NewRouter(cfg *config.Config) *Router {
 	return r
 }
 
+func (r *Router) isAllowedOrigin(origin string) bool {
+	if origin == "" {
+		return false
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	originHost := strings.ToLower(parsed.Hostname())
+	// Allow localhost / loopback for local frontend dev (Vite, React, tests)
+	if originHost == "localhost" || originHost == "127.0.0.1" || originHost == "::1" {
+		return true
+	}
+	if strings.EqualFold(originHost, r.cfg.Server.Domain) {
+		return true
+	}
+	if r.cfg.Server.RootURL != "" {
+		if rootParsed, err := url.Parse(r.cfg.Server.RootURL); err == nil {
+			if strings.EqualFold(originHost, rootParsed.Hostname()) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Global security headers
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -109,14 +136,14 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Strict-Transport-Security", fmt.Sprintf("max-age=%d; includeSubDomains; preload", r.cfg.Server.HSTSMaxAge))
 	}
 
-	// CORS handling for API
+	// CORS handling for API with origin validation to prevent credential theft
 	if strings.HasPrefix(req.URL.Path, "/api/") {
 		origin := req.Header.Get("Origin")
 		if origin != "" {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-		} else {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
+			if r.isAllowedOrigin(origin) {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+			}
 		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
@@ -124,6 +151,15 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
+	}
+
+	// Bounded body reader for API requests to mitigate memory exhaustion DoS
+	if strings.HasPrefix(req.URL.Path, "/api/") && req.Method != http.MethodGet && req.Method != http.MethodHead && req.Method != http.MethodOptions {
+		maxBody := int64(10 * 1024 * 1024) // 10MB default for JSON API bodies
+		if strings.Contains(req.URL.Path, "/contents/upload") || strings.Contains(req.URL.Path, "/releases/") {
+			maxBody = 64 * 1024 * 1024 // 64MB for file uploads
+		}
+		req.Body = http.MaxBytesReader(w, req.Body, maxBody)
 	}
 
 	r.mux.ServeHTTP(w, req)
@@ -1238,6 +1274,13 @@ func (r *Router) handleImportRepo(w http.ResponseWriter, req *http.Request) {
 		jsonError(w, http.StatusBadRequest, "Invalid clone URL")
 		return
 	}
+	// Disallow local file paths for non-admin users to prevent local repo theft
+	if !strings.HasPrefix(body.CloneURL, "http://") && !strings.HasPrefix(body.CloneURL, "https://") {
+		if !user.IsAdmin && !git.AllowLocalRepoImport {
+			jsonError(w, http.StatusBadRequest, "Only HTTP and HTTPS clone URLs are supported")
+			return
+		}
+	}
 
 	body.Name = strings.TrimSpace(body.Name)
 	if body.Name == "" {
@@ -1343,6 +1386,44 @@ func (r *Router) canAdminRepo(user *database.User, repo *database.Repository) bo
 	return false
 }
 
+// canDeleteRepo ensures only the repository owner, organization admin, or site administrator can permanently delete a repo.
+func (r *Router) canDeleteRepo(user *database.User, repo *database.Repository) bool {
+	if user == nil || repo == nil {
+		return false
+	}
+	if user.IsAdmin || user.ID == repo.OwnerID {
+		return true
+	}
+	if org, _ := database.GetOrgByName(repo.OwnerName); org != nil {
+		if database.IsOrgAdmin(org.ID, user.ID) {
+			return true
+		}
+	}
+	return false
+}
+
+// getRepoWithAccess safely retrieves a repository and validates user access permissions.
+// Returns 404 if the repo does not exist or if private and unauthorized (preventing enumeration).
+func (r *Router) getRepoWithAccess(w http.ResponseWriter, req *http.Request, owner, repoName string, write bool) (*database.Repository, *database.User, bool) {
+	repo, err := database.GetRepositoryByName(owner, repoName)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return nil, nil, false
+	}
+	user := auth.AuthenticateRequest(req)
+	if !database.CanUserAccessRepo(user, repo, write) {
+		if repo.IsPrivate || write {
+			if user == nil && write {
+				jsonError(w, http.StatusUnauthorized, "Unauthorized")
+			} else {
+				jsonError(w, http.StatusNotFound, "Repository not found")
+			}
+			return nil, nil, false
+		}
+	}
+	return repo, user, true
+}
+
 func (r *Router) handleGetRepo(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
@@ -1426,8 +1507,8 @@ func (r *Router) handleDeleteRepo(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if !r.canAdminRepo(user, repo) {
-		jsonError(w, http.StatusForbidden, "Admin privileges required to delete repository")
+	if !r.canDeleteRepo(user, repo) {
+		jsonError(w, http.StatusForbidden, "Owner or site administrator privileges required to delete repository")
 		return
 	}
 
@@ -1471,10 +1552,13 @@ func (r *Router) handleToggleStar(w http.ResponseWriter, req *http.Request) {
 func (r *Router) handleListBranches(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
+	repo, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
+		return
+	}
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
 
 	if req.URL.Query().Get("detail") == "true" {
-		repo, _ := database.GetRepositoryByName(owner, repoName)
 		defaultBranch := "main"
 		if repo != nil && repo.DefaultBranch != "" {
 			defaultBranch = repo.DefaultBranch
@@ -1640,6 +1724,10 @@ func (r *Router) handleDeleteBranch(w http.ResponseWriter, req *http.Request) {
 func (r *Router) handleListTags(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
+	_, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
+		return
+	}
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
 
 	tags, err := git.GetTags(repoDir)
@@ -1653,6 +1741,10 @@ func (r *Router) handleListTags(w http.ResponseWriter, req *http.Request) {
 func (r *Router) handleListCommits(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
+	_, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
+		return
+	}
 	ref := req.URL.Query().Get("ref")
 	limit, _ := strconv.Atoi(req.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(req.URL.Query().Get("offset"))
@@ -1670,6 +1762,10 @@ func (r *Router) handleGetCommitDiff(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
 	sha := req.PathValue("sha")
+	_, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
+		return
+	}
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
 
 	diff, err := git.GetCommitDiff(repoDir, sha)
@@ -1683,6 +1779,10 @@ func (r *Router) handleGetCommitDiff(w http.ResponseWriter, req *http.Request) {
 func (r *Router) handleGetTree(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
+	_, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
+		return
+	}
 	ref := req.URL.Query().Get("ref")
 	subpath := req.URL.Query().Get("path")
 
@@ -1726,6 +1826,10 @@ func (r *Router) handleGetTree(w http.ResponseWriter, req *http.Request) {
 func (r *Router) handleGetBlob(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
+	_, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
+		return
+	}
 	ref := req.URL.Query().Get("ref")
 	filePath := req.URL.Query().Get("path")
 
@@ -1741,6 +1845,10 @@ func (r *Router) handleGetBlob(w http.ResponseWriter, req *http.Request) {
 func (r *Router) handleGetRaw(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
+	_, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
+		return
+	}
 	ref := req.URL.Query().Get("ref")
 	filePath := req.URL.Query().Get("path")
 
@@ -2012,9 +2120,8 @@ func (r *Router) handleListIssues(w http.ResponseWriter, req *http.Request) {
 	state := req.URL.Query().Get("state")
 	assignee := req.URL.Query().Get("assignee")
 
-	repo, err := database.GetRepositoryByName(owner, repoName)
-	if err != nil || repo == nil {
-		jsonError(w, http.StatusNotFound, "Repository not found")
+	repo, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
 		return
 	}
 
@@ -2105,9 +2212,8 @@ func (r *Router) handleGetIssue(w http.ResponseWriter, req *http.Request) {
 	repoName := req.PathValue("repo")
 	index, _ := strconv.ParseInt(req.PathValue("index"), 10, 64)
 
-	repo, err := database.GetRepositoryByName(owner, repoName)
-	if err != nil || repo == nil {
-		jsonError(w, http.StatusNotFound, "Repository not found")
+	repo, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
 		return
 	}
 
@@ -2270,9 +2376,8 @@ func (r *Router) handleListComments(w http.ResponseWriter, req *http.Request) {
 	repoName := req.PathValue("repo")
 	index, _ := strconv.ParseInt(req.PathValue("index"), 10, 64)
 
-	repo, err := database.GetRepositoryByName(owner, repoName)
-	if err != nil || repo == nil {
-		jsonError(w, http.StatusNotFound, "Repository not found")
+	repo, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
 		return
 	}
 
@@ -2343,9 +2448,8 @@ func (r *Router) handleListPulls(w http.ResponseWriter, req *http.Request) {
 	repoName := req.PathValue("repo")
 	state := req.URL.Query().Get("state")
 
-	repo, err := database.GetRepositoryByName(owner, repoName)
-	if err != nil || repo == nil {
-		jsonError(w, http.StatusNotFound, "Repository not found")
+	repo, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
 		return
 	}
 
@@ -2424,9 +2528,8 @@ func (r *Router) handleGetPull(w http.ResponseWriter, req *http.Request) {
 	repoName := req.PathValue("repo")
 	index, _ := strconv.ParseInt(req.PathValue("index"), 10, 64)
 
-	repo, err := database.GetRepositoryByName(owner, repoName)
-	if err != nil || repo == nil {
-		jsonError(w, http.StatusNotFound, "Repository not found")
+	repo, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
 		return
 	}
 
@@ -2451,9 +2554,8 @@ func (r *Router) handleGetPullDiff(w http.ResponseWriter, req *http.Request) {
 	repoName := req.PathValue("repo")
 	index, _ := strconv.ParseInt(req.PathValue("index"), 10, 64)
 
-	repo, err := database.GetRepositoryByName(owner, repoName)
-	if err != nil || repo == nil {
-		jsonError(w, http.StatusNotFound, "Repository not found")
+	repo, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
 		return
 	}
 
@@ -2482,6 +2584,10 @@ func (r *Router) handleGetPullDiff(w http.ResponseWriter, req *http.Request) {
 func (r *Router) handleCompareBranches(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
+	_, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
+		return
+	}
 	base := req.URL.Query().Get("base")
 	head := req.URL.Query().Get("head")
 
@@ -2605,9 +2711,8 @@ func (r *Router) handleListPullReviews(w http.ResponseWriter, req *http.Request)
 	indexStr := req.PathValue("index")
 	index, _ := strconv.ParseInt(indexStr, 10, 64)
 
-	repo, err := database.GetRepositoryByName(owner, repoName)
-	if err != nil || repo == nil {
-		jsonError(w, http.StatusNotFound, "Repository not found")
+	repo, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
 		return
 	}
 
@@ -2689,9 +2794,8 @@ func (r *Router) handleListPullReviewComments(w http.ResponseWriter, req *http.R
 	indexStr := req.PathValue("index")
 	index, _ := strconv.ParseInt(indexStr, 10, 64)
 
-	repo, err := database.GetRepositoryByName(owner, repoName)
-	if err != nil || repo == nil {
-		jsonError(w, http.StatusNotFound, "Repository not found")
+	repo, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
 		return
 	}
 
@@ -3295,6 +3399,10 @@ func (r *Router) handleServePagesRedirect(w http.ResponseWriter, req *http.Reque
 }
 
 func (r *Router) handleServePages(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Security-Policy", "sandbox allow-scripts allow-forms allow-popups; default-src 'self' 'unsafe-inline' data: https:; object-src 'none';")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
 	subPath := req.PathValue("path")
@@ -3437,6 +3545,11 @@ func (r *Router) handleServePages(w http.ResponseWriter, req *http.Request) {
 }
 
 func servePagesContent(w http.ResponseWriter, filePath string, content []byte, repo *database.Repository) {
+	// Security isolation: sandbox pages into an opaque origin to prevent access to parent session/cookies
+	w.Header().Set("Content-Security-Policy", "sandbox allow-scripts allow-forms allow-popups; default-src 'self' 'unsafe-inline' data: https:; object-src 'none';")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+
 	ext := strings.ToLower(filepath.Ext(filePath))
 	switch ext {
 	case ".html", ".htm":
@@ -3530,6 +3643,7 @@ func servePagesContent(w http.ResponseWriter, filePath string, content []byte, r
 		_, _ = w.Write(content)
 	case ".svg":
 		w.Header().Set("Content-Type", "image/svg+xml")
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline';")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(content)
 	case ".png":
@@ -6141,9 +6255,8 @@ func formatTimeAgo(t time.Time) string {
 func (r *Router) handleGetRecentPushes(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
-	repo, err := database.GetRepositoryByName(owner, repoName)
-	if err != nil || repo == nil {
-		jsonError(w, http.StatusNotFound, "Repository not found")
+	repo, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
 		return
 	}
 
@@ -6193,9 +6306,8 @@ func (r *Router) handleGetRecentPushes(w http.ResponseWriter, req *http.Request)
 func (r *Router) handleGetBlame(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
-	repo, err := database.GetRepositoryByName(owner, repoName)
-	if err != nil || repo == nil {
-		jsonError(w, http.StatusNotFound, "Repository not found")
+	repo, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
 		return
 	}
 
@@ -6238,9 +6350,8 @@ func (r *Router) handleGetBlame(w http.ResponseWriter, req *http.Request) {
 func (r *Router) handleSearchRepoCode(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
-	repo, err := database.GetRepositoryByName(owner, repoName)
-	if err != nil || repo == nil {
-		jsonError(w, http.StatusNotFound, "Repository not found")
+	repo, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
 		return
 	}
 
@@ -6281,9 +6392,8 @@ func (r *Router) handleSearchRepoCode(w http.ResponseWriter, req *http.Request) 
 func (r *Router) handleListBranchProtections(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
-	repo, err := database.GetRepositoryByName(owner, repoName)
-	if err != nil || repo == nil {
-		jsonError(w, http.StatusNotFound, "Repository not found")
+	repo, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
 		return
 	}
 
@@ -6378,9 +6488,8 @@ func (r *Router) handleDeleteBranchProtection(w http.ResponseWriter, req *http.R
 func (r *Router) handleListReleases(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
-	repo, err := database.GetRepositoryByName(owner, repoName)
-	if err != nil || repo == nil {
-		jsonError(w, http.StatusNotFound, "Repository not found")
+	repo, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
 		return
 	}
 

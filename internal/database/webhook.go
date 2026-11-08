@@ -2,6 +2,7 @@ package database
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -9,21 +10,69 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 )
 
-// CreateWebhook registers a new webhook for a repository.
-func CreateWebhook(repoID int64, hookURL, secret, contentType, events string, isActive bool) (*Webhook, error) {
+// AllowPrivateWebhookHosts controls whether DeliverWebhook and webhook creation allow loopback/private IP targets.
+// By default false in production for SSRF mitigation; can be enabled in test suites or via config.
+var AllowPrivateWebhookHosts = false
+
+func isPrivateWebhookIP(ip net.IP) bool {
+	if ip == nil {
+		return true
+	}
+	if ip4 := ip.To4(); ip4 != nil {
+		return ip4.IsLoopback() ||
+			ip4.IsLinkLocalUnicast() ||
+			ip4.IsLinkLocalMulticast() ||
+			ip4.IsPrivate() ||
+			ip4.IsMulticast() ||
+			ip4.IsUnspecified() ||
+			ip4.Equal(net.IPv4bcast)
+	}
+	return ip.IsLoopback() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsPrivate() ||
+		ip.IsMulticast() ||
+		ip.IsUnspecified()
+}
+
+func isBlockedWebhookHost(host string) bool {
+	h := strings.ToLower(strings.TrimSpace(host))
+	if h == "" || h == "localhost" || strings.HasSuffix(h, ".localhost") || strings.HasSuffix(h, ".local") {
+		return true
+	}
+	if ip := net.ParseIP(h); ip != nil {
+		return isPrivateWebhookIP(ip)
+	}
+	return false
+}
+
+// ValidateWebhookURL ensures a webhook URL uses http/https and does not target private/reserved networks.
+func ValidateWebhookURL(hookURL string) error {
 	hookURL = strings.TrimSpace(hookURL)
 	if hookURL == "" {
-		return nil, fmt.Errorf("webhook payload URL cannot be empty")
+		return fmt.Errorf("webhook payload URL cannot be empty")
 	}
 	parsedURL, err := url.ParseRequestURI(hookURL)
 	if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
-		return nil, fmt.Errorf("invalid webhook URL; must start with http:// or https://")
+		return fmt.Errorf("invalid webhook URL; must start with http:// or https://")
+	}
+	if !AllowPrivateWebhookHosts && isBlockedWebhookHost(parsedURL.Hostname()) {
+		return fmt.Errorf("webhook payload URL cannot target localhost or private network addresses")
+	}
+	return nil
+}
+
+// CreateWebhook registers a new webhook for a repository.
+func CreateWebhook(repoID int64, hookURL, secret, contentType, events string, isActive bool) (*Webhook, error) {
+	if err := ValidateWebhookURL(hookURL); err != nil {
+		return nil, err
 	}
 
 	contentType = strings.ToLower(strings.TrimSpace(contentType))
@@ -97,13 +146,8 @@ func ListRepoWebhooks(repoID int64) ([]*Webhook, error) {
 
 // UpdateWebhook updates an existing webhook's parameters.
 func UpdateWebhook(id int64, hookURL, secret, contentType, events string, isActive bool) error {
-	hookURL = strings.TrimSpace(hookURL)
-	if hookURL == "" {
-		return fmt.Errorf("webhook payload URL cannot be empty")
-	}
-	parsedURL, err := url.ParseRequestURI(hookURL)
-	if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
-		return fmt.Errorf("invalid webhook URL; must start with http:// or https://")
+	if err := ValidateWebhookURL(hookURL); err != nil {
+		return err
 	}
 
 	contentType = strings.ToLower(strings.TrimSpace(contentType))
@@ -115,6 +159,8 @@ func UpdateWebhook(id int64, hookURL, secret, contentType, events string, isActi
 	if events == "" {
 		events = "push,issue,pull_request"
 	}
+
+	var err error
 
 	// If secret is non-empty, update it; otherwise preserve current secret
 	if strings.TrimSpace(secret) != "" {
@@ -257,8 +303,64 @@ func DeliverWebhook(hook *Webhook, event string, payload any) (*WebhookDelivery,
 		req.Header.Set("X-ProGit-Signature", "sha256="+sigHex)
 	}
 
+	dialer := &net.Dialer{
+		Timeout:   5 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+
+			if !AllowPrivateWebhookHosts {
+				if isBlockedWebhookHost(host) {
+					return nil, fmt.Errorf("webhook delivery to blocked host '%s' is prohibited", host)
+				}
+
+				ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+				if err != nil {
+					return nil, err
+				}
+				if len(ips) == 0 {
+					return nil, fmt.Errorf("no IP address found for %s", host)
+				}
+
+				var safeIP net.IP
+				for _, ipAddr := range ips {
+					if isPrivateWebhookIP(ipAddr.IP) {
+						return nil, fmt.Errorf("webhook destination resolves to private/reserved IP: %s", ipAddr.IP)
+					}
+					if safeIP == nil {
+						safeIP = ipAddr.IP
+					}
+				}
+				// Connect directly to the validated safe IP to prevent DNS rebinding attacks
+				return dialer.DialContext(ctx, network, net.JoinHostPort(safeIP.String(), port))
+			}
+
+			return dialer.DialContext(ctx, network, addr)
+		},
+		ResponseHeaderTimeout: 5 * time.Second,
+	}
+
 	client := &http.Client{
-		Timeout: 6 * time.Second,
+		Transport: transport,
+		Timeout:   6 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 3 {
+				return fmt.Errorf("stopped after 3 redirects")
+			}
+			if !AllowPrivateWebhookHosts {
+				if err := ValidateWebhookURL(req.URL.String()); err != nil {
+					return fmt.Errorf("redirect blocked: %w", err)
+				}
+			}
+			return nil
+		},
 	}
 
 	start := time.Now()

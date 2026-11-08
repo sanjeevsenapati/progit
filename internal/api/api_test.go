@@ -32,9 +32,14 @@ func setupTestRouter(t *testing.T) (*Router, func()) {
 		t.Fatalf("database init failed: %v", err)
 	}
 
+	database.AllowPrivateWebhookHosts = true
+	git.AllowLocalRepoImport = true
+
 	router := NewRouter(cfg)
 
 	cleanup := func() {
+		database.AllowPrivateWebhookHosts = false
+		git.AllowLocalRepoImport = false
 		if database.DB != nil {
 			_ = database.DB.Close()
 		}
@@ -2198,6 +2203,189 @@ func TestImportRepositoryEndpoint(t *testing.T) {
 	router.ServeHTTP(recDup, reqDup)
 	if recDup.Code != http.StatusConflict {
 		t.Errorf("expected 409 Conflict on duplicate repo, got %d", recDup.Code)
+	}
+}
+
+func TestVulnerabilityAssessmentRemediations(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	// 1. Create owner and unauthorized user
+	ownerUser, err := database.CreateUser("va_owner", "va_owner@example.com", "hash", "VA Owner", false)
+	if err != nil {
+		t.Fatalf("failed to create owner: %v", err)
+	}
+	ownerToken := "pgt_va_owner_tok"
+	_, _ = database.CreateAccessToken(ownerUser.ID, "tok", ownerToken, "repo,user")
+
+	intruderUser, err := database.CreateUser("va_intruder", "va_intruder@example.com", "hash", "VA Intruder", false)
+	if err != nil {
+		t.Fatalf("failed to create intruder: %v", err)
+	}
+	intruderToken := "pgt_va_intruder_tok"
+	_, _ = database.CreateAccessToken(intruderUser.ID, "tok", intruderToken, "repo,user")
+
+	collabUser, err := database.CreateUser("va_collab", "va_collab@example.com", "hash", "VA Collab", false)
+	if err != nil {
+		t.Fatalf("failed to create collab: %v", err)
+	}
+	collabToken := "pgt_va_collab_tok"
+	_, _ = database.CreateAccessToken(collabUser.ID, "tok", collabToken, "repo,user")
+
+	// Create private repo with disk files
+	privRepo, err := database.CreateRepository(ownerUser.ID, "confidential-vault", "Secret repository", true)
+	if err != nil {
+		t.Fatalf("failed to create private repo: %v", err)
+	}
+
+	repoDir := filepath.Join(router.cfg.Repository.Root, ownerUser.Username, privRepo.Name+".git")
+	if err := git.InitRepositoryWithReadme(repoDir, privRepo.Name, "Confidential Project Data", "main", "VA Owner", "va_owner@example.com"); err != nil {
+		t.Fatalf("failed to init bare git repo: %v", err)
+	}
+
+	// Add an issue to the private repo
+	issue, _ := database.CreateIssue(privRepo.ID, ownerUser.ID, "Security audit item", "Top secret findings", false, nil)
+
+	// Add collaborator with admin mode
+	_ = database.AddCollaborator(privRepo.ID, collabUser.ID, "admin")
+
+	// =========================================================================
+	// VA Point 1: Private Repository Sub-Resource BOLA / IDOR Verification
+	// Anonymous and unauthorized users MUST receive 404 Not Found on all endpoints
+	// =========================================================================
+	endpoints := []string{
+		fmt.Sprintf("/api/v1/repos/%s/%s/branches", ownerUser.Username, privRepo.Name),
+		fmt.Sprintf("/api/v1/repos/%s/%s/tags", ownerUser.Username, privRepo.Name),
+		fmt.Sprintf("/api/v1/repos/%s/%s/commits", ownerUser.Username, privRepo.Name),
+		fmt.Sprintf("/api/v1/repos/%s/%s/tree", ownerUser.Username, privRepo.Name),
+		fmt.Sprintf("/api/v1/repos/%s/%s/blob?path=README.md", ownerUser.Username, privRepo.Name),
+		fmt.Sprintf("/api/v1/repos/%s/%s/raw?path=README.md", ownerUser.Username, privRepo.Name),
+		fmt.Sprintf("/api/v1/repos/%s/%s/issues", ownerUser.Username, privRepo.Name),
+		fmt.Sprintf("/api/v1/repos/%s/%s/issues/%d", ownerUser.Username, privRepo.Name, issue.IndexNumber),
+		fmt.Sprintf("/api/v1/repos/%s/%s/issues/%d/comments", ownerUser.Username, privRepo.Name, issue.IndexNumber),
+		fmt.Sprintf("/api/v1/repos/%s/%s/pulls", ownerUser.Username, privRepo.Name),
+		fmt.Sprintf("/api/v1/repos/%s/%s/recent-pushes", ownerUser.Username, privRepo.Name),
+		fmt.Sprintf("/api/v1/repos/%s/%s/blame?path=README.md", ownerUser.Username, privRepo.Name),
+		fmt.Sprintf("/api/v1/repos/%s/%s/code-search?q=Confidential", ownerUser.Username, privRepo.Name),
+		fmt.Sprintf("/api/v1/repos/%s/%s/branch-protections", ownerUser.Username, privRepo.Name),
+		fmt.Sprintf("/api/v1/repos/%s/%s/releases", ownerUser.Username, privRepo.Name),
+	}
+
+	for _, ep := range endpoints {
+		// A. Anonymous request
+		reqAnon := httptest.NewRequest("GET", ep, nil)
+		recAnon := httptest.NewRecorder()
+		router.ServeHTTP(recAnon, reqAnon)
+		if recAnon.Code != http.StatusNotFound {
+			t.Errorf("BOLA leak: Anonymous access to '%s' gave status %d; expected 404", ep, recAnon.Code)
+		}
+
+		// B. Unauthorized user (intruder) request
+		reqIntruder := httptest.NewRequest("GET", ep, nil)
+		reqIntruder.Header.Set("Authorization", "Bearer "+intruderToken)
+		recIntruder := httptest.NewRecorder()
+		router.ServeHTTP(recIntruder, reqIntruder)
+		if recIntruder.Code != http.StatusNotFound {
+			t.Errorf("BOLA leak: Intruder access to '%s' gave status %d; expected 404", ep, recIntruder.Code)
+		}
+
+		// C. Authorized owner request MUST succeed (200 OK)
+		reqOwner := httptest.NewRequest("GET", ep, nil)
+		reqOwner.Header.Set("Authorization", "Bearer "+ownerToken)
+		recOwner := httptest.NewRecorder()
+		router.ServeHTTP(recOwner, reqOwner)
+		if recOwner.Code != http.StatusOK {
+			t.Errorf("Expected owner access to '%s' to succeed (200 OK), got %d: %s", ep, recOwner.Code, recOwner.Body.String())
+		}
+	}
+
+	// =========================================================================
+	// VA Point 2: Collaborator Privilege Boundary on Repository Deletion
+	// Admin collaborator cannot delete someone else's personal repository
+	// =========================================================================
+	reqCollabDel := httptest.NewRequest("DELETE", fmt.Sprintf("/api/v1/repos/%s/%s", ownerUser.Username, privRepo.Name), nil)
+	reqCollabDel.Header.Set("Authorization", "Bearer "+collabToken)
+	recCollabDel := httptest.NewRecorder()
+	router.ServeHTTP(recCollabDel, reqCollabDel)
+	if recCollabDel.Code != http.StatusForbidden {
+		t.Errorf("Privilege Escalation: Admin collaborator was allowed to delete repo (status %d); expected 403 Forbidden", recCollabDel.Code)
+	}
+
+	// =========================================================================
+	// VA Point 3: Webhook SSRF Intranet Blocking
+	// When AllowPrivateWebhookHosts = false, private/loopback/cloud metadata targets are rejected
+	// =========================================================================
+	database.AllowPrivateWebhookHosts = false
+
+	blockedHooks := []string{
+		"http://127.0.0.1:8080/pwn",
+		"http://localhost:3000/api",
+		"http://169.254.169.254/latest/meta-data",
+		"http://10.0.0.1/admin",
+		"http://192.168.1.1/router",
+	}
+	for _, hookTarget := range blockedHooks {
+		payload := fmt.Sprintf(`{"url":"%s","events":"push"}`, hookTarget)
+		reqHook := httptest.NewRequest("POST", fmt.Sprintf("/api/v1/repos/%s/%s/hooks", ownerUser.Username, privRepo.Name), strings.NewReader(payload))
+		reqHook.Header.Set("Authorization", "Bearer "+ownerToken)
+		reqHook.Header.Set("Content-Type", "application/json")
+		recHook := httptest.NewRecorder()
+		router.ServeHTTP(recHook, reqHook)
+		if recHook.Code != http.StatusBadRequest {
+			t.Errorf("SSRF leak: Target '%s' was accepted (status %d); expected 400 Bad Request", hookTarget, recHook.Code)
+		}
+	}
+
+	// =========================================================================
+	// VA Point 4: Import Repository Protocol & Local Filesystem Guard
+	// Non-admin cannot clone local paths when AllowLocalRepoImport = false
+	// =========================================================================
+	git.AllowLocalRepoImport = false
+
+	localImportPayload := `{"clone_url":"/etc/passwd","name":"stolen-local-data"}`
+	reqImport := httptest.NewRequest("POST", "/api/v1/repos/import", strings.NewReader(localImportPayload))
+	reqImport.Header.Set("Authorization", "Bearer "+ownerToken)
+	reqImport.Header.Set("Content-Type", "application/json")
+	recImport := httptest.NewRecorder()
+	router.ServeHTTP(recImport, reqImport)
+	if recImport.Code != http.StatusBadRequest {
+		t.Errorf("Local repo theft: Non-admin import of local path was allowed (status %d); expected 400 Bad Request", recImport.Code)
+	}
+
+	// =========================================================================
+	// VA Point 5: CORS Permissive Reflection Hardening
+	// Untrusted origins must NOT receive Access-Control-Allow-Origin with credentials
+	// =========================================================================
+	reqCorsEvil := httptest.NewRequest("GET", "/api/v1/user", nil)
+	reqCorsEvil.Header.Set("Origin", "https://malicious-attacker.com")
+	recCorsEvil := httptest.NewRecorder()
+	router.ServeHTTP(recCorsEvil, reqCorsEvil)
+	if recCorsEvil.Header().Get("Access-Control-Allow-Origin") == "https://malicious-attacker.com" {
+		t.Errorf("CORS vulnerability: reflected malicious origin with Access-Control-Allow-Origin")
+	}
+
+	// Trusted origin (localhost) IS allowed
+	reqCorsGood := httptest.NewRequest("GET", "/api/v1/user", nil)
+	reqCorsGood.Header.Set("Origin", "http://localhost:3000")
+	recCorsGood := httptest.NewRecorder()
+	router.ServeHTTP(recCorsGood, reqCorsGood)
+	if recCorsGood.Header().Get("Access-Control-Allow-Origin") != "http://localhost:3000" {
+		t.Errorf("Expected localhost origin to be allowed, got '%s'", recCorsGood.Header().Get("Access-Control-Allow-Origin"))
+	}
+
+	// =========================================================================
+	// VA Point 6: ProGit Pages Content Security Policy & Sandbox
+	// User-generated pages must have restrictive sandbox & nosniff
+	// =========================================================================
+	reqPages := httptest.NewRequest("GET", fmt.Sprintf("/pages/%s/%s/", ownerUser.Username, privRepo.Name), nil)
+	recPages := httptest.NewRecorder()
+	router.ServeHTTP(recPages, reqPages)
+	csp := recPages.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "sandbox") || strings.Contains(csp, "allow-same-origin") {
+		t.Errorf("ProGit Pages missing secure sandbox CSP: got '%s'", csp)
+	}
+	if recPages.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Errorf("ProGit Pages missing X-Content-Type-Options: nosniff")
 	}
 }
 

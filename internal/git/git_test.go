@@ -254,7 +254,10 @@ func TestImportRepositoryAndUtilities(t *testing.T) {
 		t.Errorf("expected redacted user in %s", sanitized)
 	}
 
-	// 2. Import Repository from local bare repo
+	// 2. Import Repository from local bare repo (requires AllowLocalRepoImport)
+	AllowLocalRepoImport = true
+	defer func() { AllowLocalRepoImport = false }()
+
 	tempDir, err := os.MkdirTemp("", "progit-import-test-*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
@@ -283,6 +286,76 @@ func TestImportRepositoryAndUtilities(t *testing.T) {
 	defBranch := GetDefaultBranch(destRepo)
 	if defBranch != "main" {
 		t.Errorf("expected default branch main, got %s", defBranch)
+	}
+}
+
+func TestSecurityVulnerabilitiesRemediated(t *testing.T) {
+	// 1. Path Traversal & .git hooks prevention
+	blockedPaths := []string{
+		".git",
+		".git/hooks/pre-commit",
+		".git/config",
+		"foo/.git/hooks/post-commit",
+		"../etc/passwd",
+		"../../shadow",
+		"-oProxyCommand=calc",
+		"--upload-pack=calc",
+		"a/b/../../../etc/hosts",
+		"foo\x00bar",
+		`win\path\.git\hooks`,
+	}
+	for _, p := range blockedPaths {
+		if _, err := ValidateRepoPath(p); err == nil {
+			t.Errorf("expected path '%s' to be blocked, but was accepted", p)
+		}
+	}
+
+	allowedPaths := []string{
+		"README.md",
+		"src/main.go",
+		".gitignore",
+		".gitattributes",
+		".github/workflows/ci.yml",
+		"docs/intro.md",
+	}
+	for _, p := range allowedPaths {
+		if _, err := ValidateRepoPath(p); err != nil {
+			t.Errorf("expected path '%s' to be allowed, but got error: %v", p, err)
+		}
+	}
+
+	// 2. Wiki Slug Validation
+	blockedSlugs := []string{
+		"../../etc/passwd",
+		"-help",
+		".git",
+		"pages/subpage",
+		"win\\path",
+		"evil\x00slug",
+	}
+	for _, s := range blockedSlugs {
+		if _, err := ValidateWikiSlug(s); err == nil {
+			t.Errorf("expected wiki slug '%s' to be blocked, but was accepted", s)
+		}
+	}
+
+	// 3. Import SSRF and Protocol Injection prevention
+	AllowLocalRepoImport = false
+	blockedImportURLs := []string{
+		"/etc/passwd",
+		"file:///etc/passwd",
+		"ext::sh -c whoami",
+		"http://127.0.0.1:8080/evil.git",
+		"http://localhost:3000/repo.git",
+		"http://169.254.169.254/latest/meta-data",
+		"http://10.0.0.1/private.git",
+		"http://192.168.1.1/secret.git",
+		"http://172.16.0.1/corp.git",
+	}
+	for _, u := range blockedImportURLs {
+		if err := ImportRepository(u, "/tmp/should-fail.git", "", ""); err == nil {
+			t.Errorf("expected import URL '%s' to be rejected, but succeeded", u)
+		}
 	}
 }
 

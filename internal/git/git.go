@@ -5,10 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -97,6 +100,116 @@ func SanitizeURL(rawURL string) string {
 	return parsed.String()
 }
 
+// AllowLocalRepoImport controls whether local filesystem paths can be imported into repositories.
+// By default false for security; can be enabled in test environments or by site administrators.
+var AllowLocalRepoImport = false
+
+func isPrivateIP(ip net.IP) bool {
+	if ip == nil {
+		return true
+	}
+	if ip4 := ip.To4(); ip4 != nil {
+		return ip4.IsLoopback() ||
+			ip4.IsLinkLocalUnicast() ||
+			ip4.IsLinkLocalMulticast() ||
+			ip4.IsPrivate() ||
+			ip4.IsMulticast() ||
+			ip4.IsUnspecified() ||
+			ip4.Equal(net.IPv4bcast)
+	}
+	return ip.IsLoopback() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsPrivate() ||
+		ip.IsMulticast() ||
+		ip.IsUnspecified()
+}
+
+func isBlockedHost(host string) bool {
+	h := strings.ToLower(strings.TrimSpace(host))
+	if h == "" || h == "localhost" || strings.HasSuffix(h, ".localhost") || strings.HasSuffix(h, ".local") {
+		return true
+	}
+	if ip := net.ParseIP(h); ip != nil {
+		return isPrivateIP(ip)
+	}
+	return false
+}
+
+// ValidateRepoPath ensures a relative file path is safe to use in repository operations:
+// - Rejects null bytes and control characters
+// - Normalizes Windows backslashes to forward slashes
+// - Cleans path and strips leading/trailing slashes
+// - Rejects empty paths, '.', or '..'
+// - Rejects any path component matching '.git' (case-insensitive) or internal metadata
+// - Rejects any path component starting with '-'
+func ValidateRepoPath(filePath string) (string, error) {
+	if strings.ContainsRune(filePath, 0) {
+		return "", fmt.Errorf("file path contains null byte")
+	}
+	normalized := strings.ReplaceAll(filePath, "\\", "/")
+	// Reject explicit path traversal attempts
+	for _, segment := range strings.Split(normalized, "/") {
+		if segment == ".." || segment == "." {
+			return "", fmt.Errorf("path traversal component not allowed")
+		}
+	}
+
+	cleaned := path.Clean("/" + normalized)
+	cleaned = strings.TrimPrefix(cleaned, "/")
+
+	if cleaned == "" || cleaned == "." || cleaned == ".." {
+		return "", fmt.Errorf("invalid file path")
+	}
+
+	parts := strings.Split(cleaned, "/")
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		pLower := strings.ToLower(p)
+		if pLower == ".git" || strings.HasPrefix(pLower, ".git/") || strings.HasPrefix(pLower, ".git\\") {
+			return "", fmt.Errorf("file path cannot access .git directory")
+		}
+		if pLower == ".git" || (strings.HasPrefix(pLower, ".git") && (len(pLower) == 4 || pLower[4] == '.' || pLower[4] == '~')) {
+			if pLower != ".gitignore" && pLower != ".gitattributes" && pLower != ".gitmodules" {
+				return "", fmt.Errorf("file path cannot access git internal metadata")
+			}
+		}
+		if p == ".." || p == "." {
+			return "", fmt.Errorf("path traversal component not allowed")
+		}
+		if strings.HasPrefix(p, "-") {
+			return "", fmt.Errorf("file path cannot start with a hyphen")
+		}
+	}
+
+	return cleaned, nil
+}
+
+var validWikiSlug = regexp.MustCompile(`^[a-zA-Z0-9_\-\.\ ]+$`)
+
+// ValidateWikiSlug ensures wiki page slugs contain no path traversal, control characters, or flag injection.
+func ValidateWikiSlug(slug string) (string, error) {
+	if strings.ContainsRune(slug, 0) {
+		return "", fmt.Errorf("wiki slug contains null byte")
+	}
+	slug = strings.TrimSpace(slug)
+	clean := strings.TrimSuffix(slug, ".md")
+	clean = strings.TrimSpace(clean)
+	if clean == "" || clean == "." || clean == ".." || strings.HasPrefix(clean, "-") {
+		return "", fmt.Errorf("invalid wiki page name")
+	}
+	if strings.Contains(clean, "/") || strings.Contains(clean, "\\") {
+		return "", fmt.Errorf("wiki page name cannot contain path separators")
+	}
+	if strings.EqualFold(clean, ".git") || strings.HasPrefix(strings.ToLower(clean), ".git") {
+		return "", fmt.Errorf("invalid wiki page name")
+	}
+	if !validWikiSlug.MatchString(clean) {
+		return "", fmt.Errorf("wiki page name contains invalid characters")
+	}
+	return clean, nil
+}
+
 // ImportRepository clones a remote Git repository into a bare destination repository.
 func ImportRepository(cloneURL, destRepoPath, username, password string) error {
 	cloneURL = strings.TrimSpace(cloneURL)
@@ -118,9 +231,13 @@ func ImportRepository(cloneURL, destRepoPath, username, password string) error {
 	username = strings.TrimSpace(username)
 	password = strings.TrimSpace(password)
 
-	// If credentials provided and scheme is HTTP/HTTPS, inject credentials into URL safely
-	if username != "" || password != "" {
-		if parsed, err := url.Parse(cloneURL); err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") {
+	// Disallow ext:: and file:// protocols, enforce http/https unless local import explicitly permitted
+	parsed, parseErr := url.Parse(cloneURL)
+	if parseErr == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") {
+		if !AllowLocalRepoImport && isBlockedHost(parsed.Hostname()) {
+			return errors.New("import from private or localhost addresses is prohibited")
+		}
+		if username != "" || password != "" {
 			if username != "" && password != "" {
 				parsed.User = url.UserPassword(username, password)
 			} else if username != "" {
@@ -130,14 +247,23 @@ func ImportRepository(cloneURL, destRepoPath, username, password string) error {
 			}
 			targetURL = parsed.String()
 		}
+	} else {
+		// Not http or https
+		if !AllowLocalRepoImport {
+			return errors.New("only http and https clone URLs are supported")
+		}
+		if strings.HasPrefix(cloneURL, "ext::") || strings.Contains(cloneURL, "::") {
+			return errors.New("unsupported protocol helper in clone URL")
+		}
 	}
 
 	// Try cloning with --mirror first to preserve all branches, tags, and commits
-	_, err := RunGitWithTimeout(3*time.Minute, "", "clone", "--mirror", targetURL, destRepoPath)
+	// Always disable protocol.ext to prevent external program execution
+	_, err := RunGitWithTimeout(3*time.Minute, "", "-c", "protocol.ext.allow=never", "clone", "--mirror", targetURL, destRepoPath)
 	if err != nil {
 		// Clean up partial destination and retry with --bare
 		_ = os.RemoveAll(destRepoPath)
-		_, err = RunGitWithTimeout(3*time.Minute, "", "clone", "--bare", targetURL, destRepoPath)
+		_, err = RunGitWithTimeout(3*time.Minute, "", "-c", "protocol.ext.allow=never", "clone", "--bare", targetURL, destRepoPath)
 	}
 
 	if err != nil {
@@ -552,7 +678,7 @@ func GetCommitDiff(repoPath, sha string) (*CommitDiff, error) {
 		c = &commits[0]
 	}
 
-	out, err := RunGit(repoPath, "diff-tree", "-r", "-p", "--root", sha)
+	out, err := RunGit(repoPath, "diff-tree", "-r", "-p", "--root", "--end-of-options", sha)
 	if err != nil {
 		return nil, err
 	}
@@ -579,7 +705,7 @@ func GetBranchDiff(repoPath, baseBranch, headBranch string) (*CompareResult, err
 	commits, _ := GetCommits(repoPath, commitRange, 100, 0)
 
 	// Get unified diff
-	diffOut, _ := RunGit(repoPath, "diff", "-u", baseBranch, headBranch, "--")
+	diffOut, _ := RunGit(repoPath, "diff", "-u", "--", baseBranch, headBranch)
 	files := parseDiffOutput(string(diffOut))
 
 	return &CompareResult{
@@ -595,6 +721,9 @@ func GetBranchDiff(repoPath, baseBranch, headBranch string) (*CompareResult, err
 func MergeBranches(repoPath, baseBranch, headBranch, mergeStyle, message, authorName, authorEmail string) (string, error) {
 	if abs, err := filepath.Abs(repoPath); err == nil {
 		repoPath = abs
+	}
+	if strings.HasPrefix(baseBranch, "-") || strings.HasPrefix(headBranch, "-") {
+		return "", fmt.Errorf("invalid branch name")
 	}
 
 	tempDir, err := os.MkdirTemp("", "progit-merge-*")
@@ -620,7 +749,11 @@ func MergeBranches(repoPath, baseBranch, headBranch, mergeStyle, message, author
 	}
 
 	authorStr := fmt.Sprintf("%s <%s>", authorName, authorEmail)
-	gitConfigArgs := []string{"-c", "user.name=" + authorName, "-c", "user.email=" + authorEmail}
+	gitConfigArgs := []string{
+		"-c", "core.hooksPath=",
+		"-c", "user.name=" + authorName,
+		"-c", "user.email=" + authorEmail,
+	}
 
 	switch mergeStyle {
 	case "squash":
@@ -885,12 +1018,11 @@ func SaveWikiPage(wikiRepoPath, repoName, slug, title, content, authorName, auth
 		wikiRepoPath = abs
 	}
 
-	cleanSlug := strings.TrimSpace(slug)
-	if cleanSlug == "" {
-		cleanSlug = "Home"
+	cleanSlug, err := ValidateWikiSlug(slug)
+	if err != nil {
+		return err
 	}
 	cleanSlug = strings.ReplaceAll(cleanSlug, " ", "-")
-	cleanSlug = strings.TrimSuffix(cleanSlug, ".md")
 	fileName := cleanSlug + ".md"
 
 	if authorName == "" {
@@ -920,11 +1052,12 @@ func SaveWikiPage(wikiRepoPath, repoName, slug, title, content, authorName, auth
 			return err
 		}
 
-		if _, err := RunGit(tempDir, "add", fileName); err != nil {
+		if _, err := RunGit(tempDir, "add", "--", fileName); err != nil {
 			return err
 		}
 
 		commitArgs := []string{
+			"-c", "core.hooksPath=",
 			"-c", "user.name=" + authorName,
 			"-c", "user.email=" + authorEmail,
 			"commit", "-m", message,
@@ -959,12 +1092,16 @@ func SaveWikiPage(wikiRepoPath, repoName, slug, title, content, authorName, auth
 		return err
 	}
 
-	if _, err := RunGit(tempDir, "add", fileName); err != nil {
+	if _, err := RunGit(tempDir, "add", "--", fileName); err != nil {
 		return err
 	}
 
 	authorStr := fmt.Sprintf("%s <%s>", authorName, authorEmail)
-	gitConfigArgs := []string{"-c", "user.name=" + authorName, "-c", "user.email=" + authorEmail}
+	gitConfigArgs := []string{
+		"-c", "core.hooksPath=",
+		"-c", "user.name=" + authorName,
+		"-c", "user.email=" + authorEmail,
+	}
 
 	commitArgs := append(gitConfigArgs, "commit", "-m", message, "--author="+authorStr)
 	if _, err := RunGit(tempDir, commitArgs...); err != nil {
@@ -987,7 +1124,11 @@ func DeleteWikiPage(wikiRepoPath, slug, authorName, authorEmail string) error {
 		return fmt.Errorf("wiki repository does not exist")
 	}
 
-	cleanSlug := strings.TrimSuffix(slug, ".md")
+	cleanSlug, err := ValidateWikiSlug(slug)
+	if err != nil {
+		return err
+	}
+	cleanSlug = strings.ReplaceAll(cleanSlug, " ", "-")
 	fileName := cleanSlug + ".md"
 
 	tempDir, err := os.MkdirTemp("", "progit-wiki-rm-*")
@@ -1005,13 +1146,17 @@ func DeleteWikiPage(wikiRepoPath, slug, authorName, authorEmail string) error {
 		return fmt.Errorf("page '%s' does not exist", cleanSlug)
 	}
 
-	if _, err := RunGit(tempDir, "rm", fileName); err != nil {
+	if _, err := RunGit(tempDir, "rm", "--", fileName); err != nil {
 		return err
 	}
 
 	message := fmt.Sprintf("Delete page %s", cleanSlug)
 	authorStr := fmt.Sprintf("%s <%s>", authorName, authorEmail)
-	gitConfigArgs := []string{"-c", "user.name=" + authorName, "-c", "user.email=" + authorEmail}
+	gitConfigArgs := []string{
+		"-c", "core.hooksPath=",
+		"-c", "user.name=" + authorName,
+		"-c", "user.email=" + authorEmail,
+	}
 
 	commitArgs := append(gitConfigArgs, "commit", "-m", message, "--author="+authorStr)
 	if _, err := RunGit(tempDir, commitArgs...); err != nil {
@@ -1047,6 +1192,11 @@ func SaveFile(repoPath, branch, filePath, content, authorName, authorEmail, mess
 		targetBranch = newBranch
 	}
 
+	cleanFilePath, err := ValidateRepoPath(filePath)
+	if err != nil {
+		return "", "", err
+	}
+
 	tempDir, err := os.MkdirTemp("", "progit-file-edit-*")
 	if err != nil {
 		return "", "", err
@@ -1078,12 +1228,13 @@ func SaveFile(repoPath, branch, filePath, content, authorName, authorEmail, mess
 		}
 	}
 
-	cleanFilePath := strings.TrimPrefix(filepath.Clean("/"+filePath), "/")
-	if cleanFilePath == "" || cleanFilePath == "." {
-		return "", "", fmt.Errorf("invalid file path")
+	destPath := filepath.Join(tempDir, filepath.FromSlash(cleanFilePath))
+	cleanTemp := filepath.Clean(tempDir)
+	cleanDest := filepath.Clean(destPath)
+	if !strings.HasPrefix(cleanDest, cleanTemp+string(filepath.Separator)) {
+		return "", "", fmt.Errorf("file path escapes repository boundary")
 	}
 
-	destPath := filepath.Join(tempDir, filepath.FromSlash(cleanFilePath))
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 		return "", "", fmt.Errorf("create directory failed: %w", err)
 	}
@@ -1092,7 +1243,7 @@ func SaveFile(repoPath, branch, filePath, content, authorName, authorEmail, mess
 		return "", "", fmt.Errorf("write file failed: %w", err)
 	}
 
-	if _, err := RunGit(tempDir, "add", filepath.FromSlash(cleanFilePath)); err != nil {
+	if _, err := RunGit(tempDir, "add", "--", filepath.FromSlash(cleanFilePath)); err != nil {
 		return "", "", fmt.Errorf("git add failed: %w", err)
 	}
 
@@ -1106,7 +1257,11 @@ func SaveFile(repoPath, branch, filePath, content, authorName, authorEmail, mess
 		authorEmail = "git@progit.io"
 	}
 	authorStr := fmt.Sprintf("%s <%s>", authorName, authorEmail)
-	gitConfigArgs := []string{"-c", "user.name=" + authorName, "-c", "user.email=" + authorEmail}
+	gitConfigArgs := []string{
+		"-c", "core.hooksPath=",
+		"-c", "user.name=" + authorName,
+		"-c", "user.email=" + authorEmail,
+	}
 
 	commitArgs := append(gitConfigArgs, "commit", "-m", message, "--author="+authorStr)
 	if _, err := RunGit(tempDir, commitArgs...); err != nil {
@@ -1139,6 +1294,11 @@ func DeleteFile(repoPath, branch, filePath, authorName, authorEmail, message, ne
 		targetBranch = newBranch
 	}
 
+	cleanFilePath, err := ValidateRepoPath(filePath)
+	if err != nil {
+		return "", "", err
+	}
+
 	tempDir, err := os.MkdirTemp("", "progit-file-delete-*")
 	if err != nil {
 		return "", "", err
@@ -1156,13 +1316,17 @@ func DeleteFile(repoPath, branch, filePath, authorName, authorEmail, message, ne
 		}
 	}
 
-	cleanFilePath := strings.TrimPrefix(filepath.Clean("/"+filePath), "/")
 	destPath := filepath.Join(tempDir, filepath.FromSlash(cleanFilePath))
+	cleanTemp := filepath.Clean(tempDir)
+	cleanDest := filepath.Clean(destPath)
+	if !strings.HasPrefix(cleanDest, cleanTemp+string(filepath.Separator)) {
+		return "", "", fmt.Errorf("file path escapes repository boundary")
+	}
 	if _, err := os.Stat(destPath); os.IsNotExist(err) {
 		return "", "", fmt.Errorf("file '%s' does not exist", cleanFilePath)
 	}
 
-	if _, err := RunGit(tempDir, "rm", filepath.FromSlash(cleanFilePath)); err != nil {
+	if _, err := RunGit(tempDir, "rm", "--", filepath.FromSlash(cleanFilePath)); err != nil {
 		return "", "", fmt.Errorf("git rm failed: %w", err)
 	}
 
@@ -1176,7 +1340,11 @@ func DeleteFile(repoPath, branch, filePath, authorName, authorEmail, message, ne
 		authorEmail = "git@progit.io"
 	}
 	authorStr := fmt.Sprintf("%s <%s>", authorName, authorEmail)
-	gitConfigArgs := []string{"-c", "user.name=" + authorName, "-c", "user.email=" + authorEmail}
+	gitConfigArgs := []string{
+		"-c", "core.hooksPath=",
+		"-c", "user.name=" + authorName,
+		"-c", "user.email=" + authorEmail,
+	}
 
 	commitArgs := append(gitConfigArgs, "commit", "-m", message, "--author="+authorStr)
 	if _, err := RunGit(tempDir, commitArgs...); err != nil {
@@ -1212,6 +1380,15 @@ func UploadFiles(repoPath, branch, baseSubPath string, files []UploadedFile, aut
 		targetBranch = newBranch
 	}
 
+	cleanBasePath := ""
+	if baseSubPath != "" {
+		cbp, err := ValidateRepoPath(baseSubPath)
+		if err != nil {
+			return "", "", fmt.Errorf("invalid base path: %w", err)
+		}
+		cleanBasePath = cbp
+	}
+
 	tempDir, err := os.MkdirTemp("", "progit-upload-*")
 	if err != nil {
 		return "", "", err
@@ -1243,21 +1420,21 @@ func UploadFiles(repoPath, branch, baseSubPath string, files []UploadedFile, aut
 		}
 	}
 
-	cleanBasePath := strings.TrimPrefix(filepath.Clean("/"+baseSubPath), "/")
-	if cleanBasePath == "." {
-		cleanBasePath = ""
-	}
-
+	cleanTemp := filepath.Clean(tempDir)
 	for _, f := range files {
-		cleanRelPath := strings.TrimPrefix(filepath.Clean("/"+f.Path), "/")
-		if cleanRelPath == "" || cleanRelPath == "." {
-			continue
+		cleanRelPath, err := ValidateRepoPath(f.Path)
+		if err != nil {
+			return "", "", fmt.Errorf("invalid file path '%s': %w", f.Path, err)
 		}
 		fullRel := cleanRelPath
 		if cleanBasePath != "" {
-			fullRel = filepath.Join(cleanBasePath, cleanRelPath)
+			fullRel = path.Join(cleanBasePath, cleanRelPath)
 		}
 		destPath := filepath.Join(tempDir, filepath.FromSlash(fullRel))
+		cleanDest := filepath.Clean(destPath)
+		if !strings.HasPrefix(cleanDest, cleanTemp+string(filepath.Separator)) {
+			return "", "", fmt.Errorf("file path '%s' escapes repository boundary", fullRel)
+		}
 
 		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 			return "", "", fmt.Errorf("create directory for %s failed: %w", fullRel, err)
@@ -1265,7 +1442,7 @@ func UploadFiles(repoPath, branch, baseSubPath string, files []UploadedFile, aut
 		if err := os.WriteFile(destPath, f.Data, 0644); err != nil {
 			return "", "", fmt.Errorf("write file %s failed: %w", fullRel, err)
 		}
-		if _, err := RunGit(tempDir, "add", filepath.FromSlash(fullRel)); err != nil {
+		if _, err := RunGit(tempDir, "add", "--", filepath.FromSlash(fullRel)); err != nil {
 			return "", "", fmt.Errorf("git add %s failed: %w", fullRel, err)
 		}
 	}
@@ -1280,7 +1457,11 @@ func UploadFiles(repoPath, branch, baseSubPath string, files []UploadedFile, aut
 		authorEmail = "git@progit.io"
 	}
 	authorStr := fmt.Sprintf("%s <%s>", authorName, authorEmail)
-	gitConfigArgs := []string{"-c", "user.name=" + authorName, "-c", "user.email=" + authorEmail}
+	gitConfigArgs := []string{
+		"-c", "core.hooksPath=",
+		"-c", "user.name=" + authorName,
+		"-c", "user.email=" + authorEmail,
+	}
 
 	commitArgs := append(gitConfigArgs, "commit", "-m", message, "--author="+authorStr)
 	if _, err := RunGit(tempDir, commitArgs...); err != nil {
@@ -1316,8 +1497,13 @@ func GetBlame(repoDir, ref, filePath string) ([]BlameLine, error) {
 	if ref == "" {
 		ref = "HEAD"
 	}
-	cleanPath := filepath.Clean(filePath)
-	cleanPath = strings.TrimPrefix(cleanPath, "/")
+	if strings.HasPrefix(ref, "-") {
+		return nil, fmt.Errorf("invalid branch or ref name")
+	}
+	cleanPath, err := ValidateRepoPath(filePath)
+	if err != nil {
+		return nil, err
+	}
 
 	out, err := RunGit(repoDir, "blame", "--line-porcelain", ref, "--", cleanPath)
 	if err != nil {
@@ -1400,11 +1586,14 @@ func SearchCode(repoDir, ref, query string) ([]CodeMatch, error) {
 	if ref == "" {
 		ref = "HEAD"
 	}
+	if strings.HasPrefix(ref, "-") {
+		return nil, fmt.Errorf("invalid branch or ref name")
+	}
 	if query == "" {
 		return nil, nil
 	}
 
-	out, err := RunGit(repoDir, "grep", "-n", "-I", "-i", "--max-count=150", query, ref)
+	out, err := RunGit(repoDir, "grep", "-n", "-I", "-i", "--max-count=150", "-e", query, "--", ref)
 	if err != nil {
 		// Exit code 1 from git grep means no matches found
 		return []CodeMatch{}, nil
