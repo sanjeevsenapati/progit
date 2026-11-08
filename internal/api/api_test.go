@@ -2529,6 +2529,138 @@ func TestRepoAndOrgCreationLimits(t *testing.T) {
 	}
 }
 
+func TestUserFollowUnfollow(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	// 1. Create two test users
+	alice, err := database.CreateUser("follow_alice", "alice@follow.local", "hash", "Alice Follower", false)
+	if err != nil {
+		t.Fatalf("failed to create alice: %v", err)
+	}
+	aliceToken := "pgt_follow_alice_tok"
+	_, _ = database.CreateAccessToken(alice.ID, "tok", aliceToken, "repo,user")
+
+	bob, err := database.CreateUser("follow_bob", "bob@follow.local", "hash", "Bob Target", false)
+	if err != nil {
+		t.Fatalf("failed to create bob: %v", err)
+	}
+	bobToken := "pgt_follow_bob_tok"
+	_, _ = database.CreateAccessToken(bob.ID, "tok", bobToken, "repo,user")
+
+	// 2. Alice tries to follow herself (must fail with 400 Bad Request)
+	reqSelf := httptest.NewRequest("POST", "/api/v1/user/following/follow_alice", nil)
+	reqSelf.Header.Set("Authorization", "Bearer "+aliceToken)
+	recSelf := httptest.NewRecorder()
+	router.ServeHTTP(recSelf, reqSelf)
+	if recSelf.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 Bad Request when following self, got %d: %s", recSelf.Code, recSelf.Body.String())
+	}
+
+	// 3. Alice follows Bob (POST /api/v1/user/following/follow_bob)
+	reqFollow := httptest.NewRequest("POST", "/api/v1/user/following/follow_bob", nil)
+	reqFollow.Header.Set("Authorization", "Bearer "+aliceToken)
+	recFollow := httptest.NewRecorder()
+	router.ServeHTTP(recFollow, reqFollow)
+	if recFollow.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK following bob, got %d: %s", recFollow.Code, recFollow.Body.String())
+	}
+
+	var followResp map[string]any
+	_ = json.Unmarshal(recFollow.Body.Bytes(), &followResp)
+	if followResp["following"] != true {
+		t.Errorf("expected following: true, got %v", followResp["following"])
+	}
+	if fmt.Sprintf("%v", followResp["followers_count"]) != "1" {
+		t.Errorf("expected followers_count: 1, got %v", followResp["followers_count"])
+	}
+
+	// 4. Alice checks follow status
+	reqCheck := httptest.NewRequest("GET", "/api/v1/user/following/follow_bob", nil)
+	reqCheck.Header.Set("Authorization", "Bearer "+aliceToken)
+	recCheck := httptest.NewRecorder()
+	router.ServeHTTP(recCheck, reqCheck)
+	if recCheck.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK checking follow status, got %d", recCheck.Code)
+	}
+	var checkResp map[string]any
+	_ = json.Unmarshal(recCheck.Body.Bytes(), &checkResp)
+	if checkResp["following"] != true {
+		t.Errorf("expected following to be true in check, got %v", checkResp["following"])
+	}
+
+	// 5. Check Bob's profile as Alice
+	reqProfile := httptest.NewRequest("GET", "/api/v1/users/follow_bob", nil)
+	reqProfile.Header.Set("Authorization", "Bearer "+aliceToken)
+	recProfile := httptest.NewRecorder()
+	router.ServeHTTP(recProfile, reqProfile)
+	if recProfile.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK getting profile, got %d", recProfile.Code)
+	}
+	var profResp map[string]any
+	_ = json.Unmarshal(recProfile.Body.Bytes(), &profResp)
+	if profResp["is_following"] != true {
+		t.Errorf("expected is_following to be true in profile, got %v", profResp["is_following"])
+	}
+	if fmt.Sprintf("%v", profResp["followers_count"]) != "1" {
+		t.Errorf("expected followers_count: 1, got %v", profResp["followers_count"])
+	}
+
+	// 6. List Bob's followers
+	reqFollowers := httptest.NewRequest("GET", "/api/v1/users/follow_bob/followers", nil)
+	recFollowers := httptest.NewRecorder()
+	router.ServeHTTP(recFollowers, reqFollowers)
+	if recFollowers.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK listing followers, got %d", recFollowers.Code)
+	}
+	var followersList []map[string]any
+	_ = json.Unmarshal(recFollowers.Body.Bytes(), &followersList)
+	if len(followersList) != 1 || followersList[0]["username"] != "follow_alice" {
+		t.Errorf("expected follow_alice in followers list, got %v", followersList)
+	}
+
+	// 7. List Alice's following
+	reqFollowing := httptest.NewRequest("GET", "/api/v1/users/follow_alice/following", nil)
+	recFollowing := httptest.NewRecorder()
+	router.ServeHTTP(recFollowing, reqFollowing)
+	if recFollowing.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK listing following, got %d", recFollowing.Code)
+	}
+	var followingList []map[string]any
+	_ = json.Unmarshal(recFollowing.Body.Bytes(), &followingList)
+	if len(followingList) != 1 || followingList[0]["username"] != "follow_bob" {
+		t.Errorf("expected follow_bob in following list, got %v", followingList)
+	}
+
+	// 8. Alice unfollows Bob (DELETE /api/v1/user/following/follow_bob)
+	reqUnfollow := httptest.NewRequest("DELETE", "/api/v1/user/following/follow_bob", nil)
+	reqUnfollow.Header.Set("Authorization", "Bearer "+aliceToken)
+	recUnfollow := httptest.NewRecorder()
+	router.ServeHTTP(recUnfollow, reqUnfollow)
+	if recUnfollow.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK unfollowing bob, got %d: %s", recUnfollow.Code, recUnfollow.Body.String())
+	}
+	var unfollowResp map[string]any
+	_ = json.Unmarshal(recUnfollow.Body.Bytes(), &unfollowResp)
+	if unfollowResp["following"] != false {
+		t.Errorf("expected following: false, got %v", unfollowResp["following"])
+	}
+	if fmt.Sprintf("%v", unfollowResp["followers_count"]) != "0" {
+		t.Errorf("expected followers_count: 0, got %v", unfollowResp["followers_count"])
+	}
+
+	// 9. Verify follow status is now false
+	reqCheck2 := httptest.NewRequest("GET", "/api/v1/user/following/follow_bob", nil)
+	reqCheck2.Header.Set("Authorization", "Bearer "+aliceToken)
+	recCheck2 := httptest.NewRecorder()
+	router.ServeHTTP(recCheck2, reqCheck2)
+	var check2Resp map[string]any
+	_ = json.Unmarshal(recCheck2.Body.Bytes(), &check2Resp)
+	if check2Resp["following"] != false {
+		t.Errorf("expected following: false after unfollow, got %v", check2Resp["following"])
+	}
+}
+
 
 
 

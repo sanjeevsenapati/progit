@@ -154,6 +154,15 @@ func runMigrations(db *sql.DB) error {
 		PRIMARY KEY(user_id, repo_id)
 	);
 
+	CREATE TABLE IF NOT EXISTS follows (
+		follower_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		following_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY(follower_id, following_id)
+	);
+	CREATE INDEX IF NOT EXISTS idx_follows_follower ON follows(follower_id);
+	CREATE INDEX IF NOT EXISTS idx_follows_following ON follows(following_id);
+
 	CREATE TABLE IF NOT EXISTS collaborators (
 		repo_id INTEGER NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
 		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -622,6 +631,7 @@ func DeleteUser(userID int64) error {
 	_, _ = DB.Exec(`DELETE FROM access_tokens WHERE user_id = ?`, userID)
 	_, _ = DB.Exec(`DELETE FROM ssh_keys WHERE user_id = ?`, userID)
 	_, _ = DB.Exec(`DELETE FROM stars WHERE user_id = ?`, userID)
+	_, _ = DB.Exec(`DELETE FROM follows WHERE follower_id = ? OR following_id = ?`, userID, userID)
 	_, _ = DB.Exec(`DELETE FROM activities WHERE user_id = ?`, userID)
 	_, err := DB.Exec(`DELETE FROM users WHERE id = ?`, userID)
 	return err
@@ -1262,6 +1272,116 @@ func ListStarredRepositories(userID int64) ([]*Repository, error) {
 		list = append(list, r)
 	}
 	return list, rows.Err()
+}
+
+// ============================================================================
+// User Follow / Social Graph Functions
+// ============================================================================
+
+func FollowUser(followerID, followingID int64) error {
+	if followerID == followingID {
+		return fmt.Errorf("cannot follow yourself")
+	}
+	_, err := DB.Exec(`INSERT OR IGNORE INTO follows (follower_id, following_id) VALUES (?, ?)`, followerID, followingID)
+	return err
+}
+
+func UnfollowUser(followerID, followingID int64) error {
+	_, err := DB.Exec(`DELETE FROM follows WHERE follower_id = ? AND following_id = ?`, followerID, followingID)
+	return err
+}
+
+func IsFollowing(followerID, followingID int64) bool {
+	if followerID == 0 || followingID == 0 || followerID == followingID {
+		return false
+	}
+	var count int
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM follows WHERE follower_id = ? AND following_id = ?`, followerID, followingID).Scan(&count)
+	return count > 0
+}
+
+func CountFollowers(userID int64) (int, error) {
+	var count int
+	err := DB.QueryRow(`SELECT COUNT(*) FROM follows WHERE following_id = ?`, userID).Scan(&count)
+	return count, err
+}
+
+func CountFollowing(userID int64) (int, error) {
+	var count int
+	err := DB.QueryRow(`SELECT COUNT(*) FROM follows WHERE follower_id = ?`, userID).Scan(&count)
+	return count, err
+}
+
+func ListFollowers(userID int64, limit, offset int) ([]*User, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	query := `
+		SELECT u.id, u.username, u.email, u.full_name, u.avatar_url, u.is_admin, u.is_active,
+		       u.location, u.website, u.bio, u.max_repo_creation, u.max_org_creation, u.created_at, u.updated_at
+		FROM users u
+		JOIN follows f ON f.follower_id = u.id
+		WHERE f.following_id = ?
+		ORDER BY f.created_at DESC
+		LIMIT ? OFFSET ?
+	`
+	rows, err := DB.Query(query, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(
+			&u.ID, &u.Username, &u.Email, &u.FullName, &u.AvatarURL,
+			&u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio,
+			&u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		u.NumFollowers, _ = CountFollowers(u.ID)
+		u.NumFollowing, _ = CountFollowing(u.ID)
+		users = append(users, &u)
+	}
+	return users, nil
+}
+
+func ListFollowing(userID int64, limit, offset int) ([]*User, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	query := `
+		SELECT u.id, u.username, u.email, u.full_name, u.avatar_url, u.is_admin, u.is_active,
+		       u.location, u.website, u.bio, u.max_repo_creation, u.max_org_creation, u.created_at, u.updated_at
+		FROM users u
+		JOIN follows f ON f.following_id = u.id
+		WHERE f.follower_id = ?
+		ORDER BY f.created_at DESC
+		LIMIT ? OFFSET ?
+	`
+	rows, err := DB.Query(query, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(
+			&u.ID, &u.Username, &u.Email, &u.FullName, &u.AvatarURL,
+			&u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio,
+			&u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		u.NumFollowers, _ = CountFollowers(u.ID)
+		u.NumFollowing, _ = CountFollowing(u.ID)
+		users = append(users, &u)
+	}
+	return users, nil
 }
 
 func CanUserAccessRepo(user *User, repo *Repository, writeRequired bool) bool {

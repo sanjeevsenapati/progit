@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api, User, Repository, Activity, Organization } from '../lib/api';
 import { useAuth } from '../lib/theme';
 import { OrgView } from './OrgView';
+import { showToast } from '../components/ModalDialog';
 import { 
   BookOpen, 
   GitBranch, 
@@ -18,7 +19,10 @@ import {
   Lock, 
   Search, 
   ExternalLink,
-  ChevronDown
+  ChevronDown,
+  UserPlus,
+  UserCheck,
+  Loader2
 } from 'lucide-react';
 
 interface UserProfileProps {
@@ -63,9 +67,19 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username }) => {
   const [isOrg, setIsOrg] = useState(false);
   const [loading, setLoading] = useState(() => !isSelf);
   
-  const [activeTab, setActiveTab] = useState<'overview' | 'repositories' | 'starred' | 'organizations'>(() => {
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followLoading, setFollowLoading] = useState(false);
+
+  const [followersList, setFollowersList] = useState<User[]>([]);
+  const [followingList, setFollowingList] = useState<User[]>([]);
+  const [followersLoading, setFollowersLoading] = useState(false);
+  const [followingLoading, setFollowingLoading] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<'overview' | 'repositories' | 'starred' | 'organizations' | 'followers' | 'following'>(() => {
     const urlTab = new URLSearchParams(window.location.search).get('tab');
-    if (urlTab === 'organizations' || urlTab === 'repositories' || urlTab === 'starred') return urlTab;
+    if (urlTab === 'organizations' || urlTab === 'repositories' || urlTab === 'starred' || urlTab === 'followers' || urlTab === 'following') return urlTab;
     return 'overview';
   });
   const [repoSearch, setRepoSearch] = useState('');
@@ -84,6 +98,9 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username }) => {
         setActivities(data.activities || []);
         setOrganizations(data.organizations || []);
         setStarred(data.starred || []);
+        setFollowersCount(data.followers_count ?? data.user?.num_followers ?? 0);
+        setFollowingCount(data.following_count ?? data.user?.num_following ?? 0);
+        setIsFollowing(data.is_following ?? data.user?.is_following ?? false);
       } catch (err) {
         console.error(err);
       } finally {
@@ -92,6 +109,51 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username }) => {
     }
     load();
   }, [username]);
+
+  // Load followers/following when tab is selected
+  useEffect(() => {
+    if (activeTab === 'followers') {
+      setFollowersLoading(true);
+      api.listFollowers(username)
+        .then(res => setFollowersList(res || []))
+        .catch(err => console.error(err))
+        .finally(() => setFollowersLoading(false));
+    } else if (activeTab === 'following') {
+      setFollowingLoading(true);
+      api.listFollowing(username)
+        .then(res => setFollowingList(res || []))
+        .catch(err => console.error(err))
+        .finally(() => setFollowingLoading(false));
+    }
+  }, [activeTab, username]);
+
+  const handleFollowToggle = async () => {
+    if (!currentUser) {
+      window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+      return;
+    }
+    if (isSelf) return;
+
+    try {
+      setFollowLoading(true);
+      if (isFollowing) {
+        const res = await api.unfollowUser(username);
+        setIsFollowing(false);
+        setFollowersCount(res.followers_count ?? Math.max(0, followersCount - 1));
+        showToast(`Unfollowed @${username}`, 'info');
+      } else {
+        const res = await api.followUser(username);
+        setIsFollowing(true);
+        setFollowersCount(res.followers_count ?? (followersCount + 1));
+        showToast(`Started following @${username}`, 'success');
+      }
+    } catch (err: any) {
+      console.error('Follow error:', err);
+      showToast(err.message || 'Failed to update follow status', 'error');
+    } finally {
+      setFollowLoading(false);
+    }
+  };
 
   if (isOrg) {
     return <OrgView orgName={username} />;
@@ -223,6 +285,36 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username }) => {
                 </span>
               </button>
             )}
+
+            <button
+              onClick={() => setActiveTab('followers')}
+              className={`flex items-center space-x-2 py-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
+                activeTab === 'followers'
+                  ? 'border-emerald-500 text-gray-900 dark:text-white font-semibold'
+                  : 'border-transparent text-gray-500 dark:text-dark-muted hover:text-gray-700 dark:hover:text-dark-text'
+              }`}
+            >
+              <Users className="w-4 h-4 text-gray-400" />
+              <span>Followers</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-dark-border text-gray-600 dark:text-dark-text font-bold">
+                {followersCount}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('following')}
+              className={`flex items-center space-x-2 py-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
+                activeTab === 'following'
+                  ? 'border-emerald-500 text-gray-900 dark:text-white font-semibold'
+                  : 'border-transparent text-gray-500 dark:text-dark-muted hover:text-gray-700 dark:hover:text-dark-text'
+              }`}
+            >
+              <Users className="w-4 h-4 text-gray-400" />
+              <span>Following</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-dark-border text-gray-600 dark:text-dark-text font-bold">
+                {followingCount}
+              </span>
+            </button>
           </div>
         </div>
       </div>
@@ -271,9 +363,31 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username }) => {
             ) : (
               <div className="space-y-2">
                 <button
-                  className="w-full py-1.5 px-3 text-center text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-colors cursor-pointer"
+                  type="button"
+                  onClick={handleFollowToggle}
+                  disabled={followLoading}
+                  className={`w-full py-1.5 px-3 text-center text-xs font-semibold rounded-lg shadow-sm transition-all flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-60 ${
+                    isFollowing
+                      ? 'border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-700 dark:text-gray-200 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 dark:hover:text-red-400 hover:border-red-300 dark:hover:border-red-800'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  }`}
                 >
-                  Follow
+                  {followLoading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Updating...</span>
+                    </>
+                  ) : isFollowing ? (
+                    <>
+                      <UserCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>Following</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>Follow</span>
+                    </>
+                  )}
                 </button>
                 {currentUser && (
                   <a
@@ -289,16 +403,28 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username }) => {
 
             {/* Social & Followers stats */}
             <div className="flex items-center space-x-4 text-xs text-gray-600 dark:text-dark-muted pt-2 border-t border-gray-200 dark:border-dark-border">
-              <div className="flex items-center space-x-1.5">
+              <button
+                type="button"
+                onClick={() => setActiveTab('followers')}
+                className={`flex items-center space-x-1.5 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer ${
+                  activeTab === 'followers' ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : ''
+                }`}
+              >
                 <Users className="w-4 h-4 text-gray-400" />
-                <span className="font-bold text-gray-900 dark:text-white">1</span>
-                <span>follower</span>
-              </div>
+                <span className="font-bold text-gray-900 dark:text-white">{followersCount}</span>
+                <span>{followersCount === 1 ? 'follower' : 'followers'}</span>
+              </button>
               <span>•</span>
-              <div className="flex items-center space-x-1">
-                <span className="font-bold text-gray-900 dark:text-white">3</span>
+              <button
+                type="button"
+                onClick={() => setActiveTab('following')}
+                className={`flex items-center space-x-1 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer ${
+                  activeTab === 'following' ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : ''
+                }`}
+              >
+                <span className="font-bold text-gray-900 dark:text-white">{followingCount}</span>
                 <span>following</span>
-              </div>
+              </button>
             </div>
 
             {/* Metadata list */}
@@ -710,6 +836,110 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username }) => {
                     )}
                   </a>
                 ))}
+              </div>
+            )}
+
+            {/* FOLLOWERS TAB */}
+            {activeTab === 'followers' && (
+              <div className="space-y-4">
+                <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-xs divide-y divide-gray-100 dark:divide-dark-border overflow-hidden">
+                  {followersLoading ? (
+                    <div className="p-8 text-center text-xs text-gray-400 flex items-center justify-center space-x-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                      <span>Loading followers...</span>
+                    </div>
+                  ) : followersList.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-gray-400 space-y-2">
+                      <Users className="w-8 h-8 mx-auto text-gray-300 dark:text-dark-muted" />
+                      <p>No followers yet.</p>
+                    </div>
+                  ) : (
+                    followersList.map(u => (
+                      <div key={u.id} className="p-4 flex items-center justify-between hover:bg-gray-50/50 dark:hover:bg-dark-hover/30 transition-colors">
+                        <div className="flex items-center space-x-3 min-w-0">
+                          <a href={`/${u.username}`} className="w-10 h-10 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
+                            {u.avatar_url ? (
+                              <img src={u.avatar_url} alt={u.username} className="w-full h-full object-cover" />
+                            ) : (
+                              u.username.charAt(0).toUpperCase()
+                            )}
+                          </a>
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-2">
+                              <a href={`/${u.username}`} className="font-bold text-sm text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 truncate">
+                                {u.full_name || u.username}
+                              </a>
+                              <span className="text-xs text-gray-400 truncate">@{u.username}</span>
+                            </div>
+                            {u.bio && (
+                              <p className="text-xs text-gray-600 dark:text-dark-muted line-clamp-1 mt-0.5">
+                                {u.bio}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <a
+                          href={`/${u.username}`}
+                          className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-white shrink-0 ml-4"
+                        >
+                          View Profile
+                        </a>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* FOLLOWING TAB */}
+            {activeTab === 'following' && (
+              <div className="space-y-4">
+                <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-xs divide-y divide-gray-100 dark:divide-dark-border overflow-hidden">
+                  {followingLoading ? (
+                    <div className="p-8 text-center text-xs text-gray-400 flex items-center justify-center space-x-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                      <span>Loading following...</span>
+                    </div>
+                  ) : followingList.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-gray-400 space-y-2">
+                      <Users className="w-8 h-8 mx-auto text-gray-300 dark:text-dark-muted" />
+                      <p>Not following anyone yet.</p>
+                    </div>
+                  ) : (
+                    followingList.map(u => (
+                      <div key={u.id} className="p-4 flex items-center justify-between hover:bg-gray-50/50 dark:hover:bg-dark-hover/30 transition-colors">
+                        <div className="flex items-center space-x-3 min-w-0">
+                          <a href={`/${u.username}`} className="w-10 h-10 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
+                            {u.avatar_url ? (
+                              <img src={u.avatar_url} alt={u.username} className="w-full h-full object-cover" />
+                            ) : (
+                              u.username.charAt(0).toUpperCase()
+                            )}
+                          </a>
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-2">
+                              <a href={`/${u.username}`} className="font-bold text-sm text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 truncate">
+                                {u.full_name || u.username}
+                              </a>
+                              <span className="text-xs text-gray-400 truncate">@{u.username}</span>
+                            </div>
+                            {u.bio && (
+                              <p className="text-xs text-gray-600 dark:text-dark-muted line-clamp-1 mt-0.5">
+                                {u.bio}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <a
+                          href={`/${u.username}`}
+                          className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-white shrink-0 ml-4"
+                        >
+                          View Profile
+                        </a>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             )}
           </div>

@@ -198,6 +198,14 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("PUT /api/v1/user/password", r.handleUpdateUserPassword)
 	r.mux.HandleFunc("GET /api/v1/users/{username}", r.handleGetUserProfile)
 
+	// User Follow / Unfollow
+	r.mux.HandleFunc("GET /api/v1/user/following/{username}", r.handleCheckFollowing)
+	r.mux.HandleFunc("POST /api/v1/user/following/{username}", r.handleFollowUser)
+	r.mux.HandleFunc("PUT /api/v1/user/following/{username}", r.handleFollowUser)
+	r.mux.HandleFunc("DELETE /api/v1/user/following/{username}", r.handleUnfollowUser)
+	r.mux.HandleFunc("GET /api/v1/users/{username}/followers", r.handleListFollowers)
+	r.mux.HandleFunc("GET /api/v1/users/{username}/following", r.handleListFollowing)
+
 	// Repositories
 	r.mux.HandleFunc("GET /api/v1/repos", r.handleListRepos)
 	r.mux.HandleFunc("GET /api/v1/repos/search", r.handleSearchRepos)
@@ -1065,15 +1073,137 @@ func (r *Router) handleGetUserProfile(w http.ResponseWriter, req *http.Request) 
 		orgData = org
 	}
 
+	followersCount, _ := database.CountFollowers(targetUser.ID)
+	followingCount, _ := database.CountFollowing(targetUser.ID)
+	isFollowing := false
+	if currentUser != nil {
+		isFollowing = database.IsFollowing(currentUser.ID, targetUser.ID)
+	}
+	targetUser.NumFollowers = followersCount
+	targetUser.NumFollowing = followingCount
+	targetUser.IsFollowing = isFollowing
+
 	jsonResponse(w, http.StatusOK, map[string]any{
-		"user":          targetUser,
-		"repositories":  repos,
-		"activities":    activities,
-		"organizations": orgs,
-		"starred":       starred,
-		"is_org":        isOrg,
-		"organization":  orgData,
+		"user":            targetUser,
+		"repositories":    repos,
+		"activities":      activities,
+		"organizations":   orgs,
+		"starred":         starred,
+		"is_org":          isOrg,
+		"organization":    orgData,
+		"followers_count": followersCount,
+		"following_count": followingCount,
+		"is_following":    isFollowing,
 	})
+}
+
+// User Follow / Social Graph Handlers
+
+func (r *Router) handleCheckFollowing(w http.ResponseWriter, req *http.Request) {
+	currentUser := auth.AuthenticateRequest(req)
+	if currentUser == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	targetUsername := req.PathValue("username")
+	targetUser, err := database.GetUserByUsername(targetUsername)
+	if err != nil || targetUser == nil {
+		jsonError(w, http.StatusNotFound, "User not found")
+		return
+	}
+	following := database.IsFollowing(currentUser.ID, targetUser.ID)
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"following": following,
+	})
+}
+
+func (r *Router) handleFollowUser(w http.ResponseWriter, req *http.Request) {
+	currentUser := auth.AuthenticateRequest(req)
+	if currentUser == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	targetUsername := req.PathValue("username")
+	targetUser, err := database.GetUserByUsername(targetUsername)
+	if err != nil || targetUser == nil {
+		jsonError(w, http.StatusNotFound, "User not found")
+		return
+	}
+	if targetUser.ID == currentUser.ID {
+		jsonError(w, http.StatusBadRequest, "You cannot follow yourself")
+		return
+	}
+	if err := database.FollowUser(currentUser.ID, targetUser.ID); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	database.CreateActivity(currentUser.ID, currentUser.Username, nil, "", "follow_user", fmt.Sprintf("Started following @%s", targetUser.Username))
+	followersCount, _ := database.CountFollowers(targetUser.ID)
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"message":         fmt.Sprintf("Now following @%s", targetUser.Username),
+		"following":       true,
+		"followers_count": followersCount,
+	})
+}
+
+func (r *Router) handleUnfollowUser(w http.ResponseWriter, req *http.Request) {
+	currentUser := auth.AuthenticateRequest(req)
+	if currentUser == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	targetUsername := req.PathValue("username")
+	targetUser, err := database.GetUserByUsername(targetUsername)
+	if err != nil || targetUser == nil {
+		jsonError(w, http.StatusNotFound, "User not found")
+		return
+	}
+	if err := database.UnfollowUser(currentUser.ID, targetUser.ID); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	followersCount, _ := database.CountFollowers(targetUser.ID)
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"message":         fmt.Sprintf("Unfollowed @%s", targetUser.Username),
+		"following":       false,
+		"followers_count": followersCount,
+	})
+}
+
+func (r *Router) handleListFollowers(w http.ResponseWriter, req *http.Request) {
+	targetUsername := req.PathValue("username")
+	targetUser, err := database.GetUserByUsername(targetUsername)
+	if err != nil || targetUser == nil {
+		jsonError(w, http.StatusNotFound, "User not found")
+		return
+	}
+	followers, err := database.ListFollowers(targetUser.ID, 100, 0)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if followers == nil {
+		followers = []*database.User{}
+	}
+	jsonResponse(w, http.StatusOK, followers)
+}
+
+func (r *Router) handleListFollowing(w http.ResponseWriter, req *http.Request) {
+	targetUsername := req.PathValue("username")
+	targetUser, err := database.GetUserByUsername(targetUsername)
+	if err != nil || targetUser == nil {
+		jsonError(w, http.StatusNotFound, "User not found")
+		return
+	}
+	following, err := database.ListFollowing(targetUser.ID, 100, 0)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if following == nil {
+		following = []*database.User{}
+	}
+	jsonResponse(w, http.StatusOK, following)
 }
 
 // Repository Handlers

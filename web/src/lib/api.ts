@@ -13,6 +13,9 @@ export interface User {
   max_org_creation: number;
   num_repos?: number;
   num_orgs?: number;
+  num_followers?: number;
+  num_following?: number;
+  is_following?: boolean;
   created_at: string;
 }
 
@@ -765,7 +768,34 @@ export const api = {
       starred?: Repository[];
       is_org?: boolean;
       organization?: Organization;
+      followers_count?: number;
+      following_count?: number;
+      is_following?: boolean;
     }>(`/api/v1/users/${username}`);
+  },
+
+  async followUser(username: string) {
+    return fetchJSON<{ message: string; following: boolean; followers_count: number }>(`/api/v1/user/following/${username}`, {
+      method: 'POST',
+    });
+  },
+
+  async unfollowUser(username: string) {
+    return fetchJSON<{ message: string; following: boolean; followers_count: number }>(`/api/v1/user/following/${username}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async checkFollowing(username: string) {
+    return fetchJSON<{ following: boolean }>(`/api/v1/user/following/${username}`);
+  },
+
+  async listFollowers(username: string) {
+    return fetchJSON<User[]>(`/api/v1/users/${username}/followers`);
+  },
+
+  async listFollowing(username: string) {
+    return fetchJSON<User[]>(`/api/v1/users/${username}/following`);
   },
 
   async updateUserSettings(data: {

@@ -18,6 +18,9 @@ type User struct {
 	MaxOrgCreation  int       `json:"max_org_creation"`  // -1 = inherit global default, 0 = disabled, >0 = limit
 	NumRepos        int       `json:"num_repos,omitempty"`
 	NumOrgs         int       `json:"num_orgs,omitempty"`
+	NumFollowers    int       `json:"num_followers,omitempty"`
+	NumFollowing    int       `json:"num_following,omitempty"`
+	IsFollowing     bool      `json:"is_following,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
