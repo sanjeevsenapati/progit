@@ -1379,12 +1379,15 @@ func (r *Router) handleGetRepo(w http.ResponseWriter, req *http.Request) {
 	} else {
 		sshCloneURL = fmt.Sprintf("ssh://git@%s:%d/%s/%s.git", r.cfg.Server.Domain, r.cfg.SSH.Port, owner, repoName)
 	}
-	wikiCloneURLHTTP := fmt.Sprintf("%s%s/%s.wiki.git", rootURL, owner, repoName)
+	var wikiCloneURLHTTP string
 	var wikiCloneURLSSH string
-	if r.cfg.SSH.Port == 22 {
-		wikiCloneURLSSH = fmt.Sprintf("git@%s:%s/%s.wiki.git", r.cfg.Server.Domain, owner, repoName)
-	} else {
-		wikiCloneURLSSH = fmt.Sprintf("ssh://git@%s:%d/%s/%s.wiki.git", r.cfg.Server.Domain, r.cfg.SSH.Port, owner, repoName)
+	if repo.EnableWiki {
+		wikiCloneURLHTTP = fmt.Sprintf("%s%s/%s.wiki.git", rootURL, owner, repoName)
+		if r.cfg.SSH.Port == 22 {
+			wikiCloneURLSSH = fmt.Sprintf("git@%s:%s/%s.wiki.git", r.cfg.Server.Domain, owner, repoName)
+		} else {
+			wikiCloneURLSSH = fmt.Sprintf("ssh://git@%s:%d/%s/%s.wiki.git", r.cfg.Server.Domain, r.cfg.SSH.Port, owner, repoName)
+		}
 	}
 	pagesURL := fmt.Sprintf("%spages/%s/%s/", rootURL, owner, repoName)
 
@@ -2879,17 +2882,26 @@ func (r *Router) handleListWikiPages(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if !repo.EnableWiki {
+		jsonError(w, http.StatusForbidden, "Wikis are disabled for this repository")
+		return
+	}
+
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
 	wikiDir := git.GetWikiRepoPath(repoDir)
 
 	if _, err := os.Stat(wikiDir); os.IsNotExist(err) {
-		_ = git.InitWikiRepository(wikiDir, repo.Name, "ProGit", "wiki@progit.io")
+		jsonResponse(w, http.StatusOK, []git.WikiPageMeta{})
+		return
 	}
 
 	pages, err := git.ListWikiPages(wikiDir)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	if pages == nil {
+		pages = []git.WikiPageMeta{}
 	}
 
 	jsonResponse(w, http.StatusOK, pages)
@@ -2912,11 +2924,17 @@ func (r *Router) handleGetWikiPage(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if !repo.EnableWiki {
+		jsonError(w, http.StatusForbidden, "Wikis are disabled for this repository")
+		return
+	}
+
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
 	wikiDir := git.GetWikiRepoPath(repoDir)
 
 	if _, err := os.Stat(wikiDir); os.IsNotExist(err) {
-		_ = git.InitWikiRepository(wikiDir, repo.Name, "ProGit", "wiki@progit.io")
+		jsonError(w, http.StatusNotFound, "Wiki page not found")
+		return
 	}
 
 	page, err := git.GetWikiPage(wikiDir, slug)
@@ -2941,6 +2959,11 @@ func (r *Router) handleSaveWikiPage(w http.ResponseWriter, req *http.Request) {
 	repo, err := database.GetRepositoryByName(owner, repoName)
 	if err != nil || repo == nil {
 		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !repo.EnableWiki {
+		jsonError(w, http.StatusForbidden, "Wikis are disabled for this repository")
 		return
 	}
 
@@ -2995,6 +3018,11 @@ func (r *Router) handleDeleteWikiPage(w http.ResponseWriter, req *http.Request) 
 		return
 	}
 
+	if !repo.EnableWiki {
+		jsonError(w, http.StatusForbidden, "Wikis are disabled for this repository")
+		return
+	}
+
 	if !database.CanUserAccessRepo(user, repo, true) {
 		jsonError(w, http.StatusForbidden, "Write access required")
 		return
@@ -3027,6 +3055,11 @@ func (r *Router) handleGetWikiPageHistory(w http.ResponseWriter, req *http.Reque
 	user := auth.AuthenticateRequest(req)
 	if !database.CanUserAccessRepo(user, repo, false) {
 		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !repo.EnableWiki {
+		jsonError(w, http.StatusForbidden, "Wikis are disabled for this repository")
 		return
 	}
 

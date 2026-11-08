@@ -268,6 +268,28 @@ func TestWikiAndPagesWorkflow(t *testing.T) {
 		t.Fatalf("expected 201 Created for repo, got %d: %s", recRepo.Code, recRepo.Body.String())
 	}
 
+	// 2b. Verify First-Time Wiki Experience:
+	// Prior to saving any page, listing pages returns an empty slice (not auto-creating default files)
+	reqWikiInitList := httptest.NewRequest("GET", "/api/v1/repos/alice/wiki-demo/wiki/pages", nil)
+	recWikiInitList := httptest.NewRecorder()
+	router.ServeHTTP(recWikiInitList, reqWikiInitList)
+	if recWikiInitList.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for initial wiki list, got %d: %s", recWikiInitList.Code, recWikiInitList.Body.String())
+	}
+	var initPages []map[string]any
+	_ = json.Unmarshal(recWikiInitList.Body.Bytes(), &initPages)
+	if len(initPages) != 0 {
+		t.Fatalf("expected 0 wiki pages before creation, got %d", len(initPages))
+	}
+
+	// Also verify requesting non-existent page returns 404 Not Found without creating repos
+	reqWikiInitGet := httptest.NewRequest("GET", "/api/v1/repos/alice/wiki-demo/wiki/pages/Home", nil)
+	recWikiInitGet := httptest.NewRecorder()
+	router.ServeHTTP(recWikiInitGet, reqWikiInitGet)
+	if recWikiInitGet.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 Not Found for non-existent initial wiki page, got %d: %s", recWikiInitGet.Code, recWikiInitGet.Body.String())
+	}
+
 	// 3. Save a Wiki Page
 	wikiPageBody := map[string]string{
 		"slug":    "Architecture",
@@ -313,6 +335,63 @@ func TestWikiAndPagesWorkflow(t *testing.T) {
 	router.ServeHTTP(recWikiHist, reqWikiHist)
 	if recWikiHist.Code != http.StatusOK {
 		t.Fatalf("expected 200 OK for wiki history, got %d: %s", recWikiHist.Code, recWikiHist.Body.String())
+	}
+
+	// 6b. Test Repository Wiki Enable/Disable Settings Toggle
+	// Disable wiki via repo settings PATCH
+	disableWikiBody := map[string]any{"enable_wiki": false}
+	disableWikiBytes, _ := json.Marshal(disableWikiBody)
+	reqDisableWiki := httptest.NewRequest("PATCH", "/api/v1/repos/alice/wiki-demo/settings", bytes.NewReader(disableWikiBytes))
+	reqDisableWiki.Header.Set("Authorization", "Bearer "+token)
+	reqDisableWiki.Header.Set("Content-Type", "application/json")
+	recDisableWiki := httptest.NewRecorder()
+	router.ServeHTTP(recDisableWiki, reqDisableWiki)
+	if recDisableWiki.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for repo settings update, got %d: %s", recDisableWiki.Code, recDisableWiki.Body.String())
+	}
+
+	// Endpoints must now return 403 Forbidden
+	reqWikiDisabledList := httptest.NewRequest("GET", "/api/v1/repos/alice/wiki-demo/wiki/pages", nil)
+	recWikiDisabledList := httptest.NewRecorder()
+	router.ServeHTTP(recWikiDisabledList, reqWikiDisabledList)
+	if recWikiDisabledList.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden for wiki list when disabled, got %d", recWikiDisabledList.Code)
+	}
+
+	reqWikiDisabledGet := httptest.NewRequest("GET", "/api/v1/repos/alice/wiki-demo/wiki/pages/Architecture", nil)
+	recWikiDisabledGet := httptest.NewRecorder()
+	router.ServeHTTP(recWikiDisabledGet, reqWikiDisabledGet)
+	if recWikiDisabledGet.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden for wiki get when disabled, got %d", recWikiDisabledGet.Code)
+	}
+
+	reqWikiDisabledSave := httptest.NewRequest("POST", "/api/v1/repos/alice/wiki-demo/wiki/pages", bytes.NewReader(wikiPageBytes))
+	reqWikiDisabledSave.Header.Set("Authorization", "Bearer "+token)
+	reqWikiDisabledSave.Header.Set("Content-Type", "application/json")
+	recWikiDisabledSave := httptest.NewRecorder()
+	router.ServeHTTP(recWikiDisabledSave, reqWikiDisabledSave)
+	if recWikiDisabledSave.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden for wiki save when disabled, got %d", recWikiDisabledSave.Code)
+	}
+
+	// Re-enable wiki via repo settings PATCH
+	enableWikiBody := map[string]any{"enable_wiki": true}
+	enableWikiBytes, _ := json.Marshal(enableWikiBody)
+	reqEnableWiki := httptest.NewRequest("PATCH", "/api/v1/repos/alice/wiki-demo/settings", bytes.NewReader(enableWikiBytes))
+	reqEnableWiki.Header.Set("Authorization", "Bearer "+token)
+	reqEnableWiki.Header.Set("Content-Type", "application/json")
+	recEnableWiki := httptest.NewRecorder()
+	router.ServeHTTP(recEnableWiki, reqEnableWiki)
+	if recEnableWiki.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for repo settings update re-enabling wiki, got %d: %s", recEnableWiki.Code, recEnableWiki.Body.String())
+	}
+
+	// Verify endpoints are accessible again
+	reqWikiReenabledList := httptest.NewRequest("GET", "/api/v1/repos/alice/wiki-demo/wiki/pages", nil)
+	recWikiReenabledList := httptest.NewRecorder()
+	router.ServeHTTP(recWikiReenabledList, reqWikiReenabledList)
+	if recWikiReenabledList.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for wiki list after re-enabling, got %d", recWikiReenabledList.Code)
 	}
 
 	// 7. Enable Pages & Configure

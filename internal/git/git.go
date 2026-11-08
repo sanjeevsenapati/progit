@@ -885,12 +885,6 @@ func SaveWikiPage(wikiRepoPath, repoName, slug, title, content, authorName, auth
 		wikiRepoPath = abs
 	}
 
-	if _, err := os.Stat(wikiRepoPath); os.IsNotExist(err) {
-		if err := InitWikiRepository(wikiRepoPath, repoName, authorName, authorEmail); err != nil {
-			return err
-		}
-	}
-
 	cleanSlug := strings.TrimSpace(slug)
 	if cleanSlug == "" {
 		cleanSlug = "Home"
@@ -898,6 +892,57 @@ func SaveWikiPage(wikiRepoPath, repoName, slug, title, content, authorName, auth
 	cleanSlug = strings.ReplaceAll(cleanSlug, " ", "-")
 	cleanSlug = strings.TrimSuffix(cleanSlug, ".md")
 	fileName := cleanSlug + ".md"
+
+	if authorName == "" {
+		authorName = "ProGit"
+	}
+	if authorEmail == "" {
+		authorEmail = "wiki@progit.io"
+	}
+	if message == "" {
+		message = fmt.Sprintf("Initial wiki page %s", cleanSlug)
+	}
+
+	// If wiki repository does not exist yet, initialize it directly with the first page
+	if _, err := os.Stat(wikiRepoPath); os.IsNotExist(err) {
+		tempDir, err := os.MkdirTemp("", "progit-wiki-init-*")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(tempDir)
+
+		if _, err := RunGit("", "init", "--initial-branch=main", tempDir); err != nil {
+			return err
+		}
+
+		filePath := filepath.Join(tempDir, fileName)
+		if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+			return err
+		}
+
+		if _, err := RunGit(tempDir, "add", fileName); err != nil {
+			return err
+		}
+
+		commitArgs := []string{
+			"-c", "user.name=" + authorName,
+			"-c", "user.email=" + authorEmail,
+			"commit", "-m", message,
+		}
+		if _, err := RunGit(tempDir, commitArgs...); err != nil {
+			return err
+		}
+
+		if err := os.MkdirAll(filepath.Dir(wikiRepoPath), 0755); err != nil {
+			return err
+		}
+
+		if _, err := RunGit("", "clone", "--bare", tempDir, wikiRepoPath); err != nil {
+			return err
+		}
+
+		return nil
+	}
 
 	tempDir, err := os.MkdirTemp("", "progit-wiki-work-*")
 	if err != nil {
@@ -918,15 +963,6 @@ func SaveWikiPage(wikiRepoPath, repoName, slug, title, content, authorName, auth
 		return err
 	}
 
-	if message == "" {
-		message = fmt.Sprintf("Update %s", cleanSlug)
-	}
-	if authorName == "" {
-		authorName = "ProGit"
-	}
-	if authorEmail == "" {
-		authorEmail = "wiki@progit.io"
-	}
 	authorStr := fmt.Sprintf("%s <%s>", authorName, authorEmail)
 	gitConfigArgs := []string{"-c", "user.name=" + authorName, "-c", "user.email=" + authorEmail}
 

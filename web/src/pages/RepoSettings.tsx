@@ -526,23 +526,38 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
             </h2>
 
             {/* Wiki Feature Toggle */}
-            <div className="flex items-start justify-between pb-4 border-b border-gray-100 dark:border-dark-border/40">
-              <div className="space-y-1">
+            <label className="flex items-start justify-between p-4 rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50/60 dark:bg-dark-hover/30 hover:bg-gray-100/60 dark:hover:bg-dark-hover/60 transition-colors cursor-pointer">
+              <div className="space-y-1 pr-4">
                 <div className="flex items-center space-x-2">
                   <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span className="font-semibold text-sm text-gray-900 dark:text-white">Built-in Git Wiki</span>
+                  <span className="font-semibold text-sm text-gray-900 dark:text-white">Wikis</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                    enableWiki 
+                      ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300' 
+                      : 'bg-gray-200 dark:bg-dark-border text-gray-600 dark:text-dark-muted'
+                  }`}>
+                    {enableWiki ? 'Enabled' : 'Disabled'}
+                  </span>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-dark-muted max-w-xl">
-                  Host documentation alongside your project with its own versioned Git repository and markdown viewer.
+                  GitHub-style wikis for project documentation, architecture guides, and roadmaps alongside your code.
+                </p>
+                <p className="text-[11px] text-gray-400 dark:text-dark-muted">
+                  {enableWiki 
+                    ? 'The Wiki tab is visible in repository navigation and pages can be viewed or edited.' 
+                    : 'The Wiki tab and its endpoints are hidden from navigation and disabled for this repository.'}
                 </p>
               </div>
-              <input
-                type="checkbox"
-                checked={enableWiki}
-                onChange={e => setEnableWiki(e.target.checked)}
-                className="w-4 h-4 text-emerald-600 rounded border-gray-300 dark:border-dark-border focus:ring-emerald-500 mt-1 cursor-pointer"
-              />
-            </div>
+              <div className="flex items-center pt-1">
+                <input
+                  type="checkbox"
+                  id="enable_wiki_toggle"
+                  checked={enableWiki}
+                  onChange={e => setEnableWiki(e.target.checked)}
+                  className="w-5 h-5 text-emerald-600 rounded border-gray-300 dark:border-dark-border focus:ring-emerald-500 cursor-pointer"
+                />
+              </div>
+            </label>
 
             {/* ProGit Pages Feature Toggle */}
             <div className="space-y-4">

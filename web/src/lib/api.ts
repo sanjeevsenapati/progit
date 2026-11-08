@@ -831,10 +831,12 @@ export const api = {
     pages_branch?: string;
     pages_folder?: string;
   }) {
-    return fetchJSON<Repository>(`/api/v1/repos/${owner}/${repo}/settings`, {
+    const res = await fetchJSON<Repository>(`/api/v1/repos/${owner}/${repo}/settings`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
+    this.clearRepoCache(owner, repo);
+    return res;
   },
 
   // Installation
