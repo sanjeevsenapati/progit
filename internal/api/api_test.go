@@ -2389,6 +2389,146 @@ func TestVulnerabilityAssessmentRemediations(t *testing.T) {
 	}
 }
 
+func TestRepoAndOrgCreationLimits(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	// 1. Create Super Admin user
+	admin, err := database.CreateUser("limit_admin", "admin@limits.local", "hash", "Super Admin", true)
+	if err != nil {
+		t.Fatalf("failed to create admin: %v", err)
+	}
+	adminToken := "pgt_limit_admin_tok"
+	_, _ = database.CreateAccessToken(admin.ID, "tok", adminToken, "repo,user,admin")
+
+	// 2. Create Standard User
+	bob, err := database.CreateUser("limit_bob", "bob@limits.local", "hash", "Bob Normal", false)
+	if err != nil {
+		t.Fatalf("failed to create bob: %v", err)
+	}
+	bobToken := "pgt_limit_bob_tok"
+	_, _ = database.CreateAccessToken(bob.ID, "tok", bobToken, "repo,user")
+
+	// Set global repository creation limit to 2
+	router.cfg.Repository.MaxCreationLimit = 2
+	// Set global organization creation limit to 1
+	router.cfg.Organization.MaxCreationLimit = 1
+
+	// Helper to create repo for Bob
+	createRepo := func(name string) int {
+		body, _ := json.Marshal(map[string]any{
+			"name":      name,
+			"auto_init": true,
+		})
+		req := httptest.NewRequest("POST", "/api/v1/repos", bytes.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+bobToken)
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	// Helper to create org for Bob
+	createOrg := func(name string) int {
+		body, _ := json.Marshal(map[string]any{
+			"name": name,
+		})
+		req := httptest.NewRequest("POST", "/api/v1/orgs", bytes.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+bobToken)
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	// Bob creates Repo 1 (allowed, count becomes 1)
+	if code := createRepo("repo-one"); code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for repo 1, got %d", code)
+	}
+
+	// Bob creates Repo 2 (allowed, count becomes 2)
+	if code := createRepo("repo-two"); code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for repo 2, got %d", code)
+	}
+
+	// Bob creates Repo 3 (should be blocked by global limit = 2)
+	if code := createRepo("repo-three"); code != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden for repo 3 exceeding limit, got %d", code)
+	}
+
+	// Bob creates Org 1 (allowed, count becomes 1)
+	if code := createOrg("bob-org-one"); code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for org 1, got %d", code)
+	}
+
+	// Bob creates Org 2 (should be blocked by global org limit = 1)
+	if code := createOrg("bob-org-two"); code != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden for org 2 exceeding limit, got %d", code)
+	}
+
+	// Admin overrides Bob's per-user limits: max_repo_creation = 4, max_org_creation = 2
+	repoLimit4 := 4
+	orgLimit2 := 2
+	updateLimitsBody, _ := json.Marshal(map[string]any{
+		"max_repo_creation": repoLimit4,
+		"max_org_creation":  orgLimit2,
+	})
+	reqPatch := httptest.NewRequest("PATCH", fmt.Sprintf("/api/v1/admin/users/%d", bob.ID), bytes.NewReader(updateLimitsBody))
+	reqPatch.Header.Set("Authorization", "Bearer "+adminToken)
+	reqPatch.Header.Set("Content-Type", "application/json")
+	recPatch := httptest.NewRecorder()
+	router.ServeHTTP(recPatch, reqPatch)
+	if recPatch.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK updating user limits, got %d: %s", recPatch.Code, recPatch.Body.String())
+	}
+
+	// Bob creates Repo 3 now (allowed because custom limit = 4)
+	if code := createRepo("repo-three"); code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for repo 3 after limit increase, got %d", code)
+	}
+
+	// Bob creates Org 2 now (allowed because custom limit = 2)
+	if code := createOrg("bob-org-two"); code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for org 2 after limit increase, got %d", code)
+	}
+
+	// Admin tests bypass: Admin can create repos and orgs regardless of limits
+	adminRepoBody, _ := json.Marshal(map[string]any{
+		"name":      "admin-unlimited-repo",
+		"auto_init": true,
+	})
+	reqAdminRepo := httptest.NewRequest("POST", "/api/v1/repos", bytes.NewReader(adminRepoBody))
+	reqAdminRepo.Header.Set("Authorization", "Bearer "+adminToken)
+	reqAdminRepo.Header.Set("Content-Type", "application/json")
+	recAdminRepo := httptest.NewRecorder()
+	router.ServeHTTP(recAdminRepo, reqAdminRepo)
+	if recAdminRepo.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for admin repo, got %d", recAdminRepo.Code)
+	}
+
+	// Admin updates global configuration via PUT /api/v1/admin/config
+	newGlobalRepoLimit := 10
+	newGlobalOrgLimit := 5
+	cfgUpdateBody, _ := json.Marshal(map[string]any{
+		"default_repo_max_creation_limit": newGlobalRepoLimit,
+		"default_org_max_creation_limit":  newGlobalOrgLimit,
+	})
+	reqCfg := httptest.NewRequest("PUT", "/api/v1/admin/config", bytes.NewReader(cfgUpdateBody))
+	reqCfg.Header.Set("Authorization", "Bearer "+adminToken)
+	reqCfg.Header.Set("Content-Type", "application/json")
+	recCfg := httptest.NewRecorder()
+	router.ServeHTTP(recCfg, reqCfg)
+	if recCfg.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK updating admin config, got %d: %s", recCfg.Code, recCfg.Body.String())
+	}
+	if router.cfg.Repository.MaxCreationLimit != 10 {
+		t.Errorf("expected global repo limit 10, got %d", router.cfg.Repository.MaxCreationLimit)
+	}
+	if router.cfg.Organization.MaxCreationLimit != 5 {
+		t.Errorf("expected global org limit 5, got %d", router.cfg.Organization.MaxCreationLimit)
+	}
+}
+
 
 
 

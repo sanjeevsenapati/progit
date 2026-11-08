@@ -1214,6 +1214,35 @@ func (r *Router) handleCreateRepo(w http.ResponseWriter, req *http.Request) {
 		targetOwnerName = org.Name
 	}
 
+	// Enforce repository creation limits for non-admin users
+	if !user.IsAdmin {
+		if targetOwnerID == user.ID {
+			effectiveLimit := r.cfg.Repository.MaxCreationLimit
+			if user.MaxRepoCreation >= 0 {
+				effectiveLimit = user.MaxRepoCreation
+			}
+			if effectiveLimit >= 0 {
+				count, err := database.CountUserRepositories(user.ID)
+				if err == nil && count >= effectiveLimit {
+					jsonError(w, http.StatusForbidden, fmt.Sprintf("You have reached your repository creation limit of %d. Contact your administrator to increase your limit.", effectiveLimit))
+					return
+				}
+			}
+		} else {
+			effectiveLimit := r.cfg.Repository.MaxCreationLimit
+			if orgUser, err := database.GetUserByID(targetOwnerID); err == nil && orgUser != nil && orgUser.MaxRepoCreation >= 0 {
+				effectiveLimit = orgUser.MaxRepoCreation
+			}
+			if effectiveLimit >= 0 {
+				count, err := database.CountUserRepositories(targetOwnerID)
+				if err == nil && count >= effectiveLimit {
+					jsonError(w, http.StatusForbidden, fmt.Sprintf("Organization '%s' has reached its repository creation limit of %d", targetOwnerName, effectiveLimit))
+					return
+				}
+			}
+		}
+	}
+
 	repo, err := database.CreateRepository(targetOwnerID, body.Name, body.Description, body.Private)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
@@ -1324,6 +1353,35 @@ func (r *Router) handleImportRepo(w http.ResponseWriter, req *http.Request) {
 		}
 		targetOwnerID = orgUser.ID
 		targetOwnerName = org.Name
+	}
+
+	// Enforce repository creation limits for non-admin users
+	if !user.IsAdmin {
+		if targetOwnerID == user.ID {
+			effectiveLimit := r.cfg.Repository.MaxCreationLimit
+			if user.MaxRepoCreation >= 0 {
+				effectiveLimit = user.MaxRepoCreation
+			}
+			if effectiveLimit >= 0 {
+				count, err := database.CountUserRepositories(user.ID)
+				if err == nil && count >= effectiveLimit {
+					jsonError(w, http.StatusForbidden, fmt.Sprintf("You have reached your repository creation limit of %d. Contact your administrator to increase your limit.", effectiveLimit))
+					return
+				}
+			}
+		} else {
+			effectiveLimit := r.cfg.Repository.MaxCreationLimit
+			if orgUser, err := database.GetUserByID(targetOwnerID); err == nil && orgUser != nil && orgUser.MaxRepoCreation >= 0 {
+				effectiveLimit = orgUser.MaxRepoCreation
+			}
+			if effectiveLimit >= 0 {
+				count, err := database.CountUserRepositories(targetOwnerID)
+				if err == nil && count >= effectiveLimit {
+					jsonError(w, http.StatusForbidden, fmt.Sprintf("Organization '%s' has reached its repository creation limit of %d", targetOwnerName, effectiveLimit))
+					return
+				}
+			}
+		}
 	}
 
 	if existing, _ := database.GetRepositoryByName(targetOwnerName, body.Name); existing != nil {
@@ -2928,6 +2986,35 @@ func (r *Router) handleForkRepo(w http.ResponseWriter, req *http.Request) {
 		forkRepoName = parentRepo.Name
 	}
 
+	// Enforce repository creation limits for non-admin users
+	if !user.IsAdmin {
+		if destOwnerID == user.ID {
+			effectiveLimit := r.cfg.Repository.MaxCreationLimit
+			if user.MaxRepoCreation >= 0 {
+				effectiveLimit = user.MaxRepoCreation
+			}
+			if effectiveLimit >= 0 {
+				count, err := database.CountUserRepositories(user.ID)
+				if err == nil && count >= effectiveLimit {
+					jsonError(w, http.StatusForbidden, fmt.Sprintf("You have reached your repository creation limit of %d. Contact your administrator to increase your limit.", effectiveLimit))
+					return
+				}
+			}
+		} else {
+			effectiveLimit := r.cfg.Repository.MaxCreationLimit
+			if orgUser, err := database.GetUserByID(destOwnerID); err == nil && orgUser != nil && orgUser.MaxRepoCreation >= 0 {
+				effectiveLimit = orgUser.MaxRepoCreation
+			}
+			if effectiveLimit >= 0 {
+				count, err := database.CountUserRepositories(destOwnerID)
+				if err == nil && count >= effectiveLimit {
+					jsonError(w, http.StatusForbidden, fmt.Sprintf("Organization '%s' has reached its repository creation limit of %d", destOwnerName, effectiveLimit))
+					return
+				}
+			}
+		}
+	}
+
 	// 1. Create database record
 	forkedRepo, err := database.ForkRepository(parentRepo, destOwnerID, forkRepoName)
 	if err != nil {
@@ -4163,8 +4250,10 @@ func (r *Router) handleAdminStats(w http.ResponseWriter, req *http.Request) {
 		"num_goroutines":        runtime.NumGoroutine(),
 		"memory_alloc_mb":       float64(mem.Alloc) / 1024 / 1024,
 		"memory_sys_mb":         float64(mem.Sys) / 1024 / 1024,
-		"active_sessions_count": auth.CountActiveSessions(),
-		"install_locked":        r.cfg.Security.InstallLock,
+		"active_sessions_count":           auth.CountActiveSessions(),
+		"install_locked":                  r.cfg.Security.InstallLock,
+		"default_repo_max_creation_limit": r.cfg.Repository.MaxCreationLimit,
+		"default_org_max_creation_limit":  r.cfg.Organization.MaxCreationLimit,
 	})
 }
 
@@ -4191,11 +4280,13 @@ func (r *Router) handleAdminCreateUser(w http.ResponseWriter, req *http.Request)
 	}
 
 	var body struct {
-		Username string `json:"username"`
-		Email    string `json:"email"`
-		Password string `json:"password"`
-		FullName string `json:"full_name"`
-		IsAdmin  bool   `json:"is_admin"`
+		Username        string `json:"username"`
+		Email           string `json:"email"`
+		Password        string `json:"password"`
+		FullName        string `json:"full_name"`
+		IsAdmin         bool   `json:"is_admin"`
+		MaxRepoCreation *int   `json:"max_repo_creation"`
+		MaxOrgCreation  *int   `json:"max_org_creation"`
 	}
 	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 		jsonError(w, http.StatusBadRequest, "Invalid request body")
@@ -4233,6 +4324,13 @@ func (r *Router) handleAdminCreateUser(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
+	if body.MaxRepoCreation != nil || body.MaxOrgCreation != nil {
+		_ = database.UpdateUserLimits(newUser.ID, body.MaxRepoCreation, body.MaxOrgCreation)
+		if refreshed, err := database.GetUserByID(newUser.ID); err == nil && refreshed != nil {
+			newUser = refreshed
+		}
+	}
+
 	database.CreateActivity(currentAdmin.ID, currentAdmin.Username, nil, "", "admin_create_user", fmt.Sprintf("Admin created user @%s (admin=%v)", newUser.Username, newUser.IsAdmin))
 	jsonResponse(w, http.StatusCreated, newUser)
 }
@@ -4258,8 +4356,10 @@ func (r *Router) handleAdminUpdateUser(w http.ResponseWriter, req *http.Request)
 	}
 
 	var body struct {
-		IsAdmin  *bool `json:"is_admin"`
-		IsActive *bool `json:"is_active"`
+		IsAdmin         *bool `json:"is_admin"`
+		IsActive        *bool `json:"is_active"`
+		MaxRepoCreation *int  `json:"max_repo_creation"`
+		MaxOrgCreation  *int  `json:"max_org_creation"`
 	}
 	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 		jsonError(w, http.StatusBadRequest, "Invalid request body")
@@ -4286,6 +4386,12 @@ func (r *Router) handleAdminUpdateUser(w http.ResponseWriter, req *http.Request)
 	}
 	if body.IsActive != nil {
 		if err := database.UpdateUserStatus(targetID, *body.IsActive); err != nil {
+			jsonError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+	if body.MaxRepoCreation != nil || body.MaxOrgCreation != nil {
+		if err := database.UpdateUserLimits(targetID, body.MaxRepoCreation, body.MaxOrgCreation); err != nil {
 			jsonError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -4417,11 +4523,13 @@ func (r *Router) handleAdminUpdateConfig(w http.ResponseWriter, req *http.Reques
 	}
 
 	var body struct {
-		AppName  string `json:"app_name"`
-		Domain   string `json:"domain"`
-		RootURL  string `json:"root_url"`
-		SSHPort  int    `json:"ssh_port"`
-		HTTPPort int    `json:"http_port"`
+		AppName                     string `json:"app_name"`
+		Domain                      string `json:"domain"`
+		RootURL                     string `json:"root_url"`
+		SSHPort                     int    `json:"ssh_port"`
+		HTTPPort                    int    `json:"http_port"`
+		DefaultRepoMaxCreationLimit *int   `json:"default_repo_max_creation_limit"`
+		DefaultOrgMaxCreationLimit  *int   `json:"default_org_max_creation_limit"`
 	}
 	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 		jsonError(w, http.StatusBadRequest, "Invalid request body")
@@ -4447,6 +4555,12 @@ func (r *Router) handleAdminUpdateConfig(w http.ResponseWriter, req *http.Reques
 	if body.HTTPPort > 0 {
 		r.cfg.Server.HTTPPort = body.HTTPPort
 	}
+	if body.DefaultRepoMaxCreationLimit != nil {
+		r.cfg.Repository.MaxCreationLimit = *body.DefaultRepoMaxCreationLimit
+	}
+	if body.DefaultOrgMaxCreationLimit != nil {
+		r.cfg.Organization.MaxCreationLimit = *body.DefaultOrgMaxCreationLimit
+	}
 
 	// Persist to configuration file if standard directory exists
 	configPaths := []string{
@@ -4466,12 +4580,14 @@ func (r *Router) handleAdminUpdateConfig(w http.ResponseWriter, req *http.Reques
 	database.CreateActivity(currentAdmin.ID, currentAdmin.Username, nil, "", "admin_config", fmt.Sprintf("Updated server configuration: RootURL=%s, Domain=%s", r.cfg.Server.RootURL, r.cfg.Server.Domain))
 
 	jsonResponse(w, http.StatusOK, map[string]any{
-		"message":   "Server configuration updated successfully",
-		"app_name":  r.cfg.Server.AppName,
-		"domain":    r.cfg.Server.Domain,
-		"root_url":  r.cfg.Server.RootURL,
-		"ssh_port":  r.cfg.SSH.Port,
-		"http_port": r.cfg.Server.HTTPPort,
+		"message":                         "Server configuration updated successfully",
+		"app_name":                        r.cfg.Server.AppName,
+		"domain":                          r.cfg.Server.Domain,
+		"root_url":                        r.cfg.Server.RootURL,
+		"ssh_port":                        r.cfg.SSH.Port,
+		"http_port":                       r.cfg.Server.HTTPPort,
+		"default_repo_max_creation_limit": r.cfg.Repository.MaxCreationLimit,
+		"default_org_max_creation_limit":  r.cfg.Organization.MaxCreationLimit,
 	})
 }
 
@@ -5060,6 +5176,21 @@ func (r *Router) handleCreateOrg(w http.ResponseWriter, req *http.Request) {
 	if body.Name == "" {
 		jsonError(w, http.StatusBadRequest, "Organization name is required")
 		return
+	}
+
+	// Enforce organization creation limit for non-admin users
+	if !user.IsAdmin {
+		effectiveLimit := r.cfg.Organization.MaxCreationLimit
+		if user.MaxOrgCreation >= 0 {
+			effectiveLimit = user.MaxOrgCreation
+		}
+		if effectiveLimit >= 0 {
+			count, err := database.CountUserOwnedOrgs(user.ID)
+			if err == nil && count >= effectiveLimit {
+				jsonError(w, http.StatusForbidden, fmt.Sprintf("You have reached your organization creation limit of %d. Contact your administrator to increase your limit.", effectiveLimit))
+				return
+			}
+		}
 	}
 
 	org, err := database.CreateOrganization(body.Name, body.FullName, body.Description, body.Location, body.Website, user.ID)

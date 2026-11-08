@@ -80,6 +80,8 @@ func runMigrations(db *sql.DB) error {
 		location TEXT NOT NULL DEFAULT '',
 		website TEXT NOT NULL DEFAULT '',
 		bio TEXT NOT NULL DEFAULT '',
+		max_repo_creation INTEGER NOT NULL DEFAULT -1,
+		max_org_creation INTEGER NOT NULL DEFAULT -1,
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
@@ -274,6 +276,7 @@ func runMigrations(db *sql.DB) error {
 		avatar_url TEXT NOT NULL DEFAULT '',
 		location TEXT NOT NULL DEFAULT '',
 		website TEXT NOT NULL DEFAULT '',
+		max_repo_creation INTEGER NOT NULL DEFAULT -1,
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
@@ -420,6 +423,9 @@ func runMigrations(db *sql.DB) error {
 	_, _ = db.Exec(`ALTER TABLE repositories ADD COLUMN pages_branch TEXT NOT NULL DEFAULT 'main'`)
 	_, _ = db.Exec(`ALTER TABLE repositories ADD COLUMN pages_folder TEXT NOT NULL DEFAULT '/'`)
 	_, _ = db.Exec(`UPDATE repositories SET pages_branch = default_branch WHERE pages_branch = 'gh-pages' OR pages_branch = ''`)
+	_, _ = db.Exec(`ALTER TABLE users ADD COLUMN max_repo_creation INTEGER NOT NULL DEFAULT -1`)
+	_, _ = db.Exec(`ALTER TABLE users ADD COLUMN max_org_creation INTEGER NOT NULL DEFAULT -1`)
+	_, _ = db.Exec(`ALTER TABLE organizations ADD COLUMN max_repo_creation INTEGER NOT NULL DEFAULT -1`)
 
 	_, _ = db.Exec(`
 		CREATE TABLE IF NOT EXISTS pull_reviews (
@@ -474,9 +480,9 @@ func CreateUser(username, email, passwordHash, fullName string, isAdmin bool) (*
 func GetUserByID(id int64) (*User, error) {
 	u := &User{}
 	err := DB.QueryRow(`
-		SELECT id, username, email, password_hash, full_name, avatar_url, is_admin, is_active, location, website, bio, created_at, updated_at
+		SELECT id, username, email, password_hash, full_name, avatar_url, is_admin, is_active, location, website, bio, max_repo_creation, max_org_creation, created_at, updated_at
 		FROM users WHERE id = ?
-	`, id).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio, &u.CreatedAt, &u.UpdatedAt)
+	`, id).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio, &u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -486,9 +492,9 @@ func GetUserByID(id int64) (*User, error) {
 func GetUserByUsername(username string) (*User, error) {
 	u := &User{}
 	err := DB.QueryRow(`
-		SELECT id, username, email, password_hash, full_name, avatar_url, is_admin, is_active, location, website, bio, created_at, updated_at
+		SELECT id, username, email, password_hash, full_name, avatar_url, is_admin, is_active, location, website, bio, max_repo_creation, max_org_creation, created_at, updated_at
 		FROM users WHERE username = ? COLLATE NOCASE
-	`, strings.TrimSpace(username)).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio, &u.CreatedAt, &u.UpdatedAt)
+	`, strings.TrimSpace(username)).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio, &u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -498,9 +504,9 @@ func GetUserByUsername(username string) (*User, error) {
 func GetUserByEmail(email string) (*User, error) {
 	u := &User{}
 	err := DB.QueryRow(`
-		SELECT id, username, email, password_hash, full_name, avatar_url, is_admin, is_active, location, website, bio, created_at, updated_at
+		SELECT id, username, email, password_hash, full_name, avatar_url, is_admin, is_active, location, website, bio, max_repo_creation, max_org_creation, created_at, updated_at
 		FROM users WHERE email = ? COLLATE NOCASE
-	`, strings.TrimSpace(email)).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio, &u.CreatedAt, &u.UpdatedAt)
+	`, strings.TrimSpace(email)).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio, &u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -515,8 +521,10 @@ func CountUsers() (int, error) {
 
 func ListUsers(limit, offset int) ([]*User, error) {
 	rows, err := DB.Query(`
-		SELECT id, username, email, full_name, avatar_url, is_admin, is_active, location, website, bio, created_at, updated_at
-		FROM users ORDER BY id ASC LIMIT ? OFFSET ?
+		SELECT u.id, u.username, u.email, u.full_name, u.avatar_url, u.is_admin, u.is_active, u.location, u.website, u.bio, u.max_repo_creation, u.max_org_creation, u.created_at, u.updated_at,
+		       (SELECT COUNT(*) FROM repositories r WHERE r.owner_id = u.id) AS num_repos,
+		       (SELECT COUNT(*) FROM org_members om WHERE om.user_id = u.id AND om.role = 'owner') AS num_orgs
+		FROM users u ORDER BY u.id ASC LIMIT ? OFFSET ?
 	`, limit, offset)
 	if err != nil {
 		return nil, err
@@ -526,12 +534,43 @@ func ListUsers(limit, offset int) ([]*User, error) {
 	var users []*User
 	for rows.Next() {
 		u := &User{}
-		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio, &u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt, &u.NumRepos, &u.NumOrgs); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
 	}
 	return users, rows.Err()
+}
+
+func UpdateUserLimits(userID int64, maxRepoCreation, maxOrgCreation *int) error {
+	if maxRepoCreation != nil && maxOrgCreation != nil {
+		_, err := DB.Exec(`UPDATE users SET max_repo_creation = ?, max_org_creation = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, *maxRepoCreation, *maxOrgCreation, userID)
+		return err
+	} else if maxRepoCreation != nil {
+		_, err := DB.Exec(`UPDATE users SET max_repo_creation = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, *maxRepoCreation, userID)
+		return err
+	} else if maxOrgCreation != nil {
+		_, err := DB.Exec(`UPDATE users SET max_org_creation = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, *maxOrgCreation, userID)
+		return err
+	}
+	return nil
+}
+
+func UpdateOrgLimits(orgID int64, maxRepoCreation int) error {
+	_, err := DB.Exec(`UPDATE organizations SET max_repo_creation = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, maxRepoCreation, orgID)
+	return err
+}
+
+func CountUserRepositories(ownerID int64) (int, error) {
+	var count int
+	err := DB.QueryRow(`SELECT COUNT(*) FROM repositories WHERE owner_id = ?`, ownerID).Scan(&count)
+	return count, err
+}
+
+func CountUserOwnedOrgs(userID int64) (int, error) {
+	var count int
+	err := DB.QueryRow(`SELECT COUNT(*) FROM org_members WHERE user_id = ? AND role = 'owner'`, userID).Scan(&count)
+	return count, err
 }
 
 func UpdateUserAdmin(userID int64, isAdmin bool) error {
@@ -1973,9 +2012,9 @@ func CreateOrganization(name, fullName, description, location, website string, c
 func GetOrgByID(id int64) (*Organization, error) {
 	org := &Organization{}
 	err := DB.QueryRow(`
-		SELECT id, name, full_name, description, avatar_url, location, website, created_at, updated_at
+		SELECT id, name, full_name, description, avatar_url, location, website, max_repo_creation, created_at, updated_at
 		FROM organizations WHERE id = ?
-	`, id).Scan(&org.ID, &org.Name, &org.FullName, &org.Description, &org.AvatarURL, &org.Location, &org.Website, &org.CreatedAt, &org.UpdatedAt)
+	`, id).Scan(&org.ID, &org.Name, &org.FullName, &org.Description, &org.AvatarURL, &org.Location, &org.Website, &org.MaxRepoCreation, &org.CreatedAt, &org.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -1988,9 +2027,9 @@ func GetOrgByID(id int64) (*Organization, error) {
 func GetOrgByName(name string) (*Organization, error) {
 	org := &Organization{}
 	err := DB.QueryRow(`
-		SELECT id, name, full_name, description, avatar_url, location, website, created_at, updated_at
+		SELECT id, name, full_name, description, avatar_url, location, website, max_repo_creation, created_at, updated_at
 		FROM organizations WHERE name = ? COLLATE NOCASE
-	`, strings.TrimSpace(name)).Scan(&org.ID, &org.Name, &org.FullName, &org.Description, &org.AvatarURL, &org.Location, &org.Website, &org.CreatedAt, &org.UpdatedAt)
+	`, strings.TrimSpace(name)).Scan(&org.ID, &org.Name, &org.FullName, &org.Description, &org.AvatarURL, &org.Location, &org.Website, &org.MaxRepoCreation, &org.CreatedAt, &org.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}

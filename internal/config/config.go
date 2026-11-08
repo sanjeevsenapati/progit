@@ -10,14 +10,15 @@ import (
 )
 
 type Config struct {
-	Server     ServerConfig
-	Database   DatabaseConfig
-	Repository RepositoryConfig
-	Security   SecurityConfig
-	SSH        SSHConfig
-	Log        LogConfig
-	OIDC       OIDCConfig
-	Features   FeaturesConfig
+	Server       ServerConfig
+	Database     DatabaseConfig
+	Repository   RepositoryConfig
+	Organization OrganizationConfig
+	Security     SecurityConfig
+	SSH          SSHConfig
+	Log          LogConfig
+	OIDC         OIDCConfig
+	Features     FeaturesConfig
 }
 
 // FeaturesConfig holds optional platform feature toggles.
@@ -70,7 +71,12 @@ type DatabaseConfig struct {
 }
 
 type RepositoryConfig struct {
-	Root string
+	Root             string
+	MaxCreationLimit int // Global default repo creation limit per user (-1 for unlimited)
+}
+
+type OrganizationConfig struct {
+	MaxCreationLimit int // Global default org creation limit per user (-1 for unlimited)
 }
 
 type SecurityConfig struct {
@@ -130,7 +136,11 @@ func DefaultConfig() *Config {
 			MaxIdleConns: 5,
 		},
 		Repository: RepositoryConfig{
-			Root: "./data/repositories",
+			Root:             "./data/repositories",
+			MaxCreationLimit: -1,
+		},
+		Organization: OrganizationConfig{
+			MaxCreationLimit: -1,
 		},
 		Security: SecurityConfig{
 			InstallLock:  false,
@@ -326,6 +336,25 @@ func Load(configPath string) (*Config, error) {
 		cfg.Features.EnableMessaging = strings.ToLower(val) == "true" || val == "1"
 	}
 
+	if val := os.Getenv("PROGIT_REPO_MAX_CREATION_LIMIT"); val != "" {
+		if l, err := strconv.Atoi(val); err == nil {
+			cfg.Repository.MaxCreationLimit = l
+		}
+	} else if val := os.Getenv("PROGIT_REPOSITORY_MAX_CREATION_LIMIT"); val != "" {
+		if l, err := strconv.Atoi(val); err == nil {
+			cfg.Repository.MaxCreationLimit = l
+		}
+	}
+	if val := os.Getenv("PROGIT_ORG_MAX_CREATION_LIMIT"); val != "" {
+		if l, err := strconv.Atoi(val); err == nil {
+			cfg.Organization.MaxCreationLimit = l
+		}
+	} else if val := os.Getenv("PROGIT_ORGANIZATION_MAX_CREATION_LIMIT"); val != "" {
+		if l, err := strconv.Atoi(val); err == nil {
+			cfg.Organization.MaxCreationLimit = l
+		}
+	}
+
 	// Ensure storage paths are absolute
 	if absRoot, err := filepath.Abs(cfg.Repository.Root); err == nil {
 		cfg.Repository.Root = absRoot
@@ -431,6 +460,28 @@ func parseINIFile(path string, cfg *Config) error {
 			switch key {
 			case "ROOT":
 				cfg.Repository.Root = val
+			case "MAX_CREATION_LIMIT", "REPO_CREATION_LIMIT":
+				if l, err := strconv.Atoi(val); err == nil {
+					cfg.Repository.MaxCreationLimit = l
+				}
+			}
+		case "organization", "org":
+			switch key {
+			case "MAX_CREATION_LIMIT", "ORG_CREATION_LIMIT":
+				if l, err := strconv.Atoi(val); err == nil {
+					cfg.Organization.MaxCreationLimit = l
+				}
+			}
+		case "admin":
+			switch key {
+			case "DEFAULT_REPO_MAX_CREATION_LIMIT", "REPO_MAX_CREATION_LIMIT":
+				if l, err := strconv.Atoi(val); err == nil {
+					cfg.Repository.MaxCreationLimit = l
+				}
+			case "DEFAULT_ORG_MAX_CREATION_LIMIT", "ORG_MAX_CREATION_LIMIT":
+				if l, err := strconv.Atoi(val); err == nil {
+					cfg.Organization.MaxCreationLimit = l
+				}
 			}
 		case "security":
 			switch key {
@@ -532,7 +583,11 @@ func Save(configPath string, cfg *Config) error {
 	sb.WriteString(fmt.Sprintf("BUSY_TIMEOUT = %d\n\n", cfg.Database.BusyTimeout))
 
 	sb.WriteString("[repository]\n")
-	sb.WriteString(fmt.Sprintf("ROOT = %s\n\n", cfg.Repository.Root))
+	sb.WriteString(fmt.Sprintf("ROOT = %s\n", cfg.Repository.Root))
+	sb.WriteString(fmt.Sprintf("MAX_CREATION_LIMIT = %d\n\n", cfg.Repository.MaxCreationLimit))
+
+	sb.WriteString("[organization]\n")
+	sb.WriteString(fmt.Sprintf("MAX_CREATION_LIMIT = %d\n\n", cfg.Organization.MaxCreationLimit))
 
 	sb.WriteString("[security]\n")
 	sb.WriteString(fmt.Sprintf("INSTALL_LOCK = %v\n", cfg.Security.InstallLock))

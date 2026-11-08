@@ -20,6 +20,7 @@ import {
   Settings,
   HardDrive,
   Edit3,
+  SlidersHorizontal,
   X
 } from 'lucide-react';
 
@@ -37,7 +38,16 @@ export const AdminDashboard: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [newFullName, setNewFullName] = useState('');
   const [newIsAdmin, setNewIsAdmin] = useState(false);
+  const [newMaxRepo, setNewMaxRepo] = useState(-1);
+  const [newMaxOrg, setNewMaxOrg] = useState(-1);
   const [modalLoading, setModalLoading] = useState(false);
+
+  // Edit user creation limits modal
+  const [showEditLimitsModal, setShowEditLimitsModal] = useState(false);
+  const [selectedUserForLimits, setSelectedUserForLimits] = useState<User | null>(null);
+  const [userRepoLimit, setUserRepoLimit] = useState(-1);
+  const [userOrgLimit, setUserOrgLimit] = useState(-1);
+  const [userLimitsLoading, setUserLimitsLoading] = useState(false);
 
   // Server configuration modal
   const [showEditConfigModal, setShowEditConfigModal] = useState(false);
@@ -45,6 +55,8 @@ export const AdminDashboard: React.FC = () => {
   const [cfgDomain, setCfgDomain] = useState('');
   const [cfgRootUrl, setCfgRootUrl] = useState('');
   const [cfgSshPort, setCfgSshPort] = useState(2222);
+  const [cfgDefaultRepoLimit, setCfgDefaultRepoLimit] = useState(-1);
+  const [cfgDefaultOrgLimit, setCfgDefaultOrgLimit] = useState(-1);
   const [cfgLoading, setCfgLoading] = useState(false);
 
   // Status message
@@ -150,12 +162,40 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleOpenEditLimits = (u: User) => {
+    setSelectedUserForLimits(u);
+    setUserRepoLimit(u.max_repo_creation ?? -1);
+    setUserOrgLimit(u.max_org_creation ?? -1);
+    setShowEditLimitsModal(true);
+  };
+
+  const handleSaveUserLimits = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserForLimits) return;
+    setUserLimitsLoading(true);
+    try {
+      await api.adminUpdateUser(selectedUserForLimits.id, {
+        max_repo_creation: Number(userRepoLimit),
+        max_org_creation: Number(userOrgLimit),
+      });
+      setShowEditLimitsModal(false);
+      setStatusMsg({ type: 'success', text: `Updated creation limits for @${selectedUserForLimits.username}.` });
+      loadData();
+    } catch (err: any) {
+      setStatusMsg({ type: 'error', text: err.message || 'Failed to update user creation limits.' });
+    } finally {
+      setUserLimitsLoading(false);
+    }
+  };
+
   const handleOpenEditConfig = () => {
     if (stats) {
       setCfgAppName(stats.app_name || 'ProGit');
       setCfgDomain(stats.domain || 'progit.local');
       setCfgRootUrl(stats.root_url || 'https://progit.local/');
       setCfgSshPort(stats.ssh_port || 2222);
+      setCfgDefaultRepoLimit(stats.default_repo_max_creation_limit ?? -1);
+      setCfgDefaultOrgLimit(stats.default_org_max_creation_limit ?? -1);
     }
     setShowEditConfigModal(true);
   };
@@ -169,6 +209,8 @@ export const AdminDashboard: React.FC = () => {
         domain: cfgDomain,
         root_url: cfgRootUrl,
         ssh_port: Number(cfgSshPort),
+        default_repo_max_creation_limit: Number(cfgDefaultRepoLimit),
+        default_org_max_creation_limit: Number(cfgDefaultOrgLimit),
       });
       setShowEditConfigModal(false);
       setStatusMsg({ type: 'success', text: res.message || 'Server configuration updated successfully.' });
@@ -190,6 +232,8 @@ export const AdminDashboard: React.FC = () => {
         password: newPassword,
         full_name: newFullName,
         is_admin: newIsAdmin,
+        max_repo_creation: Number(newMaxRepo),
+        max_org_creation: Number(newMaxOrg),
       });
       setShowAddUserModal(false);
       setNewUsername('');
@@ -197,6 +241,8 @@ export const AdminDashboard: React.FC = () => {
       setNewPassword('');
       setNewFullName('');
       setNewIsAdmin(false);
+      setNewMaxRepo(-1);
+      setNewMaxOrg(-1);
       setStatusMsg({ type: 'success', text: `User @${newUsername} created successfully.` });
       loadData();
     } catch (err: any) {
@@ -427,10 +473,27 @@ export const AdminDashboard: React.FC = () => {
                   {u.full_name && <span>• {u.full_name}</span>}
                   <span>• Joined {new Date(u.created_at).toLocaleDateString()}</span>
                 </div>
+                <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px]">
+                  <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-dark-hover text-gray-700 dark:text-dark-text border border-gray-200 dark:border-dark-border">
+                    Repos: <strong className="text-gray-900 dark:text-white">{u.num_repos ?? 0}</strong> / {u.max_repo_creation === -1 ? (stats?.default_repo_max_creation_limit === -1 ? 'Unlimited' : `${stats?.default_repo_max_creation_limit} (Global)`) : u.max_repo_creation}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-dark-hover text-gray-700 dark:text-dark-text border border-gray-200 dark:border-dark-border">
+                    Orgs: <strong className="text-gray-900 dark:text-white">{u.num_orgs ?? 0}</strong> / {u.max_org_creation === -1 ? (stats?.default_org_max_creation_limit === -1 ? 'Unlimited' : `${stats?.default_org_max_creation_limit} (Global)`) : u.max_org_creation}
+                  </span>
+                </div>
               </div>
 
               {/* Action Buttons */}
               <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleOpenEditLimits(u)}
+                  title="Configure repository and organization creation limits"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors flex items-center space-x-1"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span>Limits</span>
+                </button>
+
                 <button
                   onClick={() => handleToggleAdmin(u)}
                   title={u.is_admin ? 'Demote to regular user' : 'Promote to administrator'}
@@ -544,6 +607,18 @@ export const AdminDashboard: React.FC = () => {
               <span className="font-bold text-gray-800 dark:text-white">{stats.repositories_path}</span>
             </div>
             <div className="p-3 rounded-lg bg-gray-50 dark:bg-dark-hover flex justify-between">
+              <span className="text-gray-500">Global Default Repo Creation Limit:</span>
+              <span className="font-bold text-gray-800 dark:text-white">
+                {stats.default_repo_max_creation_limit === -1 ? 'Unlimited (-1)' : `${stats.default_repo_max_creation_limit} repos/user`}
+              </span>
+            </div>
+            <div className="p-3 rounded-lg bg-gray-50 dark:bg-dark-hover flex justify-between">
+              <span className="text-gray-500">Global Default Org Creation Limit:</span>
+              <span className="font-bold text-gray-800 dark:text-white">
+                {stats.default_org_max_creation_limit === -1 ? 'Unlimited (-1)' : `${stats.default_org_max_creation_limit} orgs/user`}
+              </span>
+            </div>
+            <div className="p-3 rounded-lg bg-gray-50 dark:bg-dark-hover flex justify-between">
               <span className="text-gray-500">Installation Lock Status:</span>
               <span className="font-bold text-emerald-600 dark:text-emerald-400">
                 {stats.install_locked ? 'Locked (Production Safe)' : 'Unlocked'}
@@ -629,6 +704,31 @@ export const AdminDashboard: React.FC = () => {
                 <label htmlFor="isAdminCheckbox" className="text-xs font-medium text-gray-700 dark:text-dark-text">
                   Grant Administrator Privileges
                 </label>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                    Max Repos (-1 = global)
+                  </label>
+                  <input
+                    type="number"
+                    value={newMaxRepo}
+                    onChange={e => setNewMaxRepo(parseInt(e.target.value, 10) || -1)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                    Max Orgs (-1 = global)
+                  </label>
+                  <input
+                    type="number"
+                    value={newMaxOrg}
+                    onChange={e => setNewMaxOrg(parseInt(e.target.value, 10) || -1)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-xs"
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end space-x-2 pt-4">
@@ -731,6 +831,37 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3 pt-1 border-t border-gray-100 dark:border-dark-border">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                    Default Repo Limit (-1 = Unlimited)
+                  </label>
+                  <input
+                    type="number"
+                    value={cfgDefaultRepoLimit}
+                    onChange={e => setCfgDefaultRepoLimit(parseInt(e.target.value, 10) || -1)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-xs"
+                  />
+                  <p className="mt-1 text-[11px] text-gray-500 dark:text-dark-muted">
+                    Global maximum repositories per user.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                    Default Org Limit (-1 = Unlimited)
+                  </label>
+                  <input
+                    type="number"
+                    value={cfgDefaultOrgLimit}
+                    onChange={e => setCfgDefaultOrgLimit(parseInt(e.target.value, 10) || -1)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-xs"
+                  />
+                  <p className="mt-1 text-[11px] text-gray-500 dark:text-dark-muted">
+                    Global maximum organizations per user.
+                  </p>
+                </div>
+              </div>
+
               <div className="flex justify-end space-x-2 pt-4 border-t border-gray-100 dark:border-dark-border">
                 <button
                   type="button"
@@ -745,6 +876,77 @@ export const AdminDashboard: React.FC = () => {
                   className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   {cfgLoading ? 'Saving...' : 'Save Configuration'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Limits Modal */}
+      {showEditLimitsModal && selectedUserForLimits && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm">
+          <div className="bg-white dark:bg-dark-surface rounded-xl max-w-md w-full p-6 border border-gray-200 dark:border-dark-border shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-dark-border">
+              <h3 className="font-bold text-base text-gray-900 dark:text-white flex items-center space-x-2">
+                <SlidersHorizontal className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                <span>Creation Limits for @{selectedUserForLimits.username}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowEditLimitsModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveUserLimits} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                  Max Repository Creation Limit
+                </label>
+                <input
+                  type="number"
+                  required
+                  value={userRepoLimit}
+                  onChange={e => setUserRepoLimit(parseInt(e.target.value, 10) || 0)}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs"
+                />
+                <p className="mt-1 text-[11px] text-gray-500 dark:text-dark-muted">
+                  Set to <strong>-1</strong> to inherit the global server limit ({stats?.default_repo_max_creation_limit === -1 ? 'Unlimited' : stats?.default_repo_max_creation_limit}), <strong>0</strong> to disable repository creation, or a positive number (e.g. 5) for a custom cap. Currently owns {selectedUserForLimits.num_repos ?? 0} repositories.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                  Max Organization Creation Limit
+                </label>
+                <input
+                  type="number"
+                  required
+                  value={userOrgLimit}
+                  onChange={e => setUserOrgLimit(parseInt(e.target.value, 10) || 0)}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs"
+                />
+                <p className="mt-1 text-[11px] text-gray-500 dark:text-dark-muted">
+                  Set to <strong>-1</strong> to inherit the global server limit ({stats?.default_org_max_creation_limit === -1 ? 'Unlimited' : stats?.default_org_max_creation_limit}), <strong>0</strong> to disable organization creation, or a positive number (e.g. 2) for a custom cap. Currently owns {selectedUserForLimits.num_orgs ?? 0} organizations.
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4 border-t border-gray-100 dark:border-dark-border">
+                <button
+                  type="button"
+                  onClick={() => setShowEditLimitsModal(false)}
+                  className="px-4 py-2 rounded-lg text-xs font-semibold border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={userLimitsLoading}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  {userLimitsLoading ? 'Saving...' : 'Save Limits'}
                 </button>
               </div>
             </form>

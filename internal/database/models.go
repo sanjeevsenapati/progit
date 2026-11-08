@@ -3,19 +3,23 @@ package database
 import "time"
 
 type User struct {
-	ID           int64     `json:"id"`
-	Username     string    `json:"username"`
-	Email        string    `json:"email"`
-	PasswordHash string    `json:"-"`
-	FullName     string    `json:"full_name"`
-	AvatarURL    string    `json:"avatar_url"`
-	IsAdmin      bool      `json:"is_admin"`
-	IsActive     bool      `json:"is_active"`
-	Location     string    `json:"location"`
-	Website      string    `json:"website"`
-	Bio          string    `json:"bio"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID              int64     `json:"id"`
+	Username        string    `json:"username"`
+	Email           string    `json:"email"`
+	PasswordHash    string    `json:"-"`
+	FullName        string    `json:"full_name"`
+	AvatarURL       string    `json:"avatar_url"`
+	IsAdmin         bool      `json:"is_admin"`
+	IsActive        bool      `json:"is_active"`
+	Location        string    `json:"location"`
+	Website         string    `json:"website"`
+	Bio             string    `json:"bio"`
+	MaxRepoCreation int       `json:"max_repo_creation"` // -1 = inherit global default, 0 = disabled, >0 = limit
+	MaxOrgCreation  int       `json:"max_org_creation"`  // -1 = inherit global default, 0 = disabled, >0 = limit
+	NumRepos        int       `json:"num_repos,omitempty"`
+	NumOrgs         int       `json:"num_orgs,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 type AccessToken struct {
@@ -210,18 +214,19 @@ type WebhookDelivery struct {
 }
 
 type Organization struct {
-	ID          int64     `json:"id"`
-	Name        string    `json:"name"`
-	FullName    string    `json:"full_name"`
-	Description string    `json:"description"`
-	AvatarURL   string    `json:"avatar_url"`
-	Location    string    `json:"location"`
-	Website     string    `json:"website"`
-	NumMembers  int       `json:"num_members,omitempty"`
-	NumRepos    int       `json:"num_repos,omitempty"`
-	NumTeams    int       `json:"num_teams,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID              int64     `json:"id"`
+	Name            string    `json:"name"`
+	FullName        string    `json:"full_name"`
+	Description     string    `json:"description"`
+	AvatarURL       string    `json:"avatar_url"`
+	Location        string    `json:"location"`
+	Website         string    `json:"website"`
+	MaxRepoCreation int       `json:"max_repo_creation"` // -1 = inherit global default, 0 = disabled, >0 = limit
+	NumMembers      int       `json:"num_members,omitempty"`
+	NumRepos        int       `json:"num_repos,omitempty"`
+	NumTeams        int       `json:"num_teams,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 type OrgMember struct {

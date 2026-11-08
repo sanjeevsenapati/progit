@@ -54,3 +54,4 @@ func TestWebhookSSRFProtection(t *testing.T) {
 		t.Errorf("expected loopback to be allowed when AllowPrivateWebhookHosts is true, got: %v", err)
 	}
 }
+

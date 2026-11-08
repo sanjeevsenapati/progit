@@ -9,6 +9,10 @@ export interface User {
   location: string;
   website: string;
   bio: string;
+  max_repo_creation: number;
+  max_org_creation: number;
+  num_repos?: number;
+  num_orgs?: number;
   created_at: string;
 }
 
@@ -893,6 +897,8 @@ export const api = {
       memory_sys_mb: number;
       active_sessions_count: number;
       install_locked: boolean;
+      default_repo_max_creation_limit: number;
+      default_org_max_creation_limit: number;
     }>('/api/v1/admin/stats');
   },
 
@@ -902,6 +908,8 @@ export const api = {
     root_url?: string;
     ssh_port?: number;
     http_port?: number;
+    default_repo_max_creation_limit?: number;
+    default_org_max_creation_limit?: number;
   }) {
     return fetchJSON<{
       message: string;
@@ -910,6 +918,8 @@ export const api = {
       root_url: string;
       ssh_port: number;
       http_port: number;
+      default_repo_max_creation_limit?: number;
+      default_org_max_creation_limit?: number;
     }>('/api/v1/admin/config', {
       method: 'PUT',
       body: JSON.stringify(config),
@@ -926,6 +936,8 @@ export const api = {
     password: string;
     full_name: string;
     is_admin: boolean;
+    max_repo_creation?: number;
+    max_org_creation?: number;
   }) {
     return fetchJSON<User>('/api/v1/admin/users', {
       method: 'POST',
@@ -933,7 +945,7 @@ export const api = {
     });
   },
 
-  async adminUpdateUser(id: number, data: { is_admin?: boolean; is_active?: boolean }) {
+  async adminUpdateUser(id: number, data: { is_admin?: boolean; is_active?: boolean; max_repo_creation?: number; max_org_creation?: number }) {
     return fetchJSON<User>(`/api/v1/admin/users/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
