@@ -67,26 +67,39 @@
 
 ---
 
-## Quickstart with Podman / Docker
+## Quickstart with Docker & Podman
 
-ProGit is packaged for non-root, containerized execution:
+ProGit provides production-grade containerization with zero CGO dependencies and automated HTTPS:
 
+### Quick Start with Docker
 ```bash
 # 1. Clone repository
 git clone https://github.com/sanjeevsenapati/progit.git
 cd progit
 
-# 2. Build the container image
-podman build -t localhost/progit:latest -f Containerfile .
+# 2. Launch with Docker Compose
+docker compose up -d
 
-# 3. Deploy container with persistent volumes
+# Or run the automated deployment script:
+./docker/deploy.sh
+```
+> See the [Docker Deployment Guide (docs/DOCKER_DEPLOYMENT.md)](docs/DOCKER_DEPLOYMENT.md) for full instructions, multi-arch tags, backups, and reverse proxy recipes.
+
+### Quick Start with Podman
+```bash
+# 1. Clone repository
+git clone https://github.com/sanjeevsenapati/progit.git
+cd progit
+
+# 2. Deploy container with persistent volumes
 ./podman/deploy.sh
 
-# 4. Run the functional integration test suite
+# 3. Run the functional integration test suite
 ./podman/test.sh
 ```
+> See the [Podman Deployment Guide (docs/PODMAN_DEPLOYMENT.md)](docs/PODMAN_DEPLOYMENT.md) for rootless execution, RHEL 9 manual setup, and systemd integration.
 
-Navigate to `http://localhost:3000` to complete the installation wizard and initialize your Super Administrator account.
+Navigate to `https://localhost:3443` (or `http://localhost:3000`) in your web browser.
 
 ---
 

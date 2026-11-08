@@ -161,11 +161,13 @@ Headers dispatched on deliveries:
 - `DELETE /api/v1/repos/:owner/:repo/projects/:id/cards/:card_id` - Delete card.
 
 ### 2.13 Git-Backed Wiki Engine
-- `GET /api/v1/repos/:owner/:repo/wiki/pages` - List all wiki pages.
-- `GET /api/v1/repos/:owner/:repo/wiki/pages/:slug` - Get wiki page content and metadata.
-- `POST /api/v1/repos/:owner/:repo/wiki/pages` - Create or update wiki page with commit message.
-  - Body: `{"title": "Architecture", "content": "# Architecture Overview...", "message": "Initial docs"}`
-- `GET /api/v1/repos/:owner/:repo/wiki/pages/:slug/history` - Get revision history for a wiki page.
+- `GET /api/v1/repos/:owner/:repo/wiki/pages` - List all wiki pages. Returns `[]` if uninitialized. Returns `403 Forbidden` if `enable_wiki` is disabled.
+- `GET /api/v1/repos/:owner/:repo/wiki/pages/:slug` - Get wiki page content and metadata. Returns `404 Not Found` if page or wiki repository does not exist. Returns `403 Forbidden` if disabled.
+- `POST /api/v1/repos/:owner/:repo/wiki/pages` - Create or update wiki page with commit message. Initial creation automatically initializes the bare Git repository with the user's initial commit. Requires write permissions. Returns `403 Forbidden` if disabled.
+  - Body: `{"slug": "Home", "title": "Home", "content": "# Architecture Overview...", "message": "Initial docs"}`
+- `DELETE /api/v1/repos/:owner/:repo/wiki/pages/:slug` - Delete wiki page. Requires write permissions. Returns `403 Forbidden` if disabled.
+- `GET /api/v1/repos/:owner/:repo/wiki/pages/:slug/history` - Get revision history for a wiki page. Returns `403 Forbidden` if disabled.
+- `PATCH /api/v1/repos/:owner/:repo/settings` - Toggle repository features including `enable_wiki: boolean`. Requires admin permissions.
 
 ### 2.14 ProGit Pages Hosting
 - `GET /api/v1/repos/:owner/:repo/pages` - Inspect ProGit Pages configuration.

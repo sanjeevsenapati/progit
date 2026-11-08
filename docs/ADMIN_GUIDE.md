@@ -101,9 +101,12 @@ Administrators can update core server parameters live from the Admin Dashboard:
 - **Delete User**:
   - Click the **Trash** icon to delete a user account and their bare repositories from disk.
 
-### 2.3 Repository Oversight
+### 2.3 Repository Oversight & Feature Controls
 - **Global Repository Oversight**:
   - Switch to the **Repositories** tab to see all public and private repositories across all users and organizations.
+- **Repository Feature Controls**:
+  - Each repository provides granular toggles under **Settings > Features** for **Wikis** (`enable_wiki`) and **ProGit Pages** (`enable_pages`).
+  - When disabled, backend endpoints enforce 403 Forbidden checks, and navigation items are dynamically hidden.
 - **Administrative Delete**:
   - Click **Delete Repo** to immediately remove any repository from SQLite and purge the bare repository tree from disk.
 

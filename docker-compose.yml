@@ -1,0 +1,59 @@
+services:
+  progit:
+    image: ghcr.io/sanjeevsenapati/progit:latest
+    # Or build locally:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    container_name: progit
+    restart: unless-stopped
+    ports:
+      # Primary HTTPS web interface & Git Smart HTTPS
+      - "3443:3443"
+      # HTTP redirect listener (redirects to port 3443)
+      - "3000:3000"
+      # Built-in Git SSH Server
+      - "2222:2222"
+      # Standard privileged ports (uncomment if running as root or with unprivileged port binding)
+      # - "443:3443"
+      # - "80:3000"
+    environment:
+      - PROGIT_APP_NAME=ProGit
+      - PROGIT_DOMAIN=progit.local
+      - PROGIT_PROTOCOL=https
+      - PROGIT_ROOT_URL=https://progit.local:3443/
+      - PROGIT_HTTPS_PORT=3443
+      - PROGIT_HTTP_PORT=3000
+      - PROGIT_REDIRECT_OTHER_PORT=true
+      - PROGIT_CERT_FILE=/data/config/https/cert.pem
+      - PROGIT_KEY_FILE=/data/config/https/key.pem
+      - PROGIT_DB_PATH=/data/db/progit.db
+      - PROGIT_REPO_ROOT=/data/repositories
+      - PROGIT_SSH_ENABLED=true
+      - PROGIT_SSH_PORT=2222
+      # Optional: Enable OpenID Connect / Google SSO
+      # - PROGIT_OIDC_ENABLED=false
+      # - PROGIT_OIDC_PROVIDER=google
+      # - PROGIT_OIDC_CLIENT_ID=
+      # - PROGIT_OIDC_CLIENT_SECRET=
+    volumes:
+      - progit-data:/data/db
+      - progit-repositories:/data/repositories
+      - progit-config:/data/config
+      - progit-logs:/data/logs
+    healthcheck:
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:3443/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  progit-data:
+    name: progit-data
+  progit-repositories:
+    name: progit-repositories
+  progit-config:
+    name: progit-config
+  progit-logs:
+    name: progit-logs
