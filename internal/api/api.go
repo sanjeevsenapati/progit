@@ -26,7 +26,10 @@ import (
 	"progit.io/progit/internal/git"
 )
 
-var startTime = time.Now()
+var (
+	startTime = time.Now()
+	Version   = "1.2.0"
+)
 
 type ipRateLimiter struct {
 	mu       sync.Mutex
@@ -395,7 +398,7 @@ func (r *Router) handleHealth(w http.ResponseWriter, req *http.Request) {
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"status":       "ok",
 		"app":          r.cfg.Server.AppName,
-		"version":      "1.0.0",
+		"version":      Version,
 		"database":     dbStatus,
 		"repositories": repoStorageStatus,
 		"uptime":       uptime,

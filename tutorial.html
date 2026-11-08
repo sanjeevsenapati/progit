@@ -261,7 +261,7 @@
 
     /* Left Sidebar - Exact styles from index.html with single-line guarantee */
     aside.sidebar {
-      width: 300px;
+      width: 315px;
       flex-shrink: 0;
       border-right: 1px solid var(--border);
       height: calc(100vh - 64px);
@@ -867,13 +867,13 @@
         
           <li data-topic-id="git-lfs">
             <a href="#git-lfs" id="nav-link-git-lfs" onclick="jumpToTopic('git-lfs'); return false;" title="Git Large File Storage (LFS)">
-              Git LFS (Large Files)
+              Git Large File Storage (LFS)
             </a>
           </li>
         
           <li data-topic-id="git-signing">
             <a href="#git-signing" id="nav-link-git-signing" onclick="jumpToTopic('git-signing'); return false;" title="Git Signing Commits/Tags">
-              Git Signing Commits
+              Git Signing Commits/Tags
             </a>
           </li>
         
@@ -1013,25 +1013,25 @@
     
           <li data-topic-id="cicd-fundamentals">
             <a href="#cicd-fundamentals" id="nav-link-cicd-fundamentals" onclick="jumpToTopic('cicd-fundamentals'); return false;" title="CI/CD Fundamentals (CI vs CD vs CD)">
-              CI/CD Fundamentals
+              CI/CD Fundamentals (CI vs CD vs CD)
             </a>
           </li>
         
           <li data-topic-id="actions-arch">
             <a href="#actions-arch" id="nav-link-actions-arch" onclick="jumpToTopic('actions-arch'); return false;" title="GitHub Actions Architecture & YAML">
-              Actions Architecture
+              GitHub Actions Architecture & YAML
             </a>
           </li>
         
           <li data-topic-id="pipeline-ci-matrix">
             <a href="#pipeline-ci-matrix" id="nav-link-pipeline-ci-matrix" onclick="jumpToTopic('pipeline-ci-matrix'); return false;" title="Pipeline 1: Automated Test & Lint">
-              Pipeline 1: Test & Lint
+              Pipeline 1: Automated Test & Lint
             </a>
           </li>
         
           <li data-topic-id="pipeline-docker-ghcr">
             <a href="#pipeline-docker-ghcr" id="nav-link-pipeline-docker-ghcr" onclick="jumpToTopic('pipeline-docker-ghcr'); return false;" title="Pipeline 2: Docker Build & GHCR">
-              Pipeline 2: Docker Build
+              Pipeline 2: Docker Build & GHCR
             </a>
           </li>
         
@@ -1043,7 +1043,7 @@
         
           <li data-topic-id="pipeline-pages-deploy">
             <a href="#pipeline-pages-deploy" id="nav-link-pipeline-pages-deploy" onclick="jumpToTopic('pipeline-pages-deploy'); return false;" title="Pipeline 4: Static Site Deployment">
-              Pipeline 4: Pages Deploy
+              Pipeline 4: Static Site Deployment
             </a>
           </li>
         
@@ -3174,7 +3174,7 @@ db/schema.rb merge=ours
           
           <a href="#git-lfs" class="nav-btn next-nav-btn" onclick="jumpToTopic('git-lfs'); return false;" style="text-align: right;">
             <span class="dir">Next Topic &rarr;</span>
-            <span class="title">Git LFS (Large Files)</span>
+            <span class="title">Git Large File Storage (LFS)</span>
           </a>
         
         </div>
@@ -3257,7 +3257,7 @@ git lfs prune</code><button class="copy-btn" onclick="copyCode(this)">Copy</butt
           
           <a href="#git-signing" class="nav-btn next-nav-btn" onclick="jumpToTopic('git-signing'); return false;" style="text-align: right;">
             <span class="dir">Next Topic &rarr;</span>
-            <span class="title">Git Signing Commits</span>
+            <span class="title">Git Signing Commits/Tags</span>
           </a>
         
         </div>
@@ -3337,7 +3337,7 @@ git config --global commit.gpgsign true</code><button class="copy-btn" onclick="
           
           <a href="#git-lfs" class="nav-btn prev-nav-btn" onclick="jumpToTopic('git-lfs'); return false;">
             <span class="dir">&larr; Previous</span>
-            <span class="title">Git LFS (Large Files)</span>
+            <span class="title">Git Large File Storage (LFS)</span>
           </a>
         
           <div class="slide-center-indicator">
@@ -3419,7 +3419,7 @@ git am 0001-feat-add-sqlite-wal.patch</code><button class="copy-btn" onclick="co
           
           <a href="#git-signing" class="nav-btn prev-nav-btn" onclick="jumpToTopic('git-signing'); return false;">
             <span class="dir">&larr; Previous</span>
-            <span class="title">Git Signing Commits</span>
+            <span class="title">Git Signing Commits/Tags</span>
           </a>
         
           <div class="slide-center-indicator">
@@ -4802,7 +4802,7 @@ if !hmac.Equal([]byte(headerSignature), []byte(expectedSignature)) {
           
           <a href="#cicd-fundamentals" class="nav-btn next-nav-btn" onclick="jumpToTopic('cicd-fundamentals'); return false;" style="text-align: right;">
             <span class="dir">Next Topic &rarr;</span>
-            <span class="title">CI/CD Fundamentals</span>
+            <span class="title">CI/CD Fundamentals (CI vs CD vs CD)</span>
           </a>
         
         </div>
@@ -4875,7 +4875,7 @@ if !hmac.Equal([]byte(headerSignature), []byte(expectedSignature)) {
           
           <a href="#actions-arch" class="nav-btn next-nav-btn" onclick="jumpToTopic('actions-arch'); return false;" style="text-align: right;">
             <span class="dir">Next Topic &rarr;</span>
-            <span class="title">Actions Architecture</span>
+            <span class="title">GitHub Actions Architecture & YAML</span>
           </a>
         
         </div>
@@ -4969,7 +4969,7 @@ jobs: # 2. Jobs
           
           <a href="#cicd-fundamentals" class="nav-btn prev-nav-btn" onclick="jumpToTopic('cicd-fundamentals'); return false;">
             <span class="dir">&larr; Previous</span>
-            <span class="title">CI/CD Fundamentals</span>
+            <span class="title">CI/CD Fundamentals (CI vs CD vs CD)</span>
           </a>
         
           <div class="slide-center-indicator">
@@ -4979,7 +4979,7 @@ jobs: # 2. Jobs
           
           <a href="#pipeline-ci-matrix" class="nav-btn next-nav-btn" onclick="jumpToTopic('pipeline-ci-matrix'); return false;" style="text-align: right;">
             <span class="dir">Next Topic &rarr;</span>
-            <span class="title">Pipeline 1: Test & Lint</span>
+            <span class="title">Pipeline 1: Automated Test & Lint</span>
           </a>
         
         </div>
@@ -5073,7 +5073,7 @@ jobs:
           
           <a href="#actions-arch" class="nav-btn prev-nav-btn" onclick="jumpToTopic('actions-arch'); return false;">
             <span class="dir">&larr; Previous</span>
-            <span class="title">Actions Architecture</span>
+            <span class="title">GitHub Actions Architecture & YAML</span>
           </a>
         
           <div class="slide-center-indicator">
@@ -5083,7 +5083,7 @@ jobs:
           
           <a href="#pipeline-docker-ghcr" class="nav-btn next-nav-btn" onclick="jumpToTopic('pipeline-docker-ghcr'); return false;" style="text-align: right;">
             <span class="dir">Next Topic &rarr;</span>
-            <span class="title">Pipeline 2: Docker Build</span>
+            <span class="title">Pipeline 2: Docker Build & GHCR</span>
           </a>
         
         </div>
@@ -5180,7 +5180,7 @@ jobs:
           
           <a href="#pipeline-ci-matrix" class="nav-btn prev-nav-btn" onclick="jumpToTopic('pipeline-ci-matrix'); return false;">
             <span class="dir">&larr; Previous</span>
-            <span class="title">Pipeline 1: Test & Lint</span>
+            <span class="title">Pipeline 1: Automated Test & Lint</span>
           </a>
         
           <div class="slide-center-indicator">
@@ -5266,7 +5266,7 @@ jobs:
           
           <a href="#pipeline-docker-ghcr" class="nav-btn prev-nav-btn" onclick="jumpToTopic('pipeline-docker-ghcr'); return false;">
             <span class="dir">&larr; Previous</span>
-            <span class="title">Pipeline 2: Docker Build</span>
+            <span class="title">Pipeline 2: Docker Build & GHCR</span>
           </a>
         
           <div class="slide-center-indicator">
@@ -5276,7 +5276,7 @@ jobs:
           
           <a href="#pipeline-pages-deploy" class="nav-btn next-nav-btn" onclick="jumpToTopic('pipeline-pages-deploy'); return false;" style="text-align: right;">
             <span class="dir">Next Topic &rarr;</span>
-            <span class="title">Pipeline 4: Pages Deploy</span>
+            <span class="title">Pipeline 4: Static Site Deployment</span>
           </a>
         
         </div>
@@ -5427,7 +5427,7 @@ uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1</code><
           
           <a href="#pipeline-pages-deploy" class="nav-btn prev-nav-btn" onclick="jumpToTopic('pipeline-pages-deploy'); return false;">
             <span class="dir">&larr; Previous</span>
-            <span class="title">Pipeline 4: Pages Deploy</span>
+            <span class="title">Pipeline 4: Static Site Deployment</span>
           </a>
         
           <div class="slide-center-indicator">
