@@ -1,0 +1,27 @@
+# ProGit Official Search Engine Crawling Policy
+# Domain: https://progit.co.in
+
+User-agent: *
+Allow: /
+
+# Fast indexers
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+User-agent: YandexBot
+Allow: /
+
+# XML Sitemap
+Sitemap: https://progit.co.in/sitemap.xml

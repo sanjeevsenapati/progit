@@ -3,10 +3,132 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ProGit Documentation — Lightweight, High-Performance Git Service</title>
-  <meta name="description" content="Official documentation for ProGit: a lightweight, ultra-fast self-hosted Git platform built on pure Go and SQLite with zero CGO dependencies.">
-  <link rel="canonical" href="https://progit.co.in">
+  <title>ProGit — Modern Self-Hosted Git Service | GitHub, Gogs &amp; Gitea Alternative</title>
+  
+  <!-- Primary Meta Tags -->
+  <meta name="title" content="ProGit — Modern Self-Hosted Git Service | GitHub, Gogs &amp; Gitea Alternative">
+  <meta name="description" content="ProGit is a high-performance, lightweight self-hosted Git service and open-source GitHub, Gogs, and Gitea alternative. Written in pure Go with zero CGO dependencies, embedded React 19 UI, Smart Git HTTP/SSH, native Wiki, and ProGit Pages. Deploy with Docker or Podman in under 5 minutes.">
+  <meta name="keywords" content="git services, git service, github, github alternative, gogs, git gogs, gogs alternative, gitea, gitea alternative, forgejo, gitlab alternative, self-hosted git, private git server, git hosting, git collaboration platform, git server docker, git podman, lightweight git server, go git service, progit, progit.co.in">
+  <meta name="author" content="Supported by PDIH, created by ProGit Team and Sanjeev">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <meta name="theme-color" content="#10b981">
+  <link rel="canonical" href="https://progit.co.in/">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='18' cy='18' r='3'/><circle cx='6' cy='6' r='3'/><path d='M6 9v12'/><path d='M18 9a9 9 0 0 0-9 9'/></svg>">
+
+  <!-- Open Graph / Facebook / LinkedIn -->
+  <meta property="og:locale" content="en_US">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ProGit — Modern Self-Hosted Git Service | GitHub, Gogs &amp; Gitea Alternative">
+  <meta property="og:description" content="Looking for git services or a self-hosted GitHub, Gogs, or Gitea alternative? ProGit is a high-performance Git collaboration platform written in pure Go &amp; React 19 with zero CGO dependencies.">
+  <meta property="og:url" content="https://progit.co.in/">
+  <meta property="og:site_name" content="ProGit">
+  <meta property="og:image" content="https://progit.co.in/progit-og.svg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="ProGit — The Modern Self-Hosted Git Service">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ProGit — Modern Self-Hosted Git Service | GitHub, Gogs &amp; Gitea Alternative">
+  <meta name="twitter:description" content="Lightweight GitHub, Gogs, and Gitea alternative written in pure Go with zero CGO dependencies. < 40 MB RAM, Docker &amp; Podman ready.">
+  <meta name="twitter:image" content="https://progit.co.in/progit-og.svg">
+
+  <!-- Schema.org JSON-LD Structured Data for Google Rich Snippets -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://progit.co.in/#website",
+        "url": "https://progit.co.in/",
+        "name": "ProGit",
+        "description": "Modern Self-Hosted Git Service and GitHub, Gogs, and Gitea Alternative",
+        "publisher": {
+          "@id": "https://progit.co.in/#organization"
+        },
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://progit.co.in/#search={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://progit.co.in/#organization",
+        "name": "ProGit Project",
+        "url": "https://progit.co.in/",
+        "logo": "https://progit.co.in/progit-og.svg",
+        "sameAs": [
+          "https://github.com/sanjeevsenapati/progit"
+        ]
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://progit.co.in/#software",
+        "name": "ProGit",
+        "alternateName": [
+          "ProGit Git Service",
+          "ProGit Platform",
+          "GitHub Alternative ProGit",
+          "Gogs Alternative ProGit",
+          "Gitea Alternative ProGit"
+        ],
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Linux, macOS, Windows, Docker, Podman",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "description": "A high-performance, single-binary self-hosted Git service and alternative to GitHub, Gogs, Gitea, and GitLab. Built with pure Go and embedded React 19 UI.",
+        "softwareVersion": "1.2.0",
+        "license": "https://opensource.org/licenses/MIT",
+        "url": "https://progit.co.in/"
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://progit.co.in/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is ProGit?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "ProGit is an ultra-fast, single-binary, self-hosted Git service and developer collaboration platform. Written in pure Go with zero CGO dependencies and an embedded React 19 frontend, it provides Git Smart HTTP, SSH, Pull Requests, Git-backed Wikis, and ProGit Pages hosting in under 40 MB of RAM."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How does ProGit compare to GitHub, Gogs, and Gitea?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Unlike GitHub, ProGit is 100% self-hosted, keeping your source code and intellectual property on your private infrastructure. Compared to Gogs, ProGit features a modern React 19 SPA, Git-backed wikis, ProGit Pages, and Enterprise OIDC SSO. Compared to Gitea and GitLab, ProGit uses zero CGO, boots in under 50 milliseconds, and consumes less than 40 MB of RAM compared to GitLab's 4+ GB."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I deploy ProGit with Docker and Podman?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, ProGit provides official multi-architecture container images on GitHub Container Registry (ghcr.io/sanjeevsenapati/progit:latest) for both AMD64 and ARM64. You can launch it with a single command via 'docker compose up -d' or './podman/deploy.sh'."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How can I migrate from Gogs, Gitea, or GitHub to ProGit?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Migrating to ProGit is effortless: create a repository on ProGit, configure it as a Git remote in your existing repository using 'git remote set-url origin https://progit.co.in/<owner>/<repo>.git', and run 'git push --mirror origin'. ProGit preserves all branches, tags, and commit histories."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
   <style>
     :root {
       --bg: #ffffff;
@@ -744,6 +866,8 @@
         <div class="sidebar-heading">Getting Started</div>
         <ul class="sidebar-nav">
           <li><a href="#overview" data-target="overview" onclick="navigate('overview')" class="active">Overview &amp; Philosophy</a></li>
+          <li><a href="#git-comparison" data-target="git-comparison" onclick="navigate('git-comparison')">Git Services Comparison (GitHub, Gogs, Gitea)</a></li>
+          <li><a href="#migration" data-target="migration" onclick="navigate('migration')">Migrating from GitHub, Gogs, Gitea</a></li>
           <li><a href="#quickstart" data-target="quickstart" onclick="navigate('quickstart')">5-Minute Quickstart</a></li>
           <li><a href="#architecture" data-target="architecture" onclick="navigate('architecture')">Architecture &amp; Zero CGO</a></li>
           <li><a href="#credits" data-target="credits" onclick="navigate('credits')">Credits &amp; Attributions</a></li>
@@ -877,13 +1001,232 @@
           <li><strong>In-Browser Code Editor &amp; Prettier</strong>: Create files, edit code online, upload entire folder structures, and format with 8 built-in themes.</li>
         </ul>
 
+        <h2>The Modern Git Service for Teams &amp; Enterprises</h2>
+        <p>ProGit serves as a direct, private, self-hosted replacement for public cloud services like GitHub and GitLab, as well as an upgraded modern alternative to legacy platforms like Gogs and Gitea. It requires zero cloud subscriptions, keeps 100% of your source code and intellectual property on your own infrastructure, and runs seamlessly behind enterprise firewalls or in air-gapped networks.</p>
+
         <div class="page-nav-buttons">
           <div></div>
+          <a href="#git-comparison" class="nav-btn" onclick="navigate('git-comparison')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Git Services Comparison</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- Git Services Comparison -->
+      <article class="doc-page" id="page-git-comparison">
+        <div class="breadcrumbs">
+          <span>Getting Started</span>
+          <span>/</span>
+          <span class="current">Git Services Comparison</span>
+        </div>
+        <h1 class="page-title">Git Services Comparison: ProGit vs GitHub vs Gogs vs Gitea vs GitLab</h1>
+        <p class="page-subtitle">Choosing the right Git service or self-hosted platform: A comprehensive technical comparison of ProGit against GitHub, Gogs, Gitea / Forgejo, and GitLab.</p>
+
+        <h2>Overview of Git Services &amp; Self-Hosted Solutions</h2>
+        <p>Whether you are seeking a <strong>private Git server</strong>, evaluating <strong>self-hosted Git services</strong> to safeguard enterprise source code, or looking for a modern, lightweight <strong>GitHub alternative</strong> or <strong>Gogs/Gitea successor</strong>, understanding the architectural differences is critical.</p>
+
+        <p>ProGit was engineered to solve the primary drawbacks of existing Git services: eliminating massive RAM footprints, removing complex CGO and external database dependencies, modernizing the web UI with React 19, and providing turnkey containerization with Docker and Podman.</p>
+
+        <h2>Technical Comparison Matrix</h2>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Feature / Capability</th>
+                <th>ProGit</th>
+                <th>GitHub</th>
+                <th>Gogs</th>
+                <th>Gitea / Forgejo</th>
+                <th>GitLab CE</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Deployment Model</strong></td>
+                <td><span class="badge badge-success">Self-Hosted / Cloud</span></td>
+                <td>Cloud SaaS / Enterprise Server</td>
+                <td>Self-Hosted</td>
+                <td>Self-Hosted</td>
+                <td>Self-Hosted / Cloud SaaS</td>
+              </tr>
+              <tr>
+                <td><strong>Memory Footprint (Idle)</strong></td>
+                <td><span class="badge badge-success">&lt; 40 MB RAM</span></td>
+                <td>N/A (Multi-Tenant Cloud)</td>
+                <td>~80 MB RAM</td>
+                <td>~150 - 300 MB RAM</td>
+                <td><span class="badge badge-danger">4 GB - 8 GB RAM</span></td>
+              </tr>
+              <tr>
+                <td><strong>Binary Architecture</strong></td>
+                <td><span class="badge badge-success">Single Pure-Go Binary</span></td>
+                <td>Proprietary Monolith</td>
+                <td>Single Go Binary</td>
+                <td>Single Go Binary</td>
+                <td>Complex Multi-Process Omnibus</td>
+              </tr>
+              <tr>
+                <td><strong>CGO Dependencies</strong></td>
+                <td><span class="badge badge-success">Zero CGO (Pure Go)</span></td>
+                <td>Proprietary</td>
+                <td>CGO Optional</td>
+                <td>CGO Optional</td>
+                <td>Extensive Native Libraries</td>
+              </tr>
+              <tr>
+                <td><strong>Database Requirement</strong></td>
+                <td><span class="badge badge-success">Embedded SQLite WAL (Zero Setup)</span></td>
+                <td>Proprietary MySQL Cluster</td>
+                <td>MySQL / PostgreSQL / SQLite</td>
+                <td>MySQL / PostgreSQL / SQLite</td>
+                <td>Dedicated PostgreSQL + Redis</td>
+              </tr>
+              <tr>
+                <td><strong>Frontend Technology</strong></td>
+                <td><span class="badge badge-success">Modern React 19 SPA + Vite</span></td>
+                <td>Hybrid Rails / React</td>
+                <td>Legacy Go html/template</td>
+                <td>Fomantic-UI + Server Templates</td>
+                <td>Vue.js + Ruby on Rails</td>
+              </tr>
+              <tr>
+                <td><strong>Git Smart Protocol</strong></td>
+                <td><span class="badge badge-success">Native HTTP &amp; Built-in SSH (2222)</span></td>
+                <td>HTTPS &amp; OpenSSH</td>
+                <td>HTTPS &amp; OpenSSH</td>
+                <td>HTTPS &amp; Built-in / OpenSSH</td>
+                <td>HTTPS &amp; OpenSSH / Gitlab Shell</td>
+              </tr>
+              <tr>
+                <td><strong>Git-Backed Wiki Engine</strong></td>
+                <td><span class="badge badge-success">Native Bare Git Repo (.wiki.git)</span></td>
+                <td>Native Bare Git Repo</td>
+                <td>Basic Markdown</td>
+                <td>Git-backed Wiki</td>
+                <td>Git-backed Wiki</td>
+              </tr>
+              <tr>
+                <td><strong>Static Site Hosting</strong></td>
+                <td><span class="badge badge-success">Built-in ProGit Pages</span></td>
+                <td>GitHub Pages</td>
+                <td>Not Supported</td>
+                <td>Basic Pages via add-on</td>
+                <td>GitLab Pages (Requires Runner)</td>
+              </tr>
+              <tr>
+                <td><strong>Container Support</strong></td>
+                <td><span class="badge badge-success">Docker &amp; Rootless Podman (~37 MB)</span></td>
+                <td>N/A</td>
+                <td>Docker Image</td>
+                <td>Docker Image</td>
+                <td>Heavy Docker Container (~2.5 GB)</td>
+              </tr>
+              <tr>
+                <td><strong>Enterprise SSO / OIDC</strong></td>
+                <td><span class="badge badge-success">Turnkey Google, Keycloak, Okta</span></td>
+                <td>SAML (Enterprise Only)</td>
+                <td>Basic PAM / LDAP</td>
+                <td>OAuth2 / OpenID Connect</td>
+                <td>OmniAuth / SAML / LDAP</td>
+              </tr>
+              <tr>
+                <td><strong>Code Review &amp; Merges</strong></td>
+                <td><span class="badge badge-success">Unified Diffs, Merge/Squash/Rebase</span></td>
+                <td>Full Review Suite</td>
+                <td>Basic PR Merges</td>
+                <td>PR Reviews &amp; Branch Protection</td>
+                <td>Extensive Merge Requests</td>
+              </tr>
+              <tr>
+                <td><strong>Open Source License</strong></td>
+                <td><span class="badge badge-success">MIT License</span></td>
+                <td>Proprietary</td>
+                <td>MIT License</td>
+                <td>MIT License</td>
+                <td>MIT (CE) / Proprietary (EE)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2>Deep-Dive: ProGit vs Other Git Services</h2>
+
+        <h3>1. ProGit as a Self-Hosted GitHub Alternative</h3>
+        <p>While <strong>GitHub</strong> is the industry standard for public open-source hosting, many organizations, defense contractors, healthcare entities, and privacy-conscious teams cannot store proprietary source code on third-party cloud servers. ProGit offers a faithful, modern GitHub-like user experience (React 19 single-page application, dark mode, pull requests, unified syntax-highlighted diffs, Kanban boards, and branch protection) while remaining 100% self-hosted on your own on-premise hardware, private VPC, or air-gapped network.</p>
+
+        <h3>2. ProGit vs Gogs: The Modernized Successor</h3>
+        <p><strong>Gogs</strong> (Go Git Service) proved that a self-hosted Git platform could be fast and lightweight. However, Gogs relies on legacy server-side HTML templates, lacks modern single-page reactivity, does not offer native static site hosting (ProGit Pages), and lacks integrated Git-backed wiki bare repository cloning. ProGit builds upon the proven Gogs architecture, modernizing it with a pure-Go zero-CGO SQLite engine, an embedded React 19 frontend, automated HTTPS, and enterprise OIDC Single Sign-On.</p>
+
+        <h3>3. ProGit vs Gitea &amp; Forgejo</h3>
+        <p><strong>Gitea</strong> and its fork <strong>Forgejo</strong> originated as forks of Gogs that accumulated significant feature breadth over time. However, this growth introduced operational overhead: larger memory consumption (150-300+ MB idle), complex build pipelines, and hundreds of configuration permutations. ProGit retains a laser focus on high performance, booting in 50ms with less than 40 MB of RAM, embedding all static UI assets into a single executable, and providing first-class rootless Podman and Docker container isolation.</p>
+
+        <h3>4. ProGit vs GitLab: 100x Lower Resource Requirements</h3>
+        <p><strong>GitLab Community Edition</strong> is an all-in-one DevOps platform, but its resource demands are notorious: requiring a minimum of 4 GB to 8 GB of RAM, a dedicated PostgreSQL database, Redis, Puma web server, and Gitaly sidecars. Running GitLab for small-to-medium teams or edge computing environments is frequently cost-prohibitive. ProGit delivers lightning-fast Git hosting, issues, pull requests, wikis, and static pages with less than 1% of GitLab's memory footprint.</p>
+
+        <div class="page-nav-buttons">
+          <a href="#overview" class="nav-btn" onclick="navigate('overview')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Overview &amp; Philosophy</span>
+          </a>
+          <a href="#migration" class="nav-btn" onclick="navigate('migration')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Migration Guide</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- Migration Guide -->
+      <article class="doc-page" id="page-migration">
+        <div class="breadcrumbs">
+          <span>Getting Started</span>
+          <span>/</span>
+          <span class="current">Migrating to ProGit</span>
+        </div>
+        <h1 class="page-title">Migrating from GitHub, Gogs, Gitea &amp; GitLab to ProGit</h1>
+        <p class="page-subtitle">A seamless guide to migrating your Git repositories, branches, tags, and commit histories from any Git service to ProGit.</p>
+
+        <h2>Seamless Git Mirroring (Recommended)</h2>
+        <p>Because ProGit is fully compliant with the standard Git Smart HTTP and SSH protocols (Git v2), you can mirror any existing repository from GitHub, Gogs, Gitea, or GitLab with zero data loss:</p>
+
+        <h3>Step 1: Create Target Repository on ProGit</h3>
+        <p>Sign in to your ProGit instance (e.g. <code>https://progit.co.in</code> or your private server) and click <strong>+ New Repository</strong>. Name the repository with the desired owner and slug.</p>
+
+        <h3>Step 2: Mirror Push from Your Existing Git Service</h3>
+        <pre><code># 1. Clone a bare mirror of your existing repository from GitHub, Gogs, or Gitea
+git clone --mirror https://github.com/your-org/your-repo.git /tmp/mirror-repo
+cd /tmp/mirror-repo
+
+# 2. Push all branches, tags, and commit references to ProGit
+git push --mirror https://progit.co.in/your-user/your-repo.git
+
+# 3. Clean up temporary mirror clone
+cd ~ &amp;&amp; rm -rf /tmp/mirror-repo</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h3>Step 3: Update Local Developer Workstations</h3>
+        <p>Developers on your team can update their existing Git remotes in one command:</p>
+        <pre><code># Update remote URL to point to ProGit
+git remote set-url origin https://progit.co.in/your-user/your-repo.git
+# Or using SSH:
+git remote set-url origin ssh://git@progit.local:2222/your-user/your-repo.git
+
+# Verify remote configuration
+git remote -v</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h2>Batch Migration for Organizations</h2>
+        <p>If you are migrating dozens or hundreds of repositories from an existing Gogs or Gitea server, ProGit's storage format is standard bare Git (<code>&lt;owner&gt;/&lt;repo&gt;.git</code>). You can copy the bare repository directories directly into ProGit's <code>/data/repositories</code> volume and run the administrative sync command.</p>
+
+        <div class="page-nav-buttons">
+          <a href="#git-comparison" class="nav-btn" onclick="navigate('git-comparison')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Git Services Comparison</span>
+          </a>
           <a href="#quickstart" class="nav-btn" onclick="navigate('quickstart')">
             <span class="dir">Next &rarr;</span>
             <span class="title">5-Minute Quickstart</span>
           </a>
         </div>
+      </article>
       </article>
 
       <!-- 2. Quickstart -->
@@ -3838,6 +4181,8 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
   <script>
     // Search Index
     const searchIndex = [
+      { id: 'git-comparison', title: 'Git Services Comparison (ProGit vs GitHub, Gogs, Gitea, GitLab)', section: 'Getting Started', desc: 'Technical comparison of self-hosted Git services, memory footprints (< 40MB vs 4GB), zero CGO, and features.' },
+      { id: 'migration', title: 'Migrating from GitHub, Gogs, Gitea & GitLab to ProGit', section: 'Getting Started', desc: 'Step-by-step repository mirroring, batch migration, and switching git remotes seamlessly.' },
       { id: 'sme-presentation', title: 'SME & Agency Deck', section: 'Presentations', desc: 'Interactive product & sales presentation for SMEs, software agencies, and startups.' },
       { id: 'presentation', title: 'Executive & Sales Deck', section: 'Enterprise', desc: 'Interactive pitch presentation, ROI calculator, and commercial tiers for executives and sales.' },
       { id: 'overview', title: 'What is ProGit? (Overview & Philosophy)', section: 'Getting Started', desc: 'Ultra-fast, single binary, pure Go self-hosted Git platform.' },
