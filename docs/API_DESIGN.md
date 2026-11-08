@@ -176,8 +176,145 @@ Headers dispatched on deliveries:
 - `DELETE /api/v1/repos/:owner/:repo/pages` - Disable Pages hosting.
 - `GET /pages/:owner/:repo/` - Static site delivery with automatic Markdown rendering.
 
-### 2.15 System Telemetry & Administration
-- `GET /api/health` - Health check (verifies HTTP, SQLite WAL, and Repository storage).
+### 2.15 System Telemetry & Administrative APIs
+
+All administrative endpoints require **Super Administrator privileges** (`is_admin = true`). Requests must provide either an `Authorization: Bearer <admin_token>` header with `admin` scope or a valid Super Admin session cookie. Non-admin or unauthenticated requests are rejected with `401 Unauthorized` or `403 Forbidden`.
+
+#### 1. System Telemetry & Statistics
+- `GET /api/health` - Liveness & Health check (verifies HTTP, SQLite WAL, and Repository storage).
 - `GET /api/ready` - Readiness check (returns 200 OK when server is accepting traffic).
-- `GET /api/v1/admin/stats` - Super admin telemetry (user count, repo count, disk usage, Go runtime).
-- `POST /api/v1/admin/maintenance/checkpoint` - Execute SQLite WAL checkpoint (`PRAGMA wal_checkpoint(TRUNCATE)`).
+- `GET /api/v1/admin/stats` - Super admin telemetry and server statistics.
+  - **Response (200 OK)**:
+    ```json
+    {
+      "users_count": 42,
+      "repositories_count": 87,
+      "uptime": "14h22m10s",
+      "database_path": "./data/progit.db",
+      "repositories_path": "./data/repositories",
+      "ssh_enabled": true,
+      "ssh_port": 2222,
+      "domain": "git.company.com",
+      "http_port": 3000,
+      "https_port": 3443,
+      "protocol": "https",
+      "is_https": true,
+      "enable_acme": false,
+      "generate_local_cert": true,
+      "root_url": "https://git.company.com/",
+      "app_name": "ProGit Enterprise",
+      "go_version": "go1.24.0",
+      "num_goroutines": 38,
+      "memory_alloc_mb": 18.42,
+      "memory_sys_mb": 42.15,
+      "active_sessions_count": 6,
+      "install_locked": true,
+      "default_repo_max_creation_limit": -1,
+      "default_org_max_creation_limit": -1
+    }
+    ```
+
+#### 2. User Account Administration
+- `GET /api/v1/admin/users` - List all registered user accounts with administrative status and creation limits.
+  - **Query Parameters**: `limit` (default: 100), `offset` (default: 0).
+  - **Response (200 OK)**: Array of User objects:
+    ```json
+    [
+      {
+        "id": 1,
+        "username": "admin",
+        "email": "admin@company.com",
+        "full_name": "Super Admin",
+        "is_admin": true,
+        "is_active": true,
+        "max_repo_creation": -1,
+        "max_org_creation": -1,
+        "num_repos": 12,
+        "num_orgs": 3,
+        "created_at": "2026-10-30T10:00:00Z"
+      }
+    ]
+    ```
+- `POST /api/v1/admin/users` - Create a new user account with initial role and creation limits.
+  - **Request Body**:
+    ```json
+    {
+      "username": "developer1",
+      "email": "dev1@company.com",
+      "password": "TemporaryPassword123!",
+      "full_name": "Developer One",
+      "is_admin": false,
+      "max_repo_creation": 10,
+      "max_org_creation": 2
+    }
+    ```
+  - **Response (201 Created)**: Created User object.
+- `PATCH /api/v1/admin/users/:id` - Update user administrative permissions, active state, or creation limits.
+  - **Request Body**:
+    ```json
+    {
+      "is_admin": true,
+      "is_active": true,
+      "max_repo_creation": 20,
+      "max_org_creation": 5
+    }
+    ```
+  - **Response (200 OK)**: Updated User object.
+  - *Safety Guard*: Super Admins cannot demote (`is_admin: false`) or deactivate (`is_active: false`) their own account.
+- `DELETE /api/v1/admin/users/:id` - Permanently delete a user account, revoke all tokens, and purge their repository directory on disk (`data/repositories/:username/`).
+  - **Response (200 OK)**: `{"message": "User deleted successfully"}`.
+  - *Safety Guard*: Super Admins cannot delete their own account.
+
+#### 3. Repository Administration
+- `GET /api/v1/admin/repos` - List all repositories across all users and organizations on the instance (including private repos).
+  - **Query Parameters**: `limit` (default: 100), `offset` (default: 0).
+  - **Response (200 OK)**: Array of Repository objects.
+- `DELETE /api/v1/admin/repos/:id` - Permanently delete any repository across the instance and remove its bare Git storage directory.
+  - **Response (200 OK)**: `{"message": "Repository deleted successfully"}`.
+
+#### 4. System Maintenance & Database Operations
+- `POST /api/v1/admin/maintenance` - Execute database and storage maintenance tasks.
+  - **Request Body**:
+    ```json
+    {
+      "operation": "checkpoint_wal"
+    }
+    ```
+  - **Supported Operations**:
+    - `"checkpoint_wal"`: Flushes and truncates SQLite Write-Ahead Log journal (`PRAGMA wal_checkpoint(TRUNCATE)`), synchronizing memory to disk.
+    - `"vacuum"`: Rebuilds database pages and reclaims fragmented disk storage (`VACUUM`).
+  - **Response (200 OK)**: `{"message": "SQLite WAL journal checkpointed and truncated successfully"}`.
+
+#### 5. Dynamic Server Runtime Configuration & Limits
+- `PUT /api/v1/admin/config` - Update core server runtime parameters and global creation limits without restarting. Changes are automatically persisted to `conf/app.ini`.
+  - **Request Body**:
+    ```json
+    {
+      "app_name": "ProGit Enterprise",
+      "domain": "git.company.com",
+      "root_url": "https://git.company.com/",
+      "ssh_port": 2222,
+      "http_port": 3000,
+      "default_repo_max_creation_limit": 10,
+      "default_org_max_creation_limit": 3
+    }
+    ```
+  - **Response (200 OK)**:
+    ```json
+    {
+      "message": "Server configuration updated successfully",
+      "app_name": "ProGit Enterprise",
+      "domain": "git.company.com",
+      "root_url": "https://git.company.com/",
+      "ssh_port": 2222,
+      "http_port": 3000,
+      "default_repo_max_creation_limit": 10,
+      "default_org_max_creation_limit": 3
+    }
+    ```
+
+#### 6. Enterprise High Availability, Licensing & Audit APIs *(Enterprise Edition)*
+- `GET /api/enterprise/cluster` - Inspect high-availability cluster topology, Raft consensus / Redis distributed locking state, and active nodes.
+- `GET /api/enterprise/license` - Inspect active enterprise license status, seat quota (`max_seats`, `active_seats`), edition, and expiry.
+- `POST /api/enterprise/license` - Upload and activate a cryptographically signed enterprise license payload.
+- `GET /api/enterprise/audit-logs?limit=100` - Stream and query SIEM compliance audit events with actor attribution and IP tracking.
