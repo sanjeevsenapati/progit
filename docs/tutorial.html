@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Git, ProGit &amp; CI/CD GitHub Actions Tutorial — Complete Beginner to Expert Guide</title>
+  
+  <meta name="title" content="Git, ProGit &amp; CI/CD GitHub Actions Tutorial — Complete Beginner to Expert Guide">
+  <meta name="description" content="Exhaustive, step-by-step tutorial covering Git fundamentals in minute detail, ProGit self-hosted platform mastery, and production CI/CD automation pipelines with GitHub Actions.">
+  <meta name="keywords" content="git tutorial, git basics, git commands, progit tutorial, github actions tutorial, ci cd pipeline tutorial, learn git, git branching, git rebase, git merge, self-hosted git, docker ci cd, ghcr actions">
+  <meta name="author" content="Supported by PDIH, created by ProGit Team and Sanjeev">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#10b981">
+  <link rel="canonical" href="https://progit.co.in/tutorial.html">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='18' cy='18' r='3'/><circle cx='6' cy='6' r='3'/><path d='M6 9v12'/><path d='M18 9a9 9 0 0 0-9 9'/></svg>">
+
+  <!-- Open Graph -->
+  <meta property="og:locale" content="en_US">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Complete Git, ProGit &amp; CI/CD GitHub Actions Tutorial">
+  <meta property="og:description" content="Master Git in minute detail, learn ProGit self-hosted platform collaboration, and build production CI/CD automated pipelines with GitHub Actions.">
+  <meta property="og:url" content="https://progit.co.in/tutorial.html">
+  <meta property="og:site_name" content="ProGit Documentation">
+  <meta property="og:image" content="https://progit.co.in/progit-og.svg">
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-surface: #f6f8fa;
+      --bg-hover: #eaeef2;
+      --border: #d0d7de;
+      --border-muted: #e1e4e8;
+      --text: #24292f;
+      --text-muted: #57606a;
+      --text-bright: #1f2328;
+      --accent: #10b981;
+      --accent-hover: #059669;
+      --accent-soft: rgba(16, 185, 129, 0.1);
+      --code-bg: #f6f8fa;
+      --callout-info-bg: #ddf4ff;
+      --callout-info-border: #54aeff;
+      --callout-tip-bg: #dafbe1;
+      --callout-tip-border: #4ac26b;
+      --callout-warn-bg: #fff8c5;
+      --callout-warn-border: #d4a72c;
+      --callout-danger-bg: #ffebe9;
+      --callout-danger-border: #ff8182;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    html.dark {
+      --bg: #0d1117;
+      --bg-surface: #161b22;
+      --bg-hover: #21262d;
+      --border: #30363d;
+      --border-muted: #21262d;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --text-bright: #f0f6fc;
+      --accent: #10b981;
+      --accent-hover: #34d399;
+      --accent-soft: rgba(16, 185, 129, 0.15);
+      --code-bg: #161b22;
+      --callout-info-bg: rgba(56, 139, 253, 0.12);
+      --callout-info-border: rgba(56, 139, 253, 0.4);
+      --callout-tip-bg: rgba(63, 185, 80, 0.12);
+      --callout-tip-border: rgba(63, 185, 80, 0.4);
+      --callout-warn-bg: rgba(210, 153, 34, 0.12);
+      --callout-warn-border: rgba(210, 153, 34, 0.4);
+      --callout-danger-bg: rgba(248, 81, 73, 0.12);
+      --callout-danger-border: rgba(248, 81, 73, 0.4);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top Navigation Header */
+    header.site-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-bright);
+    }
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      color: var(--accent);
+    }
+    .brand-title {
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: -0.5px;
+    }
+    .badge-pill {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .header-links {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-size: 13.5px;
+    }
+    .header-links a {
+      color: var(--text);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .header-links a:hover {
+      color: var(--accent);
+    }
+    .icon-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .icon-btn:hover {
+      background: var(--bg-hover);
+    }
+
+    /* Layout */
+    .tutorial-layout {
+      display: flex;
+      min-height: calc(100vh - 60px);
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    /* Sidebar Table of Contents */
+    .tutorial-sidebar {
+      width: 280px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      padding: 24px 16px;
+      position: sticky;
+      top: 60px;
+      height: calc(100vh - 60px);
+      overflow-y: auto;
+      font-size: 13px;
+    }
+    .sidebar-group-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin: 18px 0 8px 8px;
+    }
+    .sidebar-group-title:first-child {
+      margin-top: 0;
+    }
+    .sidebar-nav-list {
+      list-style: none;
+    }
+    .sidebar-nav-list li a {
+      display: block;
+      padding: 5px 10px;
+      color: var(--text-muted);
+      text-decoration: none;
+      border-radius: 6px;
+      line-height: 1.4;
+      transition: all 0.15s;
+    }
+    .sidebar-nav-list li a:hover,
+    .sidebar-nav-list li a.active {
+      color: var(--accent);
+      background: var(--accent-soft);
+      font-weight: 500;
+    }
+
+    /* Main Content Area */
+    .tutorial-content {
+      flex: 1;
+      padding: 40px 48px 80px 48px;
+      max-width: 980px;
+    }
+
+    /* Typography */
+    .hero-banner {
+      padding-bottom: 24px;
+      margin-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+    .breadcrumbs {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .breadcrumbs a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    .breadcrumbs a:hover {
+      color: var(--accent);
+    }
+    h1.tutorial-title {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      color: var(--text-bright);
+      margin-bottom: 12px;
+      line-height: 1.25;
+    }
+    p.tutorial-subtitle {
+      font-size: 17px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    h2.section-header {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--text-bright);
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-muted);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h3.sub-header {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-top: 32px;
+      margin-bottom: 12px;
+    }
+    h4.topic-header {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+    p, ul, ol {
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+    ul, ol {
+      padding-left: 24px;
+    }
+    li {
+      margin-bottom: 6px;
+    }
+
+    /* Code Blocks */
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.6;
+      margin-bottom: 20px;
+      position: relative;
+    }
+    code {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    pre code {
+      background: transparent;
+      color: var(--text-bright);
+      padding: 0;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.15s, background 0.15s;
+    }
+    .copy-btn:hover {
+      opacity: 1;
+      background: var(--bg-hover);
+      color: var(--text-bright);
+    }
+
+    /* Visual Callouts */
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--bg-surface);
+      border-radius: 0 8px 8px 0;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+    .callout.callout-info {
+      border-left-color: #388bfd;
+      background: var(--callout-info-bg);
+    }
+    .callout.callout-tip {
+      border-left-color: #2ea043;
+      background: var(--callout-tip-bg);
+    }
+    .callout.callout-warn {
+      border-left-color: #d29922;
+      background: var(--callout-warn-bg);
+    }
+    .callout-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Tables */
+    .table-container {
+      overflow-x: auto;
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+      text-align: left;
+    }
+    th, td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      background: var(--bg-surface);
+      color: var(--text-bright);
+      font-weight: 600;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* Diagram Card */
+    .diagram-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .diagram-svg {
+      max-width: 100%;
+      height: auto;
+    }
+
+    /* Footer */
+    footer.site-footer {
+      border-top: 1px solid var(--border);
+      background: var(--bg-surface);
+      padding: 32px 24px;
+      text-align: center;
+      font-size: 12.5px;
+      color: var(--text-muted);
+    }
+    footer.site-footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    footer.site-footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .tutorial-sidebar {
+        display: none;
+      }
+      .tutorial-content {
+        padding: 24px 20px;
+      }
+      h1.tutorial-title {
+        font-size: 28px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header Navigation -->
+  <header class="site-header">
+    <div class="header-left">
+      <a href="index.html" class="brand-link">
+        <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="18" cy="18" r="3"/>
+          <circle cx="6" cy="6" r="3"/>
+          <path d="M6 9v12"/>
+          <path d="M18 9a9 9 0 0 0-9 9"/>
+        </svg>
+        <span class="brand-title">ProGit</span>
+        <span class="badge-pill">Tutorial Guide</span>
+      </a>
+    </div>
+
+    <nav class="header-links">
+      <a href="index.html#overview">Docs Home</a>
+      <a href="index.html#quickstart">Quickstart</a>
+      <a href="index.html#git-comparison">Git Comparison</a>
+      <a href="index.html#config-cheatsheet">Cheat Sheet</a>
+      <a href="index.html#api-overview">REST API</a>
+      <a href="https://github.com/sanjeevsenapati/progit" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <button class="icon-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+        <svg id="theme-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg id="theme-sun" style="display:none;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
+    </nav>
+  </header>
+
+  <div class="tutorial-layout">
+    <!-- Left Sticky Sidebar TOC -->
+    <aside class="tutorial-sidebar">
+      <div class="sidebar-group-title">Module 1: Git In Minute Detail</div>
+      <ul class="sidebar-nav-list">
+        <li><a href="#git-intro">1.1 What is Git &amp; Object Model</a></li>
+        <li><a href="#git-states">1.2 The Three States of Git</a></li>
+        <li><a href="#git-config">1.3 First-Time Identity Config</a></li>
+        <li><a href="#git-init-clone">1.4 Initializing &amp; Cloning</a></li>
+        <li><a href="#git-workflow">1.5 The Edit-Stage-Commit Cycle</a></li>
+        <li><a href="#git-diff">1.6 Inspecting Changes with Diff</a></li>
+        <li><a href="#git-branches">1.7 Branching &amp; Pointer Mechanics</a></li>
+        <li><a href="#git-merge">1.8 Merging Strategies &amp; Conflicts</a></li>
+        <li><a href="#git-rebase">1.9 Rebasing vs Merging</a></li>
+        <li><a href="#git-remotes">1.10 Remotes, Push &amp; Fetch</a></li>
+        <li><a href="#git-undo">1.11 Undoing Changes &amp; Reflog</a></li>
+      </ul>
+
+      <div class="sidebar-group-title">Module 2: ProGit Platform</div>
+      <ul class="sidebar-nav-list">
+        <li><a href="#progit-intro">2.1 What is ProGit?</a></li>
+        <li><a href="#progit-auth">2.2 Keys, Tokens &amp; SSH (2222)</a></li>
+        <li><a href="#progit-repos">2.3 Repository Management</a></li>
+        <li><a href="#progit-web-ide">2.4 Web IDE &amp; Colorful Themes</a></li>
+        <li><a href="#progit-pulls">2.5 Pull Requests &amp; Code Review</a></li>
+        <li><a href="#progit-wiki">2.6 Git-Backed Wiki Engine</a></li>
+        <li><a href="#progit-pages">2.7 ProGit Pages Static Hosting</a></li>
+        <li><a href="#progit-kanban">2.8 Messages &amp; Kanban Boards</a></li>
+      </ul>
+
+      <div class="sidebar-group-title">Module 3: CI/CD &amp; GitHub Actions</div>
+      <ul class="sidebar-nav-list">
+        <li><a href="#cicd-intro">3.1 What is CI/CD?</a></li>
+        <li><a href="#actions-core">3.2 GitHub Actions Anatomy</a></li>
+        <li><a href="#pipeline-ci">3.3 Pipeline 1: Automated Test &amp; Lint</a></li>
+        <li><a href="#pipeline-docker">3.4 Pipeline 2: Docker Build &amp; GHCR</a></li>
+        <li><a href="#pipeline-deploy">3.5 Pipeline 3: Deploy to ProGit</a></li>
+        <li><a href="#pipeline-pages">3.6 Pipeline 4: Static Site Deployment</a></li>
+        <li><a href="#cicd-security">3.7 Pipeline Secrets &amp; Security</a></li>
+      </ul>
+
+      <div class="sidebar-group-title">Quick Reference</div>
+      <ul class="sidebar-nav-list">
+        <li><a href="#cheatsheet-git">Git Command Cheat Sheet</a></li>
+        <li><a href="#cheatsheet-actions">GitHub Actions Syntax Sheet</a></li>
+      </ul>
+    </aside>
+
+    <!-- Main Content Articles -->
+    <main class="tutorial-content">
+      
+      <!-- Hero -->
+      <div class="hero-banner">
+        <div class="breadcrumbs">
+          <a href="index.html">ProGit Documentation</a>
+          <span>/</span>
+          <span>Tutorial</span>
+        </div>
+        <h1 class="tutorial-title">Git, ProGit &amp; CI/CD GitHub Actions: The Comprehensive Masterclass</h1>
+        <p class="tutorial-subtitle">
+          An exhaustive, minute-by-minute tutorial breaking down Git version control down to internal pointers, mastering the self-hosted ProGit platform, and constructing battle-tested CI/CD pipelines with GitHub Actions.
+        </p>
+      </div>
+
+      <!-- ==================================================================== -->
+      <!-- MODULE 1: GIT IN MINUTE DETAIL                                       -->
+      <!-- ==================================================================== -->
+      <section id="module-1">
+        <h2 class="section-header" id="git-intro">
+          <span>Module 1: Git Fundamentals in Minute Detail</span>
+        </h2>
+
+        <h3 class="sub-header">1.1 What is Git &amp; How It Works Internally</h3>
+        <p>
+          Git is a <strong>Distributed Version Control System (DVCS)</strong> created by Linus Torvalds in 2005. Unlike older centralized systems like Subversion (SVN) or CVS which store file diffs (deltas), Git thinks of its data as a <strong>stream of snapshots</strong> of a miniature filesystem.
+        </p>
+        <p>
+          Every time you commit in Git, it takes a picture of what all your files look like at that moment and stores a reference to that snapshot. If a file has not changed, Git does not store the file again—it simply creates a lightweight link to the previously stored identical file.
+        </p>
+
+        <div class="diagram-box">
+          <svg class="diagram-svg" viewBox="0 0 800 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Commit Object -->
+            <rect x="50" y="40" width="180" height="150" rx="8" fill="#161b22" stroke="#10b981" stroke-width="2"/>
+            <text x="140" y="70" fill="#10b981" font-family="sans-serif" font-weight="700" font-size="14" text-anchor="middle">Commit Object</text>
+            <text x="140" y="95" fill="#8b949e" font-family="sans-serif" font-size="11" text-anchor="middle">Author &amp; Committer</text>
+            <text x="140" y="115" fill="#8b949e" font-family="sans-serif" font-size="11" text-anchor="middle">Parent Commit Hash</text>
+            <text x="140" y="135" fill="#8b949e" font-family="sans-serif" font-size="11" text-anchor="middle">Commit Message</text>
+            <text x="140" y="160" fill="#38bdf8" font-family="sans-serif" font-weight="600" font-size="12" text-anchor="middle">&rarr; Tree pointer</text>
+
+            <!-- Arrow -->
+            <path d="M 230 115 L 310 115" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+
+            <!-- Tree Object -->
+            <rect x="310" y="40" width="180" height="150" rx="8" fill="#161b22" stroke="#38bdf8" stroke-width="2"/>
+            <text x="400" y="70" fill="#38bdf8" font-family="sans-serif" font-weight="700" font-size="14" text-anchor="middle">Tree Object (Dir)</text>
+            <text x="400" y="95" fill="#8b949e" font-family="sans-serif" font-size="11" text-anchor="middle">100644 main.go (blob)</text>
+            <text x="400" y="115" fill="#8b949e" font-family="sans-serif" font-size="11" text-anchor="middle">100644 README.md (blob)</text>
+            <text x="400" y="135" fill="#8b949e" font-family="sans-serif" font-size="11" text-anchor="middle">040000 src/ (sub-tree)</text>
+
+            <!-- Arrow -->
+            <path d="M 490 95 L 570 70" stroke="#a78bfa" stroke-width="2"/>
+            <path d="M 490 115 L 570 150" stroke="#a78bfa" stroke-width="2"/>
+
+            <!-- Blob Objects -->
+            <rect x="570" y="30" width="180" height="70" rx="8" fill="#161b22" stroke="#a78bfa" stroke-width="2"/>
+            <text x="660" y="55" fill="#a78bfa" font-family="sans-serif" font-weight="700" font-size="13" text-anchor="middle">Blob Object (main.go)</text>
+            <text x="660" y="78" fill="#8b949e" font-family="sans-serif" font-size="11" text-anchor="middle">Raw compressed file content</text>
+
+            <rect x="570" y="125" width="180" height="70" rx="8" fill="#161b22" stroke="#a78bfa" stroke-width="2"/>
+            <text x="660" y="150" fill="#a78bfa" font-family="sans-serif" font-weight="700" font-size="13" text-anchor="middle">Blob Object (README.md)</text>
+            <text x="660" y="173" fill="#8b949e" font-family="sans-serif" font-size="11" text-anchor="middle">Raw markdown text content</text>
+          </svg>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">Figure 1.1: Git's Content-Addressable Object Model (Commits point to Trees, Trees point to Blobs).</p>
+        </div>
+
+        <h4 class="topic-header">The 4 Core Git Objects:</h4>
+        <ul>
+          <li><strong>Blob (Binary Large Object)</strong>: Holds file contents compressed with zlib. Blobs store no filenames, timestamps, or permissions—only pure data.</li>
+          <li><strong>Tree</strong>: Represents a directory. Maps filenames and permissions (e.g. <code>100644</code> for files, <code>100755</code> for executables) to Blob hashes or other sub-Trees.</li>
+          <li><strong>Commit</strong>: Top-level snapshot containing a pointer to the root Tree, parent commit hashes, author/committer timestamps, and commit message.</li>
+          <li><strong>Annotated Tag</strong>: A permanent pointer to a specific commit containing tagger name, date, and cryptographic GPG signature.</li>
+        </ul>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="git-states">1.2 The Three States of Git</h3>
+        <p>To master Git, you must understand where files reside at any point in time:</p>
+        
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>State / Area</th>
+                <th>Physical Location</th>
+                <th>What It Represents</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>1. Working Directory</strong></td>
+                <td>Files on your disk</td>
+                <td>The sandbox where you actively edit, create, and delete code.</td>
+              </tr>
+              <tr>
+                <td><strong>2. Staging Area (Index)</strong></td>
+                <td><code>.git/index</code> binary file</td>
+                <td>The preparation room. Formats precisely what changes will go into the next commit snapshot.</td>
+              </tr>
+              <tr>
+                <td><strong>3. Git Directory (Repository)</strong></td>
+                <td><code>.git/objects/</code></td>
+                <td>The permanent database where Git securely stores the history of all committed snapshots.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="git-config">1.3 Initial Setup &amp; Configuration</h3>
+        <p>Before making your first commit, configure your global identity. Git records this information immutably in every commit:</p>
+
+        <pre><code># 1. Set your name and email
+git config --global user.name "Alice Developer"
+git config --global user.email "alice@company.com"
+
+# 2. Set default branch name for all new repositories to 'main'
+git config --global init.defaultBranch main
+
+# 3. Configure line ending handling (LF on Linux/macOS, CRLF on Windows)
+git config --global core.autocrlf input   # macOS/Linux
+# git config --global core.autocrlf true  # Windows
+
+# 4. Verify your active configuration
+git config --list --show-origin</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="git-init-clone">1.4 Creating &amp; Cloning Repositories</h3>
+        
+        <h4>Scenario A: Initialize a Brand New Local Project</h4>
+        <pre><code>mkdir my-project
+cd my-project
+
+# Initializes a hidden .git directory containing Git's internal database
+git init</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h4>Scenario B: Clone an Existing Remote Project</h4>
+        <pre><code># Clone via HTTPS
+git clone https://progit.co.in/alice/web-app.git
+
+# Clone via SSH (built-in ProGit SSH server on port 2222)
+git clone ssh://git@progit.local:2222/alice/web-app.git
+
+# Shallow clone (fetches only the latest commit; fast for large repositories)
+git clone --depth=1 https://progit.co.in/alice/web-app.git</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="git-workflow">1.5 The Edit-Stage-Commit Workflow</h3>
+        <p>Let's follow a file from creation to permanent commit history:</p>
+
+        <pre><code># 1. Create a file
+echo "# Web App" > README.md
+
+# 2. Check repository status (File will appear in red as 'Untracked')
+git status
+
+# 3. Stage the file (Moves it to the Index / Staging Area)
+git add README.md
+# To stage all modified and new files:
+git add .
+
+# 4. Check status again (File will appear in green under 'Changes to be committed')
+git status
+
+# 5. Commit snapshot to history with a descriptive message
+git commit -m "docs: add initial README project documentation"
+
+# 6. Amend the last commit (if you forgot to include a file or made a typo in the message)
+git commit --amend -m "docs: add comprehensive README with setup instructions"</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <div class="callout callout-tip">
+          <div class="callout-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Interactive Staging (`git add -p`)</span>
+          </div>
+          <p>
+            If you made changes across multiple sections of a file but want to group them into separate logical commits, use <code>git add -p &lt;filename&gt;</code>. Git will prompt you per hunk (<code>y</code> to stage, <code>n</code> to skip, <code>s</code> to split into smaller hunks).
+          </p>
+        </div>
+
+        <h4 class="topic-header">Excluding Files with `.gitignore`:</h4>
+        <p>Always create a <code>.gitignore</code> file in your repository root to prevent secret keys, compiled binaries, and temporary files from being tracked:</p>
+        <pre><code># Dependencies
+node_modules/
+vendor/
+
+# Environment secrets and credentials
+.env
+*.pem
+*.key
+
+# Build output
+dist/
+build/
+*.exe
+*.bin
+
+# Operating system noise
+.DS_Store
+Thumbs.db</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="git-diff">1.6 Inspecting Changes with `git diff`</h3>
+        <pre><code># 1. Diff unstaged changes in working directory against staging area
+git diff
+
+# 2. Diff staged changes against the last commit (HEAD)
+git diff --staged
+
+# 3. Diff specific file
+git diff main.go
+
+# 4. Diff two branches
+git diff main..feature-auth
+
+# 5. Diff commit history (graphical one-line view)
+git log --oneline --graph --decorate --all</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="git-branches">1.7 Branching &amp; Pointer Mechanics</h3>
+        <p>
+          In Git, a branch is not a copy of files. A branch is simply an <strong>exceptionally lightweight, movable pointer</strong> to a commit hash (taking just 41 bytes on disk).
+        </p>
+        <p>
+          The special pointer <code>HEAD</code> indicates which branch or commit your working directory currently points to.
+        </p>
+
+        <pre><code># 1. List all local branches (* indicates current active branch)
+git branch
+
+# 2. Create and switch to a new feature branch (Modern syntax)
+git switch -c feature/oauth-login
+# (Legacy syntax: git checkout -b feature/oauth-login)
+
+# 3. Switch back to main
+git switch main
+
+# 4. Delete branch after merging
+git branch -d feature/oauth-login
+
+# 5. Force delete unmerged branch
+git branch -D feature/oauth-login</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="git-merge">1.8 Merging Strategies &amp; Merge Conflicts</h3>
+
+        <h4>Strategy 1: Fast-Forward Merge</h4>
+        <p>
+          Occurs when the target branch has no new commits since the feature branch diverged. Git simply moves the pointer forward:
+        </p>
+        <pre><code>git switch main
+git merge feature/user-profile</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h4>Strategy 2: Three-Way Merge (Non-Fast-Forward)</h4>
+        <p>
+          Occurs when both <code>main</code> and the feature branch have progressed independently. Git creates a new "Merge Commit" with two parents:
+        </p>
+        <pre><code>git merge --no-ff feature/user-profile -m "merge: integrate user profile service"</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h4>Handling Merge Conflicts:</h4>
+        <p>
+          If the same lines in the same file were edited differently in both branches, Git halts and inserts conflict markers:
+        </p>
+        <pre><code><<<<<<< HEAD (Current branch: main)
+const API_TIMEOUT = 5000;
+=======
+const API_TIMEOUT = 8000;
+>>>>>>> feature/user-profile (Incoming branch)</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <p><strong>To resolve:</strong></p>
+        <ol>
+          <li>Open the file and manually decide which code to keep (e.g. choose <code>const API_TIMEOUT = 8000;</code>).</li>
+          <li>Delete the conflict markers (<code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code>, <code>=======</code>, <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code>).</li>
+          <li>Save the file, stage it with <code>git add &lt;filename&gt;</code>, and finish the merge with <code>git commit</code>.</li>
+          <li>(Or to abort the merge and return to the pre-merge state: <code>git merge --abort</code>).</li>
+        </ol>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="git-rebase">1.9 Rebasing vs Merging</h3>
+        <p>
+          Rebasing takes the commits from your branch and <strong>replays them one by one</strong> on top of another branch. This produces a perfectly linear commit history without merge bubbles:
+        </p>
+
+        <pre><code># Rebase feature branch on top of latest main
+git switch feature/payment-gateway
+git rebase main
+
+# Interactive Rebase (Clean up the last 3 commits before submitting a PR)
+git rebase -i HEAD~3</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <div class="callout callout-warn">
+          <div class="callout-title">The Golden Rule of Rebasing</div>
+          <p>
+            <strong>Never rebase commits that have been pushed to a public/shared branch (like <code>main</code>)</strong>. Rebasing recalculates commit hashes, rewriting history and forcing colleagues into painful divergent states.
+          </p>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="git-remotes">1.10 Working with Remote Repositories</h3>
+        <pre><code># 1. View configured remote URLs
+git remote -v
+
+# 2. Add ProGit remote
+git remote add origin https://progit.co.in/alice/web-app.git
+
+# 3. Push and set upstream tracking branch
+git push -u origin main
+
+# 4. Fetch changes from remote without merging
+git fetch origin
+
+# 5. Pull (Fetch + Merge in one step)
+git pull origin main
+
+# 6. Pull with rebase (Keeps local history clean)
+git pull --rebase origin main
+
+# 7. Safe force push (Only overwrites remote if nobody else has pushed in the meantime)
+git push --force-with-lease origin feature/payment-gateway</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="git-undo">1.11 Undoing Changes &amp; The Reflog Safety Net</h3>
+        
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Goal</th><th>Command</th><th>Effect</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>Discard unstaged changes in a file</td>
+                <td><code>git restore &lt;file&gt;</code></td>
+                <td>Reverts file back to last committed state.</td>
+              </tr>
+              <tr>
+                <td>Unstage a file from Index</td>
+                <td><code>git restore --staged &lt;file&gt;</code></td>
+                <td>Keeps working directory changes; removes from staging.</td>
+              </tr>
+              <tr>
+                <td>Undo last commit, keep changes staged</td>
+                <td><code>git reset --soft HEAD~1</code></td>
+                <td>Moves HEAD back 1 commit; leaves all files staged.</td>
+              </tr>
+              <tr>
+                <td>Undo last commit, unstage changes</td>
+                <td><code>git reset --mixed HEAD~1</code></td>
+                <td>Default reset mode; changes preserved in working directory.</td>
+              </tr>
+              <tr>
+                <td>Revert a public commit safely</td>
+                <td><code>git revert &lt;commit-hash&gt;</code></td>
+                <td>Creates a brand new commit that inverts the changes.</td>
+              </tr>
+              <tr>
+                <td>Temporarily stash uncommitted work</td>
+                <td><code>git stash push -m "WIP auth"</code></td>
+                <td>Cleans working tree; restores later with <code>git stash pop</code>.</td>
+              </tr>
+              <tr>
+                <td>Recover lost commit or deleted branch</td>
+                <td><code>git reflog</code></td>
+                <td>Inspects pointer history log; find hash and run <code>git switch -c recovery &lt;hash&gt;</code>.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ==================================================================== -->
+      <!-- MODULE 2: PROGIT PLATFORM MASTERY                                    -->
+      <!-- ==================================================================== -->
+      <section id="module-2" style="margin-top: 60px;">
+        <h2 class="section-header" id="progit-intro">
+          <span>Module 2: ProGit Platform Mastery</span>
+        </h2>
+
+        <h3 class="sub-header">2.1 What is ProGit?</h3>
+        <p>
+          ProGit is a modern, high-concurrency self-hosted Git collaboration platform. Engineered in pure Go with zero CGO dependencies and an embedded React 19 single-page application, it provides all the capabilities of GitHub Enterprise while running on less than <strong>40 MB of RAM</strong> with zero external database dependencies.
+        </p>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="progit-auth">2.2 Authentication: SSH Keys &amp; Personal Access Tokens (PAT)</h3>
+        
+        <h4>Setting Up Ed25519 SSH Keys (Port 2222):</h4>
+        <pre><code># 1. Generate an Ed25519 cryptographic key pair
+ssh-keygen -t ed25519 -C "your_email@company.com"
+
+# 2. Display your public key
+cat ~/.ssh/id_ed25519.pub
+# Copy output: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5... your_email@company.com</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <p>
+          3. In ProGit Web UI, navigate to <strong>User Profile &rarr; Settings &rarr; SSH Keys</strong> &rarr; Click <strong>Add Key</strong> &rarr; Paste your public key.
+        </p>
+
+        <h4>Generating Personal Access Tokens (PAT):</h4>
+        <p>
+          For CLI Git Smart HTTPS operations and REST API integration, generate a PAT:
+        </p>
+        <ol>
+          <li>Navigate to <strong>Settings &rarr; Access Tokens</strong>.</li>
+          <li>Enter a description (e.g. <code>cli-macbook</code>) and select scopes (<code>repo</code>, <code>user</code>).</li>
+          <li>Copy the token (e.g. <code>pgt_84bf7291a...</code>). Use this token as your password when cloning or pushing over HTTPS.</li>
+        </ol>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="progit-repos">2.3 Repository Operations on ProGit</h3>
+        <pre><code># Push an existing local Git repository to your ProGit server
+cd /path/to/my-existing-project
+git remote add origin https://progit.local:3443/alice/my-project.git
+git push -u origin main</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="progit-web-ide">2.4 Web IDE &amp; Colorful Syntax Themes</h3>
+        <p>
+          ProGit includes a built-in code editor that allows developers to create files, upload directories, edit code directly in the browser, and format with Prettier.
+        </p>
+        <p>
+          Developers can customize their editing experience with <strong>8 curated syntax themes</strong> (Dracula, Nord, Monokai, GitHub Dark, Synthwave, Solarized Dark, One Dark, and Material) accessible directly in the code editor settings.
+        </p>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="progit-pulls">2.5 Pull Requests &amp; Code Review</h3>
+        <p>ProGit implements enterprise-grade Pull Request review mechanics:</p>
+        <ul>
+          <li><strong>Public Visibility for Open-Source</strong>: Public repositories allow unauthenticated community members to inspect issues, code, and pull requests.</li>
+          <li><strong>Restricted Merge Controls</strong>: Merge buttons are strictly protected—only repository members with write permissions or the original repository owner can approve and merge.</li>
+          <li><strong>3 Native Merge Strategies</strong>:
+            <ul>
+              <li><strong>Create a Merge Commit</strong> (<code>--no-ff</code>): Retains all intermediate commit history.</li>
+              <li><strong>Squash and Merge</strong>: Combines all commits into one clean commit on the target branch.</li>
+              <li><strong>Rebase and Merge</strong>: Linearly applies commits without a merge bubble.</li>
+            </ul>
+          </li>
+        </ul>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="progit-wiki">2.6 Git-Backed Wiki Documentation</h3>
+        <p>
+          Every repository on ProGit features an independent, real Git-backed wiki.
+        </p>
+        <p>
+          <strong>First-Time Experience</strong>: If a wiki has no content, ProGit displays a GitHub-style onboarding screen with a prominent <em>"Create the first page"</em> call to action—no dummy commits are automatically generated.
+        </p>
+        <p><strong>Offline Editing via Git CLI</strong>:</p>
+        <pre><code># Clone your repository's wiki as an independent Git repository
+git clone https://progit.local:3443/alice/my-project.wiki.git
+cd my-project.wiki
+
+echo "# System Architecture" > Architecture.md
+git add Architecture.md
+git commit -m "docs: add architecture documentation"
+git push origin main</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="progit-pages">2.7 ProGit Pages Static Site Hosting</h3>
+        <p>
+          Similar to GitHub Pages, ProGit automatically hosts static websites, documentation, and Single-Page Applications directly from your repository branches:
+        </p>
+        <ol>
+          <li>Navigate to repository <strong>Settings &rarr; Features</strong> (or the <strong>Pages</strong> tab).</li>
+          <li>Check <strong>Enable ProGit Pages</strong>.</li>
+          <li>Choose the source branch (e.g. <code>gh-pages</code> or <code>main</code>) and folder (<code>/</code> or <code>/docs</code>).</li>
+          <li>Your site is instantly published at <code>https://progit.local:3443/pages/&lt;owner&gt;/&lt;repo&gt;/</code>.</li>
+        </ol>
+      </section>
+
+      <!-- ==================================================================== -->
+      <!-- MODULE 3: CI/CD PIPELINES & GITHUB ACTIONS                          -->
+      <!-- ==================================================================== -->
+      <section id="module-3" style="margin-top: 60px;">
+        <h2 class="section-header" id="cicd-intro">
+          <span>Module 3: CI/CD Pipelines &amp; GitHub Actions</span>
+        </h2>
+
+        <h3 class="sub-header">3.1 What is CI/CD?</h3>
+        <ul>
+          <li><strong>Continuous Integration (CI)</strong>: Automatically builds, compiles, and tests code every time a developer commits or opens a pull request, catching bugs before merge.</li>
+          <li><strong>Continuous Delivery (CD)</strong>: Packages validated code into deployable release artifacts (such as Docker container images or compiled binaries) ready for rollout.</li>
+          <li><strong>Continuous Deployment (CD)</strong>: Automatically deploys passing artifacts to production staging or live environments with zero manual intervention.</li>
+        </ul>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="actions-core">3.2 GitHub Actions Architecture &amp; YAML Hierarchy</h3>
+        <p>
+          GitHub Actions uses declarative YAML files placed in <code>.github/workflows/*.yml</code> within your repository. Here is the operational hierarchy:
+        </p>
+
+        <div class="diagram-box">
+          <svg class="diagram-svg" viewBox="0 0 760 210" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="20" y="30" width="160" height="150" rx="8" fill="#161b22" stroke="#10b981" stroke-width="2"/>
+            <text x="100" y="60" fill="#10b981" font-family="sans-serif" font-weight="700" font-size="14" text-anchor="middle">1. Event / Trigger</text>
+            <text x="100" y="88" fill="#c9d1d9" font-family="monospace" font-size="12" text-anchor="middle">push: [main]</text>
+            <text x="100" y="112" fill="#c9d1d9" font-family="monospace" font-size="12" text-anchor="middle">pull_request</text>
+            <text x="100" y="136" fill="#c9d1d9" font-family="monospace" font-size="12" text-anchor="middle">schedule / cron</text>
+            <text x="100" y="160" fill="#c9d1d9" font-family="monospace" font-size="12" text-anchor="middle">workflow_dispatch</text>
+
+            <path d="M 180 105 L 240 105" stroke="#38bdf8" stroke-width="2"/>
+
+            <rect x="240" y="30" width="220" height="150" rx="8" fill="#161b22" stroke="#38bdf8" stroke-width="2"/>
+            <text x="350" y="60" fill="#38bdf8" font-family="sans-serif" font-weight="700" font-size="14" text-anchor="middle">2. Workflow &amp; Jobs</text>
+            <text x="350" y="88" fill="#c9d1d9" font-family="monospace" font-size="12" text-anchor="middle">runs-on: ubuntu-latest</text>
+            <text x="350" y="112" fill="#8b949e" font-family="sans-serif" font-size="11" text-anchor="middle">Jobs run in parallel</text>
+            <text x="350" y="132" fill="#8b949e" font-family="sans-serif" font-size="11" text-anchor="middle">or sequentially via</text>
+            <text x="350" y="152" fill="#38bdf8" font-family="monospace" font-size="12" text-anchor="middle">needs: [build-job]</text>
+
+            <path d="M 460 105 L 520 105" stroke="#a78bfa" stroke-width="2"/>
+
+            <rect x="520" y="30" width="220" height="150" rx="8" fill="#161b22" stroke="#a78bfa" stroke-width="2"/>
+            <text x="630" y="60" fill="#a78bfa" font-family="sans-serif" font-weight="700" font-size="14" text-anchor="middle">3. Steps &amp; Actions</text>
+            <text x="630" y="88" fill="#c9d1d9" font-family="monospace" font-size="12" text-anchor="middle">- uses: actions/checkout</text>
+            <text x="630" y="112" fill="#c9d1d9" font-family="monospace" font-size="12" text-anchor="middle">- uses: actions/setup-go</text>
+            <text x="630" y="136" fill="#c9d1d9" font-family="monospace" font-size="12" text-anchor="middle">- run: go test ./...</text>
+            <text x="630" y="160" fill="#c9d1d9" font-family="monospace" font-size="12" text-anchor="middle">- run: docker build .</text>
+          </svg>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">Figure 3.1: GitHub Actions Pipeline Execution Flow.</p>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="pipeline-ci">3.3 Pipeline 1: Automated Test &amp; Lint (Continuous Integration)</h3>
+        <p>
+          Save this as <code>.github/workflows/ci.yml</code>. It triggers on every commit and pull request, checking out code, running linter checks, and executing the Go test suite across a matrix:
+        </p>
+
+        <pre><code>name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Run Unit &amp; Integration Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.22', '1.23']
+
+    steps:
+      # Step 1: Check out repository code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Go environment
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      # Step 3: Download dependencies
+      - name: Download Go Modules
+        run: go mod download
+
+      # Step 4: Run unit &amp; API tests with race detector
+      - name: Run Go Tests
+        run: go test -v -race -coverprofile=coverage.out ./...
+
+      # Step 5: Verify static formatting
+      - name: Verify Code Formatting
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "The following files require gofmt:"
+            gofmt -l .
+            exit 1
+          fi</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="pipeline-docker">3.4 Pipeline 2: Multi-Architecture Container Build &amp; Push (GHCR)</h3>
+        <p>
+          Save this as <code>.github/workflows/docker-publish.yml</code>. It compiles a Vite frontend, builds a pure-Go static binary, and pushes multi-architecture images (AMD64 &amp; ARM64) to GitHub Container Registry:
+        </p>
+
+        <pre><code>name: Build &amp; Publish Production Container
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*.*.*' ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    name: Build Multi-Arch Image (AMD64 + ARM64)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (Emulation for ARM64)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and Push Multi-Arch Container
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="pipeline-deploy">3.5 Pipeline 3: Continuous Deployment to Production Server via SSH</h3>
+        <p>
+          Save this as <code>.github/workflows/deploy.yml</code>. Once tests and container builds pass, this workflow securely connects to your Linux production host over SSH and performs a zero-downtime rolling update:
+        </p>
+
+        <pre><code>name: Deploy to Production Server
+
+on:
+  workflow_run:
+    workflows: [ "Build &amp; Publish Production Container" ]
+    types: [ completed ]
+    branches: [ main ]
+
+jobs:
+  deploy:
+    name: SSH Rolling Update
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Execute Remote SSH Commands
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_SERVER_IP }}
+          username: ${{ secrets.PROD_SERVER_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            echo "==> Pulling latest ProGit image..."
+            docker compose pull progit
+            echo "==> Restarting container with zero downtime..."
+            docker compose up -d --remove-orphans progit
+            echo "==> Performing health check verification..."
+            curl -k -f https://localhost:3443/api/health || exit 1
+            echo "✓ Deployment Successful!"</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="pipeline-pages">3.6 Pipeline 4: Automated Documentation Deployment (ProGit Pages)</h3>
+        <p>
+          Save this as <code>.github/workflows/pages.yml</code>. Builds your static documentation or React website and publishes it directly to the <code>gh-pages</code> branch:
+        </p>
+
+        <pre><code>name: Deploy Static Documentation to Pages
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+      - 'index.html'
+
+permissions:
+  contents: write
+
+jobs:
+  deploy-pages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to gh-pages Branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          publish_branch: gh-pages
+          cname: progit.co.in</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-muted); margin: 32px 0;">
+
+        <h3 class="sub-header" id="cicd-security">3.7 CI/CD Security Best Practices</h3>
+        <ul>
+          <li><strong>Principle of Least Privilege</strong>: Always declare <code>permissions:</code> explicitly at the top of your workflow (e.g. <code>contents: read</code>) instead of granting full repository write access.</li>
+          <li><strong>Use Repository Secrets</strong>: Never hardcode passwords, API tokens, or SSH keys in YAML. Go to <strong>Settings &rarr; Secrets and variables &rarr; Actions</strong> and reference them as <code>${{ secrets.MY_SECRET }}</code>.</li>
+          <li><strong>Pin Actions to Exact Commit SHAs</strong>: Third-party tags like <code>@v3</code> can be mutated if an upstream account is compromised. In production, pin critical actions to full commit hashes (e.g. <code>actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11</code>).</li>
+          <li><strong>Timeout Safeguards</strong>: Prevent runaway jobs by setting <code>timeout-minutes: 15</code> on every job.</li>
+        </ul>
+      </section>
+
+      <!-- ==================================================================== -->
+      <!-- MODULE 4: CHEAT SHEETS & QUICK REFERENCE                            -->
+      <!-- ==================================================================== -->
+      <section id="module-4" style="margin-top: 60px;">
+        <h2 class="section-header" id="cheatsheet-git">
+          <span>Git Command Quick Reference</span>
+        </h2>
+
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Action</th><th>Git Command</th><th>Explanation</th></tr></thead>
+            <tbody>
+              <tr><td>Clone repo</td><td><code>git clone &lt;url&gt;</code></td><td>Downloads full repository history and checks out default branch.</td></tr>
+              <tr><td>Check status</td><td><code>git status</code></td><td>Shows working tree status (untracked, modified, staged).</td></tr>
+              <tr><td>Stage file</td><td><code>git add &lt;file&gt;</code></td><td>Adds file snapshot to staging index.</td></tr>
+              <tr><td>Commit changes</td><td><code>git commit -m "msg"</code></td><td>Creates permanent commit snapshot with log message.</td></tr>
+              <tr><td>Create branch</td><td><code>git switch -c &lt;name&gt;</code></td><td>Creates and switches to a new branch pointer.</td></tr>
+              <tr><td>Switch branch</td><td><code>git switch &lt;name&gt;</code></td><td>Switches working directory to specified branch.</td></tr>
+              <tr><td>Merge branch</td><td><code>git merge &lt;name&gt;</code></td><td>Integrates branch history into active branch.</td></tr>
+              <tr><td>Rebase branch</td><td><code>git rebase &lt;target&gt;</code></td><td>Replays commits on top of target branch base.</td></tr>
+              <tr><td>Pull updates</td><td><code>git pull --rebase</code></td><td>Fetches remote commits and rebases local changes on top.</td></tr>
+              <tr><td>Push changes</td><td><code>git push -u origin main</code></td><td>Pushes commits to remote and sets default tracking.</td></tr>
+              <tr><td>Stash changes</td><td><code>git stash push -m "WIP"</code></td><td>Saves dirty working directory state to temporary stack.</td></tr>
+              <tr><td>Restore stash</td><td><code>git stash pop</code></td><td>Re-applies and removes latest stashed state.</td></tr>
+              <tr><td>View reflog</td><td><code>git reflog</code></td><td>Displays every HEAD movement to recover lost commits.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 class="section-header" id="cheatsheet-actions">
+          <span>GitHub Actions Syntax Cheat Sheet</span>
+        </h2>
+
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Key</th><th>Example</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>on:</code></td><td><code>push: [main]</code></td><td>Defines the event trigger that runs the workflow.</td></tr>
+              <tr><td><code>jobs:</code></td><td><code>build:</code></td><td>Groups the distinct execution blocks.</td></tr>
+              <tr><td><code>runs-on:</code></td><td><code>ubuntu-latest</code></td><td>Specifies the runner VM operating system.</td></tr>
+              <tr><td><code>steps:</code></td><td><code>- uses: ...</code></td><td>Sequence of tasks executed inside the job container.</td></tr>
+              <tr><td><code>uses:</code></td><td><code>actions/checkout@v4</code></td><td>Imports and executes a reusable pre-built action.</td></tr>
+              <tr><td><code>with:</code></td><td><code>go-version: '1.22'</code></td><td>Passes input parameters to the referenced action.</td></tr>
+              <tr><td><code>run:</code></td><td><code>npm test</code></td><td>Executes arbitrary shell commands on the runner.</td></tr>
+              <tr><td><code>env:</code></td><td><code>NODE_ENV: production</code></td><td>Sets environment variables for job or step.</td></tr>
+              <tr><td><code>secrets:</code></td><td><code>${{ secrets.API_KEY }}</code></td><td>Securely injects encrypted repository secrets.</td></tr>
+              <tr><td><code>strategy.matrix:</code></td><td><code>os: [ubuntu, macos]</code></td><td>Multiplies jobs across platforms and versions.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Site Footer -->
+  <footer class="site-footer">
+    <div class="footer-contact" style="margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--border-muted);">
+      <div style="font-weight: 700; font-size: 13.5px; color: var(--text-bright); margin-bottom: 8px; letter-spacing: -0.2px;">
+        Contact &amp; Enterprise Support
+      </div>
+      <div style="display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; font-size: 13px;">
+        <a href="mailto:sanjeev@prodevans.com" style="display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 500;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          sanjeev@prodevans.com
+        </a>
+        <span style="color: var(--border);">&bull;</span>
+        <a href="https://www.prodevans.com/contact-us/" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 500;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          https://www.prodevans.com/contact-us/
+        </a>
+      </div>
+    </div>
+    <p style="margin-bottom: 6px;">
+      <strong>Supported by PDIH and created by ProGit Team and Sanjeev.</strong>
+    </p>
+    <p style="margin-bottom: 8px;">
+      Official Documentation &amp; Tutorial Portal: <a href="https://progit.co.in">progit.co.in</a> &bull; Released under the MIT License.
+    </p>
+    <p>
+      <a href="index.html">Documentation Home</a> &bull;
+      <a href="index.html#git-comparison">Git Comparison</a> &bull;
+      <a href="index.html#quickstart">5-Minute Quickstart</a> &bull;
+      <a href="https://github.com/sanjeevsenapati/progit" target="_blank" rel="noopener noreferrer">GitHub Repository</a> &bull;
+      <a href="https://www.prodevans.com/contact-us/" target="_blank" rel="noopener noreferrer">Contact Us</a>
+    </p>
+  </footer>
+
+  <script>
+    // Copy Code Helper
+    function copyCode(btn) {
+      const pre = btn.parentElement;
+      const code = pre.querySelector('code');
+      const text = code ? code.innerText : pre.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = btn.innerText;
+        btn.innerText = 'Copied!';
+        btn.style.color = '#10b981';
+        setTimeout(() => {
+          btn.innerText = originalText;
+          btn.style.color = '';
+        }, 2000);
+      });
+    }
+
+    // Theme Toggle
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDark = html.classList.contains('dark');
+      const moon = document.getElementById('theme-moon');
+      const sun = document.getElementById('theme-sun');
+      if (isDark) {
+        html.classList.remove('dark');
+        localStorage.setItem('progit-theme', 'light');
+        if (moon) moon.style.display = 'none';
+        if (sun) sun.style.display = 'block';
+      } else {
+        html.classList.add('dark');
+        localStorage.setItem('progit-theme', 'dark');
+        if (moon) moon.style.display = 'block';
+        if (sun) sun.style.display = 'none';
+      }
+    }
+
+    // Initialize Theme
+    (function() {
+      const savedTheme = localStorage.getItem('progit-theme') || 'dark';
+      const moon = document.getElementById('theme-moon');
+      const sun = document.getElementById('theme-sun');
+      if (savedTheme === 'light') {
+        document.documentElement.classList.remove('dark');
+        if (moon) moon.style.display = 'none';
+        if (sun) sun.style.display = 'block';
+      } else {
+        document.documentElement.classList.add('dark');
+        if (moon) moon.style.display = 'block';
+        if (sun) sun.style.display = 'none';
+      }
+    })();
+
+    // Active Sidebar TOC Highlighting on Scroll
+    window.addEventListener('scroll', () => {
+      const headers = document.querySelectorAll('h2[id], h3[id]');
+      let currentActive = null;
+      headers.forEach(header => {
+        const top = header.getBoundingClientRect().top;
+        if (top <= 120) {
+          currentActive = header.id;
+        }
+      });
+      if (currentActive) {
+        document.querySelectorAll('.sidebar-nav-list a').forEach(link => {
+          if (link.getAttribute('href') === '#' + currentActive) {
+            link.classList.add('active');
+          } else {
+            link.classList.remove('active');
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
