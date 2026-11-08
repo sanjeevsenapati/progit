@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProGit Enterprise — Executive & Sales Presentation</title>
+  <meta name="description" content="Interactive Executive and Sales Presentation for ProGit: Modern, sovereign Git collaboration platform with High Availability, zero CGO, and 80% lower TCO.">
+  <link rel="canonical" href="https://progit.co.in/presentation.html">
+  <meta name="keywords" content="git services, git service, github alternative, gogs, gitea, gitlab alternative, self-hosted git enterprise, progit">
+  <meta name="robots" content="index, follow">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='2.5'%3E%3Ccircle cx='18' cy='18' r='3'/%3E%3Ccircle cx='6' cy='6' r='3'/%3E%3Cpath d='M6 9v12'/%3E%3Cpath d='M18 9a9 9 0 0 0-9 9'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+      /* Light Mode Palette */
+      --bg: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-surface-elevated: #ffffff;
+      --bg-subtle: #f1f5f9;
+      --border: #e2e8f0;
+      --border-focus: #10b981;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --text-bright: #0f172a;
+      --accent: #10b981;
+      --accent-hover: #059669;
+      --accent-soft: rgba(16, 185, 129, 0.12);
+      --accent-glow: rgba(16, 185, 129, 0.25);
+      --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+      --card-shadow-hover: 0 20px 30px -10px rgba(16, 185, 129, 0.15);
+      --code-bg: #1e293b;
+      --code-text: #e2e8f0;
+    }
+
+    [data-theme="dark"] {
+      --bg: #090d16;
+      --bg-surface: #0f172a;
+      --bg-surface-elevated: #1e293b;
+      --bg-subtle: #131c31;
+      --border: #1e293b;
+      --border-focus: #10b981;
+      --text: #cbd5e1;
+      --text-muted: #94a3b8;
+      --text-bright: #f8fafc;
+      --accent: #10b981;
+      --accent-hover: #34d399;
+      --accent-soft: rgba(16, 185, 129, 0.16);
+      --accent-glow: rgba(16, 185, 129, 0.35);
+      --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      --card-shadow-hover: 0 20px 35px -5px rgba(16, 185, 129, 0.25);
+      --code-bg: #050811;
+      --code-text: #f1f5f9;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    /* Top Presentation Bar */
+    header.deck-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+    .brand-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-bright);
+      font-weight: 700;
+      font-size: 16px;
+    }
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: var(--accent);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .deck-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .header-center {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .slide-indicator {
+      font-family: var(--font-mono);
+      color: var(--text-bright);
+      background: var(--bg-subtle);
+      padding: 3px 10px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-decoration: none;
+    }
+    .btn-action:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white !important;
+    }
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    /* Main Deck Viewport */
+    .deck-viewport {
+      position: absolute;
+      top: 56px;
+      bottom: 56px;
+      left: 0;
+      right: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    /* Slide Card */
+    .slide {
+      position: absolute;
+      width: 100%;
+      max-width: 1200px;
+      height: 100%;
+      max-height: 720px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--card-shadow);
+      padding: 44px 56px;
+      opacity: 0;
+      visibility: hidden;
+      display: none !important;
+      transform: scale(0.96) translateY(20px);
+      pointer-events: none;
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      flex-direction: column;
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+    .slide.active {
+      display: flex !important;
+      opacity: 1;
+      visibility: visible;
+      transform: scale(1) translateY(0);
+      pointer-events: auto;
+      z-index: 10;
+    }
+    .slide.prev {
+      display: none !important;
+      opacity: 0;
+      visibility: hidden;
+      transform: scale(0.96) translateX(-40px);
+    }
+
+    /* Slide Header */
+    .slide-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .slide-category {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+    }
+    .slide-category svg { width: 14px; height: 14px; }
+    .slide-attribution {
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+
+    .slide-title {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      color: var(--text-bright);
+      line-height: 1.25;
+      margin-bottom: 8px;
+    }
+    .slide-subtitle {
+      font-size: 16px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 28px;
+    }
+
+    .slide-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    /* Grids & Cards */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+    }
+    .card:hover {
+      border-color: var(--border-focus);
+      box-shadow: var(--card-shadow-hover);
+      transform: translateY(-2px);
+    }
+    .card-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 8px;
+    }
+    .card-desc {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Stat Pill */
+    .stat-badge {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .stat-number {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--accent);
+      font-family: var(--font-mono);
+    }
+    .stat-label {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* Comparison Table */
+    .comp-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+      background: var(--bg-surface);
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .comp-table th {
+      background: var(--bg-subtle);
+      padding: 12px 16px;
+      font-weight: 700;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-bright);
+    }
+    .comp-table td {
+      padding: 11px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .comp-table tr:last-child td { border-bottom: none; }
+    .col-highlight {
+      background: var(--accent-soft);
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    /* Interactive ROI Calculator */
+    .calc-container {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+    }
+    .calc-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-bright);
+    }
+    .slider-val {
+      font-family: var(--font-mono);
+      color: var(--accent);
+      font-size: 16px;
+      font-weight: 700;
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      background: var(--border);
+      border-radius: 4px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+    .calc-results {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .savings-hero {
+      text-align: center;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .savings-amount {
+      font-size: 38px;
+      font-weight: 900;
+      font-family: var(--font-mono);
+      color: var(--accent);
+      letter-spacing: -0.03em;
+    }
+    .savings-pct {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .cost-breakdown {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 16px;
+      font-size: 13px;
+    }
+    .cost-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .cost-num {
+      font-size: 16px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--text-bright);
+    }
+
+    /* Pricing Tier Cards */
+    .pricing-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .pricing-card.featured {
+      border: 2px solid var(--accent);
+      box-shadow: var(--card-shadow-hover);
+    }
+    .tier-badge {
+      position: absolute;
+      top: -11px;
+      right: 20px;
+      background: var(--accent);
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 10px;
+      text-transform: uppercase;
+    }
+    .tier-price {
+      font-size: 30px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: var(--text-bright);
+      margin: 12px 0 16px;
+    }
+    .tier-price span {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      font-family: var(--font-sans);
+    }
+    .tier-features {
+      list-style: none;
+      font-size: 13px;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .tier-features li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .check-icon {
+      color: var(--accent);
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+    }
+
+    /* Bottom Navigation Bar */
+    footer.deck-footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 100;
+    }
+    .deck-progress-container {
+      flex: 1;
+      max-width: 400px;
+      height: 6px;
+      background: var(--bg-subtle);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 0 20px;
+    }
+    .deck-progress-bar {
+      height: 100%;
+      background: var(--accent);
+      width: 8.33%;
+      transition: width 0.3s ease;
+    }
+    .deck-nav-buttons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-nav {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-nav:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .btn-nav:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* Overview Grid Modal */
+    .overview-overlay {
+      position: fixed;
+      top: 56px;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 200;
+      display: none;
+      padding: 40px;
+      overflow-y: auto;
+    }
+    .overview-overlay.open {
+      display: block;
+      animation: fadeIn 0.2s ease-out;
+    }
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .thumb-card {
+      background: var(--bg-surface);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .thumb-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-3px);
+    }
+    .thumb-card.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+    .thumb-num {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .thumb-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-bright);
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .slide { padding: 24px; max-height: 90%; }
+      .grid-2, .grid-3, .grid-4, .calc-container { grid-template-columns: 1fr; }
+      .slide-title { font-size: 24px; }
+      .slide-subtitle { font-size: 14px; margin-bottom: 16px; }
+    }
+  </style>
+</head>
+<body data-theme="dark">
+
+  <!-- Top Navigation Header -->
+  <header class="deck-header">
+    <div class="brand-box">
+      <div class="brand-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
+      </div>
+      <span>ProGit</span>
+      <span class="deck-badge">Executive Deck</span>
+    </div>
+
+    <div class="header-center">
+      <span id="slideCategoryTitle">Executive Overview</span>
+      <span class="slide-indicator" id="slideIndicator">01 / 12</span>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn-action" id="btnToggleOverview" title="Slide Overview (Esc)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Slides</span>
+      </button>
+      <button class="btn-action" id="btnToggleTheme" title="Toggle Dark/Light">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      </button>
+      <button class="btn-action" id="btnFullscreen" title="Fullscreen (F)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+      </button>
+      <a href="sme-presentation.html" class="btn-action" title="View SME & Agency Deck">
+        <span>SME & Agency Deck</span>
+      </a>
+      <a href="index.html" class="btn-action btn-primary" title="Return to Documentation">
+        <span>Documentation</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <!-- Deck Main Stage -->
+  <div class="deck-viewport">
+
+    <!-- SLIDE 1: Title & Executive Summary -->
+    <section class="slide active" data-index="1" data-category="Vision & Executive Summary">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span>Executive Overview</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h1 class="slide-title">ProGit Enterprise</h1>
+      <p class="slide-subtitle">Modern, Sovereign Git Collaboration. Engineered for Enterprise Sovereignty, DevOps Agility, and 80% Lower Total Cost of Ownership.</p>
+
+      <div class="slide-body">
+        <div class="grid-4" style="margin-bottom: 24px;">
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+            <div class="card-title">&lt; 150 MB RAM</div>
+            <div class="card-desc">Ultra-lightweight pure-Go monolith with zero CGO runtime overhead.</div>
+          </div>
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <div class="card-title">&lt; 2s Cold Boot</div>
+            <div class="card-desc">Instant container initialization for production, staging, and CI/CD sandboxes.</div>
+          </div>
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+            <div class="card-title">99.99% HA Cluster</div>
+            <div class="card-desc">Multi-node stateless compute with sub-second automated failover.</div>
+          </div>
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+            <div class="card-title">80% TCO Savings</div>
+            <div class="card-desc">Eliminates astronomical SaaS seat fees and heavy VM infrastructure costs.</div>
+          </div>
+        </div>
+
+        <div class="card" style="background: var(--accent-soft); border-color: rgba(16, 185, 129, 0.3);">
+          <div style="font-size: 14.5px; font-weight: 600; color: var(--accent); margin-bottom: 4px;">Strategic Value Proposition</div>
+          <div style="font-size: 14px; color: var(--text-bright); line-height: 1.6;">
+            ProGit provides organizations with full technological sovereignty over their intellectual property. Deployable on-premise, air-gapped, or cloud-native in rootless containers with an intuitive GitHub-standard React SPA interface.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 2: The Enterprise Git Dilemma -->
+    <section class="slide" data-index="2" data-category="Market Problem & Industry Pain">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Market Landscape</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">The Enterprise Git Dilemma</h2>
+      <p class="slide-subtitle">Current enterprise Git hosting options trap engineering leaders between predatory pricing and unsustainable operational complexity.</p>
+
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card" style="border-left: 4px solid #ef4444;">
+            <div class="card-title" style="color: #ef4444;">1. The Per-Seat SaaS Tax</div>
+            <div class="card-desc">
+              GitHub Enterprise ($21/seat/mo) and GitLab Ultimate ($99/seat/mo) become massive recurring budget drains. For 100 engineers, licensing alone consumes <strong>$25,200 to $118,800 annually</strong>, with aggressive vendor renewal hikes.
+            </div>
+            <div class="stat-badge">
+              <span class="stat-number" style="color: #ef4444;">$120K+</span>
+              <span class="stat-label">Annual recurring SaaS bill for mid-size teams</span>
+            </div>
+          </div>
+
+          <div class="card" style="border-left: 4px solid #f59e0b;">
+            <div class="card-title" style="color: #f59e0b;">2. Heavy Infrastructure Bloat</div>
+            <div class="card-desc">
+              GitLab Self-Managed and GitHub Enterprise Server demand <strong>16 to 32 GB of RAM minimum</strong> per VM, running 20+ microservices (Ruby, Java, Redis, Gitaly, PostgreSQL). Massive hardware footprints drive up cloud hosting bills.
+            </div>
+            <div class="stat-badge">
+              <span class="stat-number" style="color: #f59e0b;">32 GB</span>
+              <span class="stat-label">Minimum RAM requirement per appliance</span>
+            </div>
+          </div>
+
+          <div class="card" style="border-left: 4px solid #8b5cf6;">
+            <div class="card-title" style="color: #8b5cf6;">3. Dev/QA & CI/CD Sandbox Lockout</div>
+            <div class="card-desc">
+              Per-seat licensing models penalize ephemeral environments. Creating sandbox clusters for automated integration tests, QA review apps, and CI bots artificially consumes expensive developer seats.
+            </div>
+            <div class="stat-badge">
+              <span class="stat-number" style="color: #8b5cf6;">$0</span>
+              <span class="stat-label">No native flat-fee sandbox option from legacy giants</span>
+            </div>
+          </div>
+
+          <div class="card" style="border-left: 4px solid #06b6d4;">
+            <div class="card-title" style="color: #06b6d4;">4. Air-Gapped & Sovereign Friction</div>
+            <div class="card-desc">
+              Regulated defense, fintech, and sovereign institutions cannot tolerate cloud telemetry, mandatory phone-home licensing checks, or complex multi-VM deployment scripts that break during offline updates.
+            </div>
+            <div class="stat-badge">
+              <span class="stat-number" style="color: #06b6d4;">100%</span>
+              <span class="stat-label">Need for completely offline, phone-home-free operation</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 3: The ProGit Solution & Technical Edge -->
+    <section class="slide" data-index="3" data-category="Architecture & Product">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <span>The ProGit Solution</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">The ProGit Architecture Edge</h2>
+      <p class="slide-subtitle">A high-performance pure-Go modular monolith with zero external runtime dependencies.</p>
+
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
+            <div class="card-title">Single Static Binary</div>
+            <div class="card-desc">Pure Go backend with React 19 SPA assets embedded via <code>embed.FS</code>. One compiled executable contains the web UI, REST API, Git engine, and SSH daemon.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
+            <div class="card-title">Zero CGO Database</div>
+            <div class="card-desc">Powered by pure Go SQLite (<code>modernc.org/sqlite</code>) with Write-Ahead Logging (WAL) for single-node, and enterprise PostgreSQL clustering for HA multi-node setups.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></div>
+            <div class="card-title">Native SSH on Port 2222</div>
+            <div class="card-desc">Integrated pure-Go SSH server requires no host OpenSSH alterations, eliminating PAM security vulnerabilities, host key leaks, and complex port redirection headaches.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 0 0-10 10c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/></svg></div>
+            <div class="card-title">Full Git Smart HTTP</div>
+            <div class="card-desc">Native integration with <code>git-upload-pack</code> and <code>git-receive-pack</code> supporting fast packfile negotiation, shallow clones, and authenticated credential caching.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+            <div class="card-title">Real Git-Backed Wikis</div>
+            <div class="card-desc">Every repository includes an independent real Git wiki repo (<code>repo.wiki.git</code>). Clone, push, and edit offline via CLI or online with responsive markdown preview.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><globe><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></globe></svg></div>
+            <div class="card-title">ProGit Pages (GitHub Pages)</div>
+            <div class="card-desc">Publish documentation portals, portfolios, and static web apps directly from <code>gh-pages</code> or <code>main</code> branch with automated Markdown rendering and access controls.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 4: Developer-First Experience -->
+    <section class="slide" data-index="4" data-category="Developer Experience">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <span>Developer Experience</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">GitHub-Standard Developer Experience</h2>
+      <p class="slide-subtitle">Zero learning curve. Developers get the exact modern UX, keyboard shortcuts, and review tools they love.</p>
+
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <span>GitHub-Style File Explorer</span>
+            </div>
+            <div class="card-desc">
+              Full collapsible file tree sidebar in both code viewing and online editing modes. Fast file search, automatic dark/light theme matching, and tab size controls with zero configuration required.
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
+              <span>Production Pull Request Reviews</span>
+            </div>
+            <div class="card-desc">
+              Toggle between <strong>Unified</strong> and <strong>Split Diff</strong> views. Sticky changed-files tree sidebar, syntax highlighting across 20+ languages, inline comments, and merge conflict resolution.
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              <span>Line Anchors (#L42) & Git Blame</span>
+            </div>
+            <div class="card-desc">
+              1-click clickable line anchors generate permanent permalinks for code sharing. Interactive Git Blame tab highlights commit authors, hashes, and dates line-by-line.
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Automated Workflow Lifecycle</span>
+            </div>
+            <div class="card-desc">
+              Automatic issue resolution via commit messages (<code>Fixes #14</code>, <code>Closes #8</code>). Post-merge "Delete branch" button, recently pushed branch banner with 1-click [Compare & PR].
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 5: Multi-Node High Availability (HA) -->
+    <section class="slide" data-index="5" data-category="Enterprise Architecture">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span>High Availability</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Multi-Node High Availability (HA)</h2>
+      <p class="slide-subtitle">Eliminate single points of failure with an active-active clustered architecture delivering 99.99% SLA.</p>
+
+      <div class="slide-body">
+        <div class="grid-4" style="margin-bottom: 24px;">
+          <div class="card">
+            <div style="font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase;">Tier 1</div>
+            <div class="card-title" style="margin-top: 4px;">Edge Ingress</div>
+            <div class="card-desc">Dual HAProxy or Cloud NLB. Layer-7 HTTPS and Layer-4 SSH with PROXY protocol v2 for client IP preservation.</div>
+          </div>
+          <div class="card">
+            <div style="font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase;">Tier 2</div>
+            <div class="card-title" style="margin-top: 4px;">Stateless Compute</div>
+            <div class="card-desc">N+1 ProGit compute nodes serving REST API, Git Smart HTTP, and SSH. Node crash causes zero user interruption.</div>
+          </div>
+          <div class="card">
+            <div style="font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase;">Tier 3</div>
+            <div class="card-title" style="margin-top: 4px;">Database & Locks</div>
+            <div class="card-desc">Clustered PostgreSQL with Patroni streaming replication + Redis Sentinel for distributed Git write locks and sessions.</div>
+          </div>
+          <div class="card">
+            <div style="font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase;">Tier 4</div>
+            <div class="card-title" style="margin-top: 4px;">Replicated Storage</div>
+            <div class="card-desc">POSIX-compliant CephFS, AWS EFS Max I/O, or GlusterFS mirrored block storage with sub-second write consistency.</div>
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div class="card" style="text-align: center;">
+            <div style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Recovery Point Objective</div>
+            <div style="font-size: 26px; font-weight: 800; color: var(--accent); font-family: var(--font-mono); margin-top: 4px;">RPO &lt; 1 Second</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Continuous streaming sync</div>
+          </div>
+          <div class="card" style="text-align: center;">
+            <div style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Recovery Time Objective</div>
+            <div style="font-size: 26px; font-weight: 800; color: var(--accent); font-family: var(--font-mono); margin-top: 4px;">RTO &lt; 30 Seconds</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Automated Patroni failover</div>
+          </div>
+          <div class="card" style="text-align: center;">
+            <div style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Uptime Guarantee</div>
+            <div style="font-size: 26px; font-weight: 800; color: var(--accent); font-family: var(--font-mono); margin-top: 4px;">99.99% SLA</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">N+1 redundant nodes</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 6: Security, Compliance & Governance -->
+    <section class="slide" data-index="6" data-category="Security & Compliance">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>Security & Governance</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Enterprise Security & Compliance</h2>
+      <p class="slide-subtitle">Engineered from day one for zero-trust environments, financial institutions, and defense air-gapped enclaves.</p>
+
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+            <div class="card-title">Zero CGO Memory Safety</div>
+            <div class="card-desc">No external C libraries (libgit2, sqlite3.so). The Go runtime provides complete memory safety, eliminating buffer overflow CVEs common in legacy C codebases.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7.5" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg></div>
+            <div class="card-title">Enterprise SSO & SCIM</div>
+            <div class="card-desc">SAML 2.0 and OIDC integrations for Microsoft Entra ID (Azure AD), Okta, Ping Identity, and Google Workspace. Automated SCIM user lifecycle deprovisioning.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
+            <div class="card-title">Comprehensive Audit Logs</div>
+            <div class="card-desc">Immutable audit trails tracking all logins, repository clones, pushes, token creations, and administrative actions. Real-time CEF/JSON streaming to Splunk or Datadog.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+            <div class="card-title">Branch Protection Rules</div>
+            <div class="card-desc">Enforce code review approvals, require status check passes, block force pushes, restrict branch deletion, and verify GPG commit signatures prior to merging.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg></div>
+            <div class="card-title">Rootless Container Hardening</div>
+            <div class="card-desc">Pre-configured non-root user execution (UID 1000), read-only root filesystems, SELinux volume type enforcement (<code>:Z</code>), and minimal attack surface alpine base.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+            <div class="card-title">Air-Gapped Offline Licensing</div>
+            <div class="card-desc">Cryptographically signed Ed25519 offline license keys. Requires zero internet connectivity and zero telemetry phoning home to third-party verification servers.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 7: Competitive Matrix -->
+    <section class="slide" data-index="7" data-category="Market Comparison">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span>Market Comparison</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Head-to-Head Competitive Analysis</h2>
+      <p class="slide-subtitle">How ProGit outperforms legacy self-managed platforms across architecture, resources, and cost.</p>
+
+      <div class="slide-body">
+        <table class="comp-table">
+          <thead>
+            <tr>
+              <th>Evaluation Criteria</th>
+              <th class="col-highlight">ProGit Enterprise</th>
+              <th>GitHub Enterprise Server</th>
+              <th>GitLab Self-Managed</th>
+              <th>Gitea / Forgejo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Memory Footprint</strong></td>
+              <td class="col-highlight"><strong>&lt; 150 MB RAM</strong></td>
+              <td>Heavy (32 GB RAM min)</td>
+              <td>Heavy (16 GB RAM min)</td>
+              <td>&lt; 500 MB RAM</td>
+            </tr>
+            <tr>
+              <td><strong>Container Startup Time</strong></td>
+              <td class="col-highlight"><strong>&lt; 2 Seconds</strong></td>
+              <td>10–15 Minutes</td>
+              <td>5–10 Minutes</td>
+              <td>&lt; 5 Seconds</td>
+            </tr>
+            <tr>
+              <td><strong>Architecture Simplicity</strong></td>
+              <td class="col-highlight"><strong>Single Binary (Go + React)</strong></td>
+              <td>Multi-VM Appliance</td>
+              <td>Omnibus (20+ microservices)</td>
+              <td>Single Binary (Go + Templates)</td>
+            </tr>
+            <tr>
+              <td><strong>Multi-Node HA Mode</strong></td>
+              <td class="col-highlight"><strong>Stateless + Patroni / Redis</strong></td>
+              <td>High tier licensing</td>
+              <td>Premium / Ultimate only</td>
+              <td>Limited / Complex community setup</td>
+            </tr>
+            <tr>
+              <td><strong>Dev / QA Enclave License</strong></td>
+              <td class="col-highlight"><strong>Flat Instance (Unlimited Seats)</strong></td>
+              <td>Per-Seat Only ($21/mo)</td>
+              <td>Per-Seat Only ($29–$99/mo)</td>
+              <td>Free Community</td>
+            </tr>
+            <tr>
+              <td><strong>Frontend Architecture</strong></td>
+              <td class="col-highlight"><strong>Modern React 19 SPA</strong></td>
+              <td>Modern Web UI</td>
+              <td>Ruby on Rails / Vue hybrid</td>
+              <td>Go HTML Templates</td>
+            </tr>
+            <tr>
+              <td><strong>Turnkey 24/7 SLA Support</strong></td>
+              <td class="col-highlight"><strong>Enterprise Backed (PDIH)</strong></td>
+              <td>Enterprise Support</td>
+              <td>Premium Support</td>
+              <td>Community only / Third-party</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SLIDE 8: Interactive ROI & TCO Calculator -->
+    <section class="slide" data-index="8" data-category="ROI & Financial Impact">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span>Financial Impact</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Interactive 3-Year TCO &amp; ROI Calculator</h2>
+      <p class="slide-subtitle">Compare recurring SaaS per-seat costs against ProGit's standalone one-time implementation and minimal patch model.</p>
+
+      <div class="slide-body">
+        <div class="calc-container">
+          <div class="calc-controls">
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Engineering Team Size</span>
+                <span class="slider-val" id="teamSizeVal">50 Developers</span>
+              </div>
+              <input type="range" id="teamSizeSlider" min="10" max="300" step="5" value="50">
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Comparison SaaS Provider</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; background: var(--bg-surface); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);">
+                  <input type="radio" name="baseline" value="github_ent" checked> GitHub Enterprise (~₹21,000 / $252 / user / yr)
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; background: var(--bg-surface); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);">
+                  <input type="radio" name="baseline" value="gitlab_prem"> GitLab Premium / Ultimate (~₹29,000 / $348 / user / yr)
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; background: var(--bg-surface); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);">
+                  <input type="radio" name="baseline" value="github_team"> GitHub Team (~₹4,000 / $48 / user / yr)
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="calc-results">
+            <div class="savings-hero">
+              <div style="font-size: 12px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); margin-bottom: 4px;">Net 3-Year Capital Savings</div>
+              <div class="savings-amount" id="savingsAmount">₹25.5 Lakhs</div>
+              <span class="savings-pct" id="savingsPct">81% Capital Saved Over 3 Years</span>
+            </div>
+
+            <div class="cost-breakdown">
+              <div class="cost-item">
+                <span style="color: var(--text-muted); font-size: 12px;">SaaS 3-Year Total</span>
+                <span class="cost-num" id="competitorTotal">₹31.5 Lakhs</span>
+              </div>
+              <div class="cost-item">
+                <span style="color: var(--accent); font-size: 12px; font-weight: 600;">ProGit 3-Year Total</span>
+                <span class="cost-num" id="progitTotal" style="color: var(--accent);">₹6.0 Lakhs</span>
+              </div>
+              <div class="cost-item">
+                <span style="color: var(--text-muted); font-size: 12px;">Capital Breakeven</span>
+                <span class="cost-num" id="breakevenVal" style="color: #10b981;">6 Months</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 9: Standalone Self-Hosted Commercial Model -->
+    <section class="slide" data-index="9" data-category="Commercial Model">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          <span>Commercial Model</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Standalone Self-Hosted Commercial Model</h2>
+      <p class="slide-subtitle">We are not a SaaS rental. We deliver a permanent standalone Git platform on your private infrastructure with turnkey installation, training, and formal IT handover.</p>
+
+      <div class="slide-body">
+        <div class="grid-2" style="margin-bottom: 20px;">
+          <!-- 5 Lakhs Package -->
+          <div class="card" style="border: 2px solid var(--accent); background: var(--bg-surface); padding: 26px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
+              <span style="font-size: 13px; font-weight: 700; color: var(--accent); text-transform: uppercase;">One-Time Implementation</span>
+              <span style="font-size: 28px; font-weight: 900; font-family: var(--font-mono); color: var(--text-bright);">₹5,00,000 <span style="font-size: 13px; font-weight: 500; color: var(--text-muted); font-family: var(--font-sans);">one-time</span></span>
+            </div>
+            <div style="font-size: 14px; font-weight: 600; color: var(--text-bright); margin-bottom: 8px;">What's Included in the ₹5 Lakhs Package:</div>
+            <ul style="list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: var(--text);">
+              <li style="display: flex; align-items: flex-start; gap: 8px;">
+                <svg style="color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span><strong>Turnkey On-Premise Installation:</strong> Production container deployment on your private bare-metal, VM, or cloud infrastructure with SSL/TLS auto-renewal and volume storage configuration.</span>
+              </li>
+              <li style="display: flex; align-items: flex-start; gap: 8px;">
+                <svg style="color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span><strong>Developer &amp; Team Training:</strong> Hands-on training sessions for developers covering Git Smart HTTP, native SSH, PR reviews, wikis, and Kanban project workflows.</span>
+              </li>
+              <li style="display: flex; align-items: flex-start; gap: 8px;">
+                <svg style="color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span><strong>Formal IT Team Handover:</strong> Comprehensive system architecture runbooks, automated SQLite WAL backup schedules, and operations training empowering your IT team with 100% autonomy.</span>
+              </li>
+              <li style="display: flex; align-items: flex-start; gap: 8px;">
+                <svg style="color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span><strong>Unlimited Scale Forever:</strong> Unlimited developers, unlimited repositories, and unlimited projects with zero monthly or annual per-seat licensing fees.</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Ops & Maintenance -->
+          <div class="card" style="padding: 26px;">
+            <div style="font-size: 13px; font-weight: 700; color: #3b82f6; text-transform: uppercase; margin-bottom: 6px;">Ongoing Operations &amp; Patches</div>
+            <div style="font-size: 22px; font-weight: 800; color: var(--text-bright); margin-bottom: 12px;">Minimal Cost per Update</div>
+            <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6; margin-bottom: 16px;">
+              Because your IT team owns the running instance after handover, your routine operational overhead is virtually zero. Updates are delivered with minimal, transparent pricing:
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="background: var(--bg-surface); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border);">
+                <div style="font-size: 13.5px; font-weight: 700; color: var(--text-bright);">Security Patches &amp; CVE Fixes</div>
+                <div style="font-size: 12.5px; color: var(--text-muted);">Critical upstream security fixes and vulnerability patches delivered at minimal cost.</div>
+              </div>
+              <div style="background: var(--bg-surface); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border);">
+                <div style="font-size: 13.5px; font-weight: 700; color: var(--text-bright);">Feature Enhancements</div>
+                <div style="font-size: 12.5px; color: var(--text-muted);">Major UI improvements and Git engine updates available as optional minimal-cost releases.</div>
+              </div>
+              <div style="background: var(--bg-surface); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border);">
+                <div style="font-size: 13.5px; font-weight: 700; color: var(--text-bright);">Permanent Asset Ownership</div>
+                <div style="font-size: 12.5px; color: var(--text-muted);">Your platform never gets disabled if an annual renewal is delayed. You permanently own your installation.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 10: Enterprise Support & SLAs -->
+    <section class="slide" data-index="10" data-category="Services & SLA">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          <span>Support & Services</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Mission-Critical Enterprise Support</h2>
+      <p class="slide-subtitle">Backed by seasoned cloud-native infrastructure engineers with guaranteed service level agreements.</p>
+
+      <div class="slide-body">
+        <div class="grid-3" style="margin-bottom: 24px;">
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg></div>
+            <div class="card-title">1-Hour Response SLA</div>
+            <div class="card-desc">Severity-1 critical production outages receive immediate triage and engineer engagement within 60 minutes, 24/7/365.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <div class="card-title">Dedicated TAM</div>
+            <div class="card-desc">Named Technical Account Manager provides architectural reviews, cluster capacity planning, and quarterly health audits.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg></div>
+            <div class="card-title">Turnkey Migration</div>
+            <div class="card-desc">Assisted automated migration of repositories, branches, tags, pull requests, issues, and wikis from GitHub, GitLab, or Bitbucket.</div>
+          </div>
+        </div>
+
+        <div class="card" style="background: var(--bg-subtle);">
+          <div style="font-size: 14.5px; font-weight: 700; color: var(--text-bright); margin-bottom: 8px;">Incident Severity Matrix</div>
+          <div class="grid-4" style="font-size: 13px;">
+            <div><strong>Sev-1 (Critical)</strong>: &lt; 1 hr (24/7)</div>
+            <div><strong>Sev-2 (High)</strong>: &lt; 4 hrs (24/7)</div>
+            <div><strong>Sev-3 (Medium)</strong>: &lt; 12 hrs (8x5)</div>
+            <div><strong>Sev-4 (Low)</strong>: &lt; 24 hrs (8x5)</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 11: 5-Minute Proof of Concept -->
+    <section class="slide" data-index="11" data-category="Deployment & Proof of Concept">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          <span>Instant Proof of Concept</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">5-Minute Instant Deployment</h2>
+      <p class="slide-subtitle">Validate ProGit on your own hardware or workstation right now with official multi-arch container images.</p>
+
+      <div class="slide-body">
+        <div class="card" style="background: var(--code-bg); border-color: #334155; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span style="font-family: var(--font-mono); font-size: 12px; color: var(--accent);">Production Podman / Docker Command</span>
+            <span style="font-size: 11px; color: #94a3b8;">linux/amd64 & linux/arm64</span>
+          </div>
+          <pre style="font-family: var(--font-mono); font-size: 13px; color: var(--code-text); line-height: 1.6; overflow-x: auto;">
+podman run -d \
+  --name progit \
+  --restart=unless-stopped \
+  -p 3443:3443 -p 3000:3000 -p 2222:2222 \
+  -v progit-data:/data/db:Z \
+  -v progit-repositories:/data/repositories:Z \
+  -v progit-config:/data/config:Z \
+  ghcr.io/sanjeevsenapati/progit:latest</pre>
+        </div>
+
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-title">1. Multi-Arch GHCR</div>
+            <div class="card-desc">Official OCI manifests for x86_64 and ARM64 (Apple Silicon, AWS Graviton).</div>
+          </div>
+          <div class="card">
+            <div class="card-title">2. Out-of-the-Box HTTPS</div>
+            <div class="card-desc">Pure-Go auto-TLS on port 3443 with instant HTTP redirect on port 3000.</div>
+          </div>
+          <div class="card">
+            <div class="card-title">3. Isolated Volumes</div>
+            <div class="card-desc">SELinux volume labels (<code>:Z</code>) keep SQLite and Git bare trees completely safe.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 12: Next Steps & Call to Action -->
+    <section class="slide" data-index="12" data-category="Next Steps">
+      <div class="slide-meta">
+        <div class="slide-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <span>Executive Next Steps</span>
+        </div>
+        <div class="slide-attribution">Supported by <strong>PDIH</strong> • Created by <strong>ProGit Team and Sanjeev</strong></div>
+      </div>
+      <h2 class="slide-title">Start Your Sovereign Git Journey</h2>
+      <p class="slide-subtitle">Schedule an architectural consultation or launch an enterprise evaluation sandbox today.</p>
+
+      <div class="slide-body">
+        <div class="grid-3" style="margin-bottom: 30px;">
+          <div class="card" style="border-top: 4px solid var(--accent);">
+            <div class="card-title">1. 30-Day Air-Gapped Pilot</div>
+            <div class="card-desc">Deploy a fully featured Enterprise HA cluster in your private sandbox with an offline cryptographically signed trial license.</div>
+          </div>
+          <div class="card" style="border-top: 4px solid #3b82f6;">
+            <div class="card-title">2. Architectural Assessment</div>
+            <div class="card-desc">Meet with our principal engineers to map your Git repository topology, Patroni HA failover, and CI/CD pipeline integrations.</div>
+          </div>
+          <div class="card" style="border-top: 4px solid #8b5cf6;">
+            <div class="card-title">3. TCO & Migration Review</div>
+            <div class="card-desc">Receive a personalized financial model detailing your exact multi-year cost savings and automated migration roadmap.</div>
+          </div>
+        </div>
+
+        <div class="card" style="background: var(--accent-soft); border-color: rgba(16, 185, 129, 0.4); text-align: center; padding: 32px;">
+          <h3 style="font-size: 22px; font-weight: 800; color: var(--text-bright); margin-bottom: 8px;">Ready to Empower Your Engineering Organization?</h3>
+          <p style="font-size: 14.5px; color: var(--text-muted); max-width: 600px; margin: 0 auto 20px;">
+            Join modern IT leaders who have chosen digital sovereignty, lightweight architecture, and 80% lower operational costs.
+          </p>
+          <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">
+            <a href="https://progit.co.in" class="btn-action btn-primary" style="padding: 10px 24px; font-size: 14px;">Explore Documentation</a>
+            <a href="https://github.com/sanjeevsenapati/progit" target="_blank" rel="noopener noreferrer" class="btn-action" style="padding: 10px 24px; font-size: 14px;">View on GitHub</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Bottom Navigation Bar -->
+  <footer class="deck-footer">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button class="btn-nav" id="btnPrev" title="Previous Slide (Left Arrow)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button class="btn-nav" id="btnNext" title="Next Slide (Right Arrow or Space)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <span style="font-size: 12px; color: var(--text-muted); margin-left: 6px;">Use <kbd style="font-family: var(--font-mono); background: var(--bg-subtle); padding: 2px 5px; border-radius: 4px; border: 1px solid var(--border);">←</kbd> <kbd style="font-family: var(--font-mono); background: var(--bg-subtle); padding: 2px 5px; border-radius: 4px; border: 1px solid var(--border);">→</kbd> or <kbd style="font-family: var(--font-mono); background: var(--bg-subtle); padding: 2px 5px; border-radius: 4px; border: 1px solid var(--border);">Space</kbd></span>
+    </div>
+
+    <div class="deck-progress-container">
+      <div class="deck-progress-bar" id="progressBar"></div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="font-size: 12px; color: var(--text-muted);">ProGit Enterprise Deck v1.2.0</span>
+    </div>
+  </footer>
+
+  <!-- Slide Overview Grid Overlay -->
+  <div class="overview-overlay" id="overviewOverlay">
+    <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto 24px;">
+      <h3 style="font-size: 20px; font-weight: 800; color: white;">Executive Presentation Navigator</h3>
+      <button class="btn-action" id="btnCloseOverview">Close (Esc)</button>
+    </div>
+    <div class="overview-grid" id="overviewGrid"></div>
+  </div>
+
+  <script>
+    // State
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const totalSlides = slides.length;
+    let currentSlide = 0;
+
+    // Elements
+    const slideIndicator = document.getElementById('slideIndicator');
+    const slideCategoryTitle = document.getElementById('slideCategoryTitle');
+    const progressBar = document.getElementById('progressBar');
+    const btnPrev = document.getElementById('btnPrev');
+    const btnNext = document.getElementById('btnNext');
+    const btnToggleTheme = document.getElementById('btnToggleTheme');
+    const btnFullscreen = document.getElementById('btnFullscreen');
+    const btnToggleOverview = document.getElementById('btnToggleOverview');
+    const btnCloseOverview = document.getElementById('btnCloseOverview');
+    const overviewOverlay = document.getElementById('overviewOverlay');
+    const overviewGrid = document.getElementById('overviewGrid');
+
+    function updateSlide(newIndex) {
+      if (newIndex < 0 || newIndex >= totalSlides) return;
+      slides[currentSlide].classList.remove('active');
+      if (newIndex > currentSlide) {
+        slides[currentSlide].classList.add('prev');
+      } else {
+        slides[currentSlide].classList.remove('prev');
+      }
+
+      currentSlide = newIndex;
+      slides.forEach((s, idx) => {
+        if (idx === currentSlide) {
+          s.classList.add('active');
+          s.classList.remove('prev');
+        } else if (idx < currentSlide) {
+          s.classList.add('prev');
+          s.classList.remove('active');
+        } else {
+          s.classList.remove('active', 'prev');
+        }
+      });
+
+      // Update counters & UI
+      const slideNum = (currentSlide + 1).toString().padStart(2, '0');
+      const totalNum = totalSlides.toString().padStart(2, '0');
+      slideIndicator.textContent = `${slideNum} / ${totalNum}`;
+      slideCategoryTitle.textContent = slides[currentSlide].dataset.category || 'Executive Overview';
+
+      const progress = ((currentSlide + 1) / totalSlides) * 100;
+      progressBar.style.width = `${progress}%`;
+
+      btnPrev.disabled = currentSlide === 0;
+      btnNext.disabled = currentSlide === totalSlides - 1;
+
+      // Update active card in overview grid
+      document.querySelectorAll('.thumb-card').forEach((card, idx) => {
+        card.classList.toggle('active', idx === currentSlide);
+      });
+    }
+
+    btnPrev.addEventListener('click', () => updateSlide(currentSlide - 1));
+    btnNext.addEventListener('click', () => updateSlide(currentSlide + 1));
+
+    // Keyboard Navigation
+    window.addEventListener('keydown', (e) => {
+      if (overviewOverlay.classList.contains('open')) {
+        if (e.key === 'Escape') toggleOverview(false);
+        return;
+      }
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        e.preventDefault();
+        updateSlide(currentSlide + 1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        updateSlide(currentSlide - 1);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        updateSlide(0);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        updateSlide(totalSlides - 1);
+      } else if (e.key === 'Escape') {
+        toggleOverview(true);
+      } else if (e.key.toLowerCase() === 'f') {
+        toggleFullscreen();
+      }
+    });
+
+    // Theme Toggle
+    btnToggleTheme.addEventListener('click', () => {
+      const isDark = document.body.getAttribute('data-theme') === 'dark';
+      document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    });
+
+    // Fullscreen Toggle
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      }
+    }
+    btnFullscreen.addEventListener('click', toggleFullscreen);
+
+    // Overview Grid Construction
+    slides.forEach((slide, idx) => {
+      const title = slide.querySelector('.slide-title')?.textContent || `Slide ${idx + 1}`;
+      const cat = slide.dataset.category || 'Topic';
+      const card = document.createElement('div');
+      card.className = `thumb-card ${idx === 0 ? 'active' : ''}`;
+      card.innerHTML = `
+        <span class="thumb-num">${(idx + 1).toString().padStart(2, '0')} • ${cat}</span>
+        <span class="thumb-title">${title}</span>
+      `;
+      card.addEventListener('click', () => {
+        updateSlide(idx);
+        toggleOverview(false);
+      });
+      overviewGrid.appendChild(card);
+    });
+
+    function toggleOverview(open) {
+      overviewOverlay.classList.toggle('open', open);
+    }
+    btnToggleOverview.addEventListener('click', () => toggleOverview(true));
+    btnCloseOverview.addEventListener('click', () => toggleOverview(false));
+
+    // Interactive TCO Calculator Logic
+    const teamSizeSlider = document.getElementById('teamSizeSlider');
+    const teamSizeVal = document.getElementById('teamSizeVal');
+    const savingsAmount = document.getElementById('savingsAmount');
+    const savingsPct = document.getElementById('savingsPct');
+    const competitorTotal = document.getElementById('competitorTotal');
+    const progitTotal = document.getElementById('progitTotal');
+    const breakevenVal = document.getElementById('breakevenVal');
+
+    function fmtINR(val) {
+      if (val >= 10000000) {
+        return '₹' + (val / 10000000).toFixed(2) + ' Cr';
+      }
+      if (val >= 100000) {
+        return '₹' + (val / 100000).toFixed(1) + ' Lakhs';
+      }
+      return '₹' + val.toLocaleString('en-IN');
+    }
+
+    function calculateTCO() {
+      const teamSize = parseInt(teamSizeSlider.value, 10);
+      const baseline = document.querySelector('input[name="baseline"]:checked')?.value || 'github_ent';
+
+      teamSizeVal.textContent = `${teamSize} Developers`;
+
+      // Annual per-seat rates in INR (~$1 = ₹84):
+      // github_ent: $21/mo * 12 * ~84 INR = ~₹21,000/seat/yr
+      // gitlab_prem: $29/mo * 12 * ~84 INR = ~₹29,000/seat/yr
+      // github_team: $4/mo * 12 * ~84 INR = ~₹4,000/seat/yr
+      let annualSeatRate = 21000;
+      if (baseline === 'gitlab_prem') annualSeatRate = 29000;
+      if (baseline === 'github_team') annualSeatRate = 4000;
+
+      const competitorAnnual = teamSize * annualSeatRate;
+      const competitor3Year = competitorAnnual * 3;
+
+      // ProGit Standalone Self-Hosted Model:
+      // Year 1: ₹5,00,000 one-time implementation, training & IT handover
+      // Year 2 & 3: Minimal patch / enhancement updates (~₹50,000/yr)
+      const progitOneTime = 500000;
+      const progitAnnualPatch = 50000;
+      const progit3Year = progitOneTime + (progitAnnualPatch * 2);
+
+      const netSavings = Math.max(0, competitor3Year - progit3Year);
+      const percentSavings = competitor3Year > 0 ? Math.round((netSavings / competitor3Year) * 100) : 0;
+
+      // Breakeven time in months
+      const monthlyCompetitor = competitorAnnual / 12;
+      const breakevenMonths = monthlyCompetitor > 0 ? Math.ceil(progitOneTime / monthlyCompetitor) : 0;
+
+      savingsAmount.textContent = fmtINR(netSavings);
+      savingsPct.textContent = `${percentSavings}% Capital Saved Over 3 Years`;
+      competitorTotal.textContent = fmtINR(competitor3Year);
+      progitTotal.textContent = fmtINR(progit3Year);
+      if (breakevenVal) {
+        breakevenVal.textContent = breakevenMonths > 0 ? `${breakevenMonths} Months` : 'Instant';
+      }
+    }
+
+    teamSizeSlider.addEventListener('input', calculateTCO);
+    document.querySelectorAll('input[name="baseline"]').forEach(r => r.addEventListener('change', calculateTCO));
+    calculateTCO();
+
+    // Initial setup
+    updateSlide(0);
+  </script>
+</body>
+</html>
