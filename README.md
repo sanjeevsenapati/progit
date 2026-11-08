@@ -1,65 +1,162 @@
-# ProGit Documentation & Official Portal
+# ProGit
 
 <p align="center">
-  <strong>The official documentation and resource hub for ProGit: a modern, lightweight, self-hosted Git collaboration platform written in pure Go and React.</strong>
+  <strong>A modern, lightweight, self-hosted Git collaboration platform and GitHub alternative written in Go and React.</strong>
 </p>
 
 <p align="center">
-  <a href="https://progit.co.in"><img src="https://img.shields.io/badge/Docs-progit.co.in-10b981?style=for-the-badge&logo=gitbook" alt="Official Documentation" /></a>
-  <a href="https://github.com/sanjeevsenapati/progit/pkgs/container/progit"><img src="https://img.shields.io/badge/GHCR-v1.2.0-blue?style=for-the-badge&logo=docker" alt="GHCR Container" /></a>
-  <img src="https://img.shields.io/badge/Go-1.22+-00ADD8?style=for-the-badge&logo=go" alt="Go Version" />
-  <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react" alt="React 19" />
-  <img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="License: MIT" />
+  <img src="https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat&logo=go" alt="Go Version" />
+  <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react" alt="React 19" />
+  <img src="https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=flat&logo=tailwind-css" alt="Tailwind CSS" />
+  <img src="https://img.shields.io/badge/Database-SQLite%20(Pure--Go)-003B57?style=flat&logo=sqlite" alt="SQLite" />
+  <img src="https://img.shields.io/badge/Container-Podman%20%2F%20Docker-892CA0?style=flat&logo=podman" alt="Podman / Docker" />
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT" />
 </p>
 
 ---
 
-## 🌐 Live Documentation Website
-The `docs` branch powers the official documentation portal at:  
-👉 **[https://progit.co.in](https://progit.co.in)**
+## Highlights
 
-This static documentation suite is served via GitHub Pages with custom domain binding (`CNAME: progit.co.in`), instant full-text search, responsive dark/light themes, and deep-linkable sections covering everything from 5-minute quickstart to multi-node high-availability clustering.
-
----
-
-## 📚 Documentation Index
-
-| Guide | Description | Target Audience |
-| :--- | :--- | :--- |
-| **[5-Minute Quickstart](docs/PODMAN_DEPLOYMENT.md)** | Instant deployment using official GHCR multi-arch container images | Everyone / DevOps |
-| **[Production Deployment](docs/DEPLOYMENT.md)** | Standalone binary, systemd, rootless Podman, and reverse proxies | System Administrators |
-| **[Admin & SSO Configuration](docs/ADMIN_GUIDE.md)** | Super Admin setup, Google Workspace/OIDC SSO, and SSL/TLS configuration | Administrators |
-| **[User & Collaboration](docs/USER_GUIDE.md)** | Fast SPA workflows, Git Smart HTTP, native SSH, wikis, and pages | Software Developers |
-| **[System Architecture](docs/ARCHITECTURE.md)** | Pure-Go modular monolith, zero-CGO SQLite, and React 19 SPA | Architects & Engineers |
-| **[Enterprise HA & Commercial Model](docs/ENTERPRISE_HA_AND_BUSINESS_MODEL.md)** | Multi-node clustering, Patroni HA, CephFS/S3, and commercial tiers | Enterprise & IT Leads |
-| **[REST API Reference](docs/API_DESIGN.md)** | Full specification for users, repositories, pull requests, and webhooks | Integrators & Tooling |
-| **[Platform Security](docs/SECURITY.md)** | Threat model, zero-CGO attack surface, and container hardening | SecOps & Compliance |
+- **Single Static Binary**: Built with pure Go (`modernc.org/sqlite`, zero CGO) and embedded modern React single-page application using `embed.FS`.
+- **Full Git Engine**: Native Git Smart HTTP (`git-upload-pack`, `git-receive-pack`) and integrated pure-Go SSH server on port 2222.
+- **Modern GitHub-Like Experience**: React 19 + TypeScript + Vite + Tailwind CSS with dark mode, responsive layout, and reactive updates.
+- **Git-Backed Wiki Engine**: Every repository features an independent, real Git-backed wiki (`<owner>/<repo>.wiki.git`) accessible via Web UI (Markdown preview, revisions, history) and Git CLI (HTTP/SSH).
+- **ProGit Pages (GitHub Pages)**: Host static websites, portfolios, or documentation directly from `gh-pages` or `main` branches with automatic Markdown rendering and access control.
+- **Complete Developer Collaboration**:
+  - Issues & Labels, Milestones, and threaded Markdown comments.
+  - Pull Requests with live syntax diffing, comparison, and native Git merges (Merge Commit, Squash, Rebase).
+  - Branch protection, forks, stars, and activity feeds.
+- **OpenID Connect (OIDC) & OAuth2 SSO**: Native single sign-on with Google Workspace, GitHub, Microsoft 365, Keycloak, and generic OIDC providers with Just-In-Time (JIT) provisioning and corporate domain whitelisting.
+- **Self-Hosted Administration**: First-run setup installation wizard, Super Admin management panel, runtime telemetry, and database WAL maintenance.
 
 ---
 
-## 🚀 Quick Deployment with Official Images
+## Architecture Overview
 
-ProGit publishes multi-architecture images (`linux/amd64` and `linux/arm64`) to GitHub Container Registry:
-
-```bash
-# 1. Add local domain to /etc/hosts
-echo "127.0.0.1 progit.local" | sudo tee -a /etc/hosts
-
-# 2. Run container with persistent volumes
-podman run -d \
-  --name progit \
-  --restart=unless-stopped \
-  -p 443:3443 -p 80:3000 \
-  -p 3443:3443 -p 3000:3000 \
-  -p 2222:2222 \
-  -v progit-data:/data/db:Z \
-  -v progit-repositories:/data/repositories:Z \
-  -v progit-config:/data/config:Z \
-  -v progit-logs:/data/logs:Z \
-  ghcr.io/sanjeevsenapati/progit:latest
+```
+                      +---------------------------------------+
+                      |       Clients (Browser / Git CLI)     |
+                      +-------------------+-------------------+
+                                          |
+                        HTTP / HTTPS (3000)   SSH (2222)
+                                          |        |
+                      +-------------------|--------|----------+
+                      |                   v        v          |
+                      |        ProGit Single Binary           |
+                      |  +---------------------------------+  |
+                      |  |     Embedded React 19 SPA       |  |
+                      |  +---------------------------------+  |
+                      |  |   REST API & Git Smart HTTP     |  |
+                      |  +---------------------------------+  |
+                      |  |     Native Pure-Go SSH Server   |  |
+                      |  +---------------------------------+  |
+                      |  | Git Operations (Repos & Wikis)  |  |
+                      |  +---------------------------------+  |
+                      |  |  SQLite Engine (WAL, Zero CGO)  |  |
+                      |  +---------------------------------+  |
+                      +-------------------|-------------------+
+                                          |
+                      +-------------------|-------------------+
+                      |                   v                   |
+                      |          Persistent Storage           |
+                      |  - /data/db/progit.db (WAL mode)      |
+                      |  - /data/repositories/<user>/<repo>   |
+                      |  - /data/config/                      |
+                      +---------------------------------------+
 ```
 
-Access your instance at **[`https://progit.local`](https://progit.local)** (or `https://progit.local:3443`).
+---
+
+## Quickstart with Docker & Podman
+
+ProGit provides production-grade containerization with zero CGO dependencies and automated HTTPS:
+
+### Quick Start with Docker
+```bash
+# 1. Clone repository
+git clone https://github.com/sanjeevsenapati/progit.git
+cd progit
+
+# 2. Launch with Docker Compose
+docker compose up -d
+
+# Or run the automated deployment script:
+./docker/deploy.sh
+```
+> See the [Docker Deployment Guide (docs/DOCKER_DEPLOYMENT.md)](docs/DOCKER_DEPLOYMENT.md) for full instructions, multi-arch tags, backups, and reverse proxy recipes.
+
+### Quick Start with Podman
+```bash
+# 1. Clone repository
+git clone https://github.com/sanjeevsenapati/progit.git
+cd progit
+
+# 2. Deploy container with persistent volumes
+./podman/deploy.sh
+
+# 3. Run the functional integration test suite
+./podman/test.sh
+```
+> See the [Podman Deployment Guide (docs/PODMAN_DEPLOYMENT.md)](docs/PODMAN_DEPLOYMENT.md) for rootless execution, RHEL 9 manual setup, and systemd integration.
+
+Navigate to `https://localhost:3443` (or `http://localhost:3000`) in your web browser.
+
+---
+
+## Building from Source
+
+### Prerequisites
+- Go 1.22+
+- Node.js 20+ & npm
+
+### Build Steps
+
+```bash
+# 1. Build frontend assets
+cd web
+npm install
+npm run build
+cd ..
+
+# 2. Synchronize frontend bundle for Go embedding
+rm -rf internal/ui/dist && cp -r web/dist internal/ui/dist
+
+# 3. Compile the standalone binary
+CGO_ENABLED=0 go build -o progit ./cmd/progit
+
+# 4. Start ProGit
+./progit web
+```
+
+---
+
+## CLI Management Commands
+
+ProGit includes CLI subcommands for maintenance and user management:
+
+```bash
+# Create an Administrator
+./progit admin create-user --username=admin --email=admin@example.com --password=SecretPassword123! --admin
+
+# List Users
+./progit admin list-users
+
+# Check database and health
+curl http://localhost:3000/api/health
+```
+
+---
+
+## Documentation
+
+Detailed architectural and deployment documentation is available in the [`docs/`](./docs) directory:
+- [Architecture & Design Decisions](./docs/ARCHITECTURE.md)
+- [Feature Inventory & Roadmap](./docs/FEATURE_INVENTORY.md)
+- [Database Design & Schema](./docs/DATABASE_DESIGN.md)
+- [REST API Specification](./docs/API_DESIGN.md)
+- [Security Model & Hardening](./docs/SECURITY.md)
+- [User Guide & Workflows](./docs/USER_GUIDE.md)
+- [Podman Deployment & Operations](./docs/PODMAN_DEPLOYMENT.md)
 
 ---
 
@@ -67,3 +164,10 @@ Access your instance at **[`https://progit.local`](https://progit.local)** (or `
 
 Supported by **PDIH** and created by **ProGit Team and Sanjeev**.  
 Built on top of the Gogs source code. Released under the open-source MIT License.
+
+---
+
+## License
+
+ProGit is licensed under the [MIT License](./project.md).
+

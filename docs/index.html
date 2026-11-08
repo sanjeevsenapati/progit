@@ -1158,28 +1158,70 @@ mv container-progit.service ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now container-progit.service</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
-        <h2>Docker Compose Example</h2>
-        <pre><code>version: '3.8'
-services:
+        <h2>Docker CLI &amp; Docker Compose Deployment</h2>
+        <p>ProGit runs natively on Docker Engine across Linux, macOS (Docker Desktop), and Windows (WSL2):</p>
+        
+        <h3>Docker CLI Run</h3>
+        <pre><code># Create named volumes
+docker volume create progit-data
+docker volume create progit-repositories
+docker volume create progit-config
+docker volume create progit-logs
+
+# Run container with persistent storage
+docker run -d --name progit \
+  --restart=unless-stopped \
+  -p 3443:3443 -p 3000:3000 -p 2222:2222 \
+  -v progit-data:/data/db \
+  -v progit-repositories:/data/repositories \
+  -v progit-config:/data/config \
+  -v progit-logs:/data/logs \
+  ghcr.io/sanjeevsenapati/progit:latest</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h3>Docker Compose (Recommended)</h3>
+        <p>Save the following as <code>docker-compose.yml</code> and launch with <code>docker compose up -d</code>:</p>
+        <pre><code>services:
   progit:
     image: ghcr.io/sanjeevsenapati/progit:latest
     container_name: progit
-    restart: always
+    restart: unless-stopped
     ports:
-      - "3000:3000"
-      - "3443:3443"
-      - "2222:2222"
+      - "3443:3443"  # HTTPS Web UI &amp; Git Smart HTTPS
+      - "3000:3000"  # HTTP redirect to port 3443
+      - "2222:2222"  # Git SSH Server
     environment:
       - PROGIT_APP_NAME=ProGit
-      - PROGIT_DOMAIN=git.example.com
-      - PROGIT_ROOT_URL=https://git.example.com/
+      - PROGIT_DOMAIN=progit.local
       - PROGIT_PROTOCOL=https
+      - PROGIT_ROOT_URL=https://progit.local:3443/
       - PROGIT_HTTPS_PORT=3443
+      - PROGIT_HTTP_PORT=3000
+      - PROGIT_REDIRECT_OTHER_PORT=true
+      - PROGIT_CERT_FILE=/data/config/https/cert.pem
+      - PROGIT_KEY_FILE=/data/config/https/key.pem
+      - PROGIT_DB_PATH=/data/db/progit.db
+      - PROGIT_REPO_ROOT=/data/repositories
+      - PROGIT_SSH_ENABLED=true
+      - PROGIT_SSH_PORT=2222
     volumes:
-      - progit-data:/data
+      - progit-data:/data/db
+      - progit-repositories:/data/repositories
+      - progit-config:/data/config
+      - progit-logs:/data/logs
+    healthcheck:
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:3443/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
 volumes:
-  progit-data:</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+  progit-data:
+  progit-repositories:
+  progit-config:
+  progit-logs:</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <p>For Ubuntu/Debian/Amazon Linux setup guides, reverse proxy configurations, and automated backup scripts, see the <a href="DOCKER_DEPLOYMENT.md" target="_blank" style="color:var(--accent-color);font-weight:600;text-decoration:underline;">Complete Docker Deployment Guide (DOCKER_DEPLOYMENT.md)</a>.</p>
 
         <div class="page-nav-buttons">
           <a href="#credits" class="nav-btn" onclick="navigate('credits')">
