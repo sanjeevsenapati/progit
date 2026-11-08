@@ -6,7 +6,7 @@ set -euo pipefail
 # Targets: macOS (arm64, amd64), Linux (amd64, arm64), Windows (amd64, arm64)
 # ==============================================================================
 
-VERSION="${1:-1.1.0}"
+VERSION="${1:-1.3.0}"
 VERSION="${VERSION#v}" # Strip leading 'v' if present
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${REPO_ROOT}/dist/release/v${VERSION}"
