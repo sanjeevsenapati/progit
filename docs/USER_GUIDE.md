@@ -189,26 +189,51 @@ Protect important branches like `main` or release branches:
 
 ## 6. Project Wiki Documentation
 
-Each ProGit repository includes a built-in, Git-backed wiki for architecture documents, guides, and manuals.
+Each ProGit repository includes a built-in, Git-backed wiki for architecture documents, guides, walkthroughs, and roadmaps.
 
-### 6.1 Browsing & Editing Pages
+### 6.1 First-Time Wiki Experience (GitHub-Style Onboarding)
+When navigating to the **Wiki** tab for a repository that does not yet have any wiki content:
+- **Clean Empty State**: ProGit does not automatically generate unneeded files or phantom commits. Instead, users are greeted with a welcoming, GitHub-style onboarding screen:
+  - Feature highlights explaining documentation versioning, Markdown support, and offline Git cloning.
+  - An informational notice for read-only visitors indicating the wiki has not yet been initialized.
+  - A prominent **"Create the first page"** button for repository collaborators with write permissions.
+- **One-Click Page Initialization**:
+  - Clicking **"Create the first page"** immediately opens the full-featured wiki editor pre-populated with title `"Home"`, slug `"Home"`, and a structured starter template.
+  - Saving creates the initial Git commit (`Initial wiki page Home`) authored by the logged-in user and smoothly transitions into the two-column wiki interface.
+
+### 6.2 Browsing & Editing Pages
 - Click the **Wiki** tab in the repository header.
 - The sidebar lists all pages in the wiki, with instant search filtering.
-- Click **New Wiki Page** to draft a new page with a custom title, slug, and markdown body.
-- Use the **Write / Preview** editor tabs to verify formatting before committing.
-- Click **History** on any page to view previous revisions and authors.
+- Click **New Wiki Page** to draft additional pages with a custom title, slug, and markdown body.
+- Use the **Write / Preview** editor tabs with syntax-highlighted markdown to verify formatting before committing.
+- Click **History** on any page to view previous revisions, commit hashes, timestamps, and author details.
+- Collaborative editing is tracked natively in Git with full commit logs.
 
-### 6.2 Offline Editing via Git CLI
+### 6.3 Enabling / Disabling Wikis (Repository Settings)
+Repository administrators can toggle the Wiki feature on or off according to project needs:
+1. Navigate to repository **Settings > Features**.
+2. Locate the **Wikis** feature card.
+3. Toggle the switch to **Disabled** or **Enabled** and click **Save Changes**.
+4. **Behavior when Disabled**:
+   - The **Wiki** tab is hidden from repository navigation.
+   - Wiki clone URLs (`.wiki.git`) are removed from repository clone dropdowns.
+   - All backend wiki API endpoints strictly enforce permissions and return `403 Forbidden` (`Wikis are disabled for this repository`).
+   - Re-enabling the wiki at any time immediately restores access to all previously created pages and revision history without data loss.
+
+### 6.4 Offline Editing via Git CLI
 The wiki is backed by an independent bare Git repository:
 ```bash
-git clone http://localhost:3000/<owner>/<repo>.wiki.git
+git clone https://localhost:3443/<owner>/<repo>.wiki.git
+# Or via SSH:
+git clone ssh://git@progit.local:2222/<owner>/<repo>.wiki.git
+
 cd <repo>.wiki
-echo "# New Guide" > Guide.md
-git add Guide.md
-git commit -m "Add guide"
+echo "# Architecture" > Architecture.md
+git add Architecture.md
+git commit -m "Add architecture guide"
 git push origin main
 ```
-Changes pushed over HTTP or SSH are instantly reflected in the Web UI.
+Changes pushed over HTTPS or SSH are instantly indexed and reflected in the ProGit Web UI.
 
 ---
 
