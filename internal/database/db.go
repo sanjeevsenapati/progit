@@ -551,6 +551,57 @@ func ListUsers(limit, offset int) ([]*User, error) {
 	return users, rows.Err()
 }
 
+func SearchUsersAdmin(query string, limit, offset int) ([]*User, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return ListUsers(limit, offset)
+	}
+
+	escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(query)
+	containsPattern := "%" + escaped + "%"
+	prefixPattern := escaped + "%"
+
+	rows, err := DB.Query(`
+		SELECT u.id, u.username, u.email, u.full_name, u.avatar_url, u.is_admin, u.is_active, u.location, u.website, u.bio, u.max_repo_creation, u.max_org_creation, u.created_at, u.updated_at,
+		       (SELECT COUNT(*) FROM repositories r WHERE r.owner_id = u.id) AS num_repos,
+		       (SELECT COUNT(*) FROM org_members om WHERE om.user_id = u.id AND om.role = 'owner') AS num_orgs
+		FROM users u
+		WHERE u.username LIKE ? ESCAPE '\' COLLATE NOCASE
+		   OR u.email LIKE ? ESCAPE '\' COLLATE NOCASE
+		   OR u.full_name LIKE ? ESCAPE '\' COLLATE NOCASE
+		ORDER BY CASE
+			WHEN LOWER(u.username) = LOWER(?) THEN 0
+			WHEN u.username LIKE ? ESCAPE '\' COLLATE NOCASE THEN 1
+			ELSE 2
+		END, u.id ASC
+		LIMIT ? OFFSET ?
+	`, containsPattern, containsPattern, containsPattern, query, prefixPattern, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := make([]*User, 0)
+	for rows.Next() {
+		u := &User{}
+		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio, &u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt, &u.NumRepos, &u.NumOrgs); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
 func UpdateUserLimits(userID int64, maxRepoCreation, maxOrgCreation *int) error {
 	if maxRepoCreation != nil && maxOrgCreation != nil {
 		_, err := DB.Exec(`UPDATE users SET max_repo_creation = ?, max_org_creation = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, *maxRepoCreation, *maxOrgCreation, userID)

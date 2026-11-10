@@ -372,9 +372,9 @@ curl -X GET "https://git.company.com/api/v1/admin/stats" \
 
 #### 2. User Management APIs
 
-**List All Users:**
+**List or Search Users:**
 ```bash
-curl -X GET "https://git.company.com/api/v1/admin/users?limit=50&offset=0" \
+curl -X GET "https://git.company.com/api/v1/admin/users?q=alice&limit=50&offset=0" \
   -H "Authorization: Bearer <ADMIN_TOKEN>"
 ```
 

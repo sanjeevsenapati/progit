@@ -956,8 +956,13 @@ export const api = {
     });
   },
 
-  async getAdminUsers() {
-    return fetchJSON<User[]>('/api/v1/admin/users');
+  async getAdminUsers(q?: string, limit?: number, offset?: number) {
+    const params = new URLSearchParams();
+    if (q && q.trim()) params.set('q', q.trim());
+    if (limit !== undefined) params.set('limit', String(limit));
+    if (offset !== undefined) params.set('offset', String(offset));
+    const qs = params.toString();
+    return fetchJSON<User[]>(`/api/v1/admin/users${qs ? `?${qs}` : ''}`);
   },
 
   async adminCreateUser(data: {

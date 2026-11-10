@@ -2661,6 +2661,104 @@ func TestUserFollowUnfollow(t *testing.T) {
 	}
 }
 
+func TestAdminUsersSearch(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	passHash, _ := auth.HashPassword("StrongPass123!")
+	adminUser, err := database.CreateUser("superadmin", "admin@example.com", passHash, "Super Admin", true)
+	if err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+	u1, err := database.CreateUser("alice_dev", "alice@company.org", passHash, "Alice Engineer", false)
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	if _, err := database.CreateUser("bob_ops", "bob@company.org", passHash, "Bob Operations", false); err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+	if _, err := database.CreateUser("charlie_100%", "charlie@vendor.io", passHash, "Charlie QA", false); err != nil {
+		t.Fatalf("create charlie: %v", err)
+	}
+
+	adminSess, err := auth.CreateSession(adminUser.ID, adminUser.Username)
+	if err != nil {
+		t.Fatalf("create admin session: %v", err)
+	}
+	adminToken := adminSess.Token
+	userSess, err := auth.CreateSession(u1.ID, u1.Username)
+	if err != nil {
+		t.Fatalf("create user session: %v", err)
+	}
+	userToken := userSess.Token
+
+	// Non-admin must be rejected
+	reqForbidden := httptest.NewRequest("GET", "/api/v1/admin/users?q=alice", nil)
+	reqForbidden.Header.Set("Authorization", "Bearer "+userToken)
+	recForbidden := httptest.NewRecorder()
+	router.ServeHTTP(recForbidden, reqForbidden)
+	if recForbidden.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for non-admin, got %d", recForbidden.Code)
+	}
+
+	// 1. Search by partial username (case-insensitive)
+	reqByUsername := httptest.NewRequest("GET", "/api/v1/admin/users?q=ALICE", nil)
+	reqByUsername.Header.Set("Authorization", "Bearer "+adminToken)
+	recByUsername := httptest.NewRecorder()
+	router.ServeHTTP(recByUsername, reqByUsername)
+	if recByUsername.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK searching by username, got %d: %s", recByUsername.Code, recByUsername.Body.String())
+	}
+	var res1 []database.User
+	_ = json.Unmarshal(recByUsername.Body.Bytes(), &res1)
+	if len(res1) != 1 || res1[0].Username != "alice_dev" {
+		t.Fatalf("expected only alice_dev, got %+v", res1)
+	}
+
+	// 2. Search by email domain
+	reqByEmail := httptest.NewRequest("GET", "/api/v1/admin/users?q=company.org", nil)
+	reqByEmail.Header.Set("Authorization", "Bearer "+adminToken)
+	recByEmail := httptest.NewRecorder()
+	router.ServeHTTP(recByEmail, reqByEmail)
+	var res2 []database.User
+	_ = json.Unmarshal(recByEmail.Body.Bytes(), &res2)
+	if len(res2) != 2 {
+		t.Fatalf("expected 2 users matching email domain, got %d", len(res2))
+	}
+
+	// 3. Search by full name
+	reqByName := httptest.NewRequest("GET", "/api/v1/admin/users?q=Operations", nil)
+	reqByName.Header.Set("Authorization", "Bearer "+adminToken)
+	recByName := httptest.NewRecorder()
+	router.ServeHTTP(recByName, reqByName)
+	var res3 []database.User
+	_ = json.Unmarshal(recByName.Body.Bytes(), &res3)
+	if len(res3) != 1 || res3[0].Username != "bob_ops" {
+		t.Fatalf("expected bob_ops by full name, got %+v", res3)
+	}
+
+	// 4. LIKE wildcard escaping ('%' should match literal '%' in charlie_100%, not everything)
+	reqWildcard := httptest.NewRequest("GET", "/api/v1/admin/users?q=100%25", nil)
+	reqWildcard.Header.Set("Authorization", "Bearer "+adminToken)
+	recWildcard := httptest.NewRecorder()
+	router.ServeHTTP(recWildcard, reqWildcard)
+	var res4 []database.User
+	_ = json.Unmarshal(recWildcard.Body.Bytes(), &res4)
+	if len(res4) != 1 || res4[0].Username != "charlie_100%" {
+		t.Fatalf("expected exact wildcard-escaped match charlie_100%%, got %+v", res4)
+	}
+
+	// 5. No matches returns [] (not null)
+	reqEmpty := httptest.NewRequest("GET", "/api/v1/admin/users?q=doesnotexist999", nil)
+	reqEmpty.Header.Set("Authorization", "Bearer "+adminToken)
+	recEmpty := httptest.NewRecorder()
+	router.ServeHTTP(recEmpty, reqEmpty)
+	if strings.TrimSpace(recEmpty.Body.String()) != "[]" {
+		t.Fatalf("expected empty JSON array [] for no matches, got %s", recEmpty.Body.String())
+	}
+}
+
+
 
 
 

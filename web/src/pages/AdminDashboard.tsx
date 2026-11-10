@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { api, User, Repository } from '../lib/api';
 import { showModalConfirm } from '../components/ModalDialog';
 import {
@@ -21,6 +21,7 @@ import {
   HardDrive,
   Edit3,
   SlidersHorizontal,
+  Search,
   X
 } from 'lucide-react';
 
@@ -30,6 +31,14 @@ export const AdminDashboard: React.FC = () => {
   const [repos, setRepos] = useState<Repository[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'repos' | 'system'>('overview');
   const [loading, setLoading] = useState(true);
+
+  // User search & filter
+  const [userSearch, setUserSearch] = useState('');
+  const [userFilter, setUserFilter] = useState<'all' | 'admin' | 'standard' | 'suspended'>('all');
+  const [userSearching, setUserSearching] = useState(false);
+  const userSearchRef = useRef('');
+  const searchSeqRef = useRef(0);
+  const hasMountedRef = useRef(false);
 
   // User creation modal
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -62,11 +71,30 @@ export const AdminDashboard: React.FC = () => {
   // Status message
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const fetchAdminUsers = async (query: string) => {
+    const seq = ++searchSeqRef.current;
+    setUserSearching(true);
+    try {
+      const uList = await api.getAdminUsers(query);
+      if (seq === searchSeqRef.current) {
+        setUsers(uList || []);
+      }
+    } catch (err: any) {
+      if (seq === searchSeqRef.current) {
+        setStatusMsg({ type: 'error', text: err.message || 'Failed to search users.' });
+      }
+    } finally {
+      if (seq === searchSeqRef.current) {
+        setUserSearching(false);
+      }
+    }
+  };
+
   const loadData = async () => {
     try {
       const [s, uList, rList] = await Promise.all([
         api.getAdminStats(),
-        api.getAdminUsers(),
+        api.getAdminUsers(userSearchRef.current),
         api.getAdminRepos(),
       ]);
       setStats(s);
@@ -82,7 +110,17 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    hasMountedRef.current = true;
   }, []);
+
+  useEffect(() => {
+    userSearchRef.current = userSearch;
+    if (!hasMountedRef.current) return;
+    const timer = window.setTimeout(() => {
+      fetchAdminUsers(userSearch);
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [userSearch]);
 
   const handleToggleAdmin = async (u: User) => {
     const action = u.is_admin ? 'revoke' : 'grant';
@@ -262,6 +300,21 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const normalizedQuery = userSearch.trim().toLowerCase();
+  const filteredUsers = users.filter(u => {
+    if (normalizedQuery) {
+      const matchesText =
+        u.username.toLowerCase().includes(normalizedQuery) ||
+        (u.email && u.email.toLowerCase().includes(normalizedQuery)) ||
+        (u.full_name && u.full_name.toLowerCase().includes(normalizedQuery));
+      if (!matchesText) return false;
+    }
+    if (userFilter === 'admin' && !u.is_admin) return false;
+    if (userFilter === 'standard' && u.is_admin) return false;
+    if (userFilter === 'suspended' && u.is_active) return false;
+    return true;
+  });
+
   if (loading) {
     return <div className="py-24 text-center text-sm text-gray-400">Loading admin console...</div>;
   }
@@ -334,7 +387,7 @@ export const AdminDashboard: React.FC = () => {
               : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
           }`}
         >
-          Users ({users.length})
+          Users ({stats?.users_count ?? users.length})
         </button>
         <button
           onClick={() => setActiveTab('repos')}
@@ -441,12 +494,75 @@ export const AdminDashboard: React.FC = () => {
 
       {/* Users Tab */}
       {activeTab === 'users' && (
-        <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-sm divide-y divide-gray-100 dark:divide-dark-border overflow-hidden">
-          <div className="p-4 bg-gray-50 dark:bg-dark-hover flex justify-between items-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-            <span>User Account</span>
-            <span>Administrative Controls</span>
+        <div className="space-y-4">
+          {/* Search & Filter Toolbar */}
+          <div className="p-4 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                placeholder="Search users by username, email, or full name..."
+                aria-label="Search users"
+                className="w-full pl-9 pr-8 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              {userSearch && (
+                <button
+                  type="button"
+                  onClick={() => setUserSearch('')}
+                  title="Clear search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5 rounded"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <select
+                value={userFilter}
+                onChange={e => setUserFilter(e.target.value as 'all' | 'admin' | 'standard' | 'suspended')}
+                aria-label="Filter users by role or status"
+                className="px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="all">All Users</option>
+                <option value="admin">Super Admins</option>
+                <option value="standard">Standard Users</option>
+                <option value="suspended">Suspended</option>
+              </select>
+
+              <span className="text-xs text-gray-500 dark:text-dark-muted whitespace-nowrap px-2">
+                {userSearching ? 'Searching...' : `${filteredUsers.length} user${filteredUsers.length === 1 ? '' : 's'}`}
+              </span>
+            </div>
           </div>
-          {users.map(u => (
+
+          <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-sm divide-y divide-gray-100 dark:divide-dark-border overflow-hidden">
+            <div className="p-4 bg-gray-50 dark:bg-dark-hover flex justify-between items-center text-xs font-bold text-gray-500 uppercase tracking-wider">
+              <span>User Account</span>
+              <span>Administrative Controls</span>
+            </div>
+            {filteredUsers.length === 0 ? (
+              <div className="p-8 text-center space-y-2">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  No users found{userSearch.trim() ? ` matching "${userSearch.trim()}"` : ''}.
+                </p>
+                {(userSearch || userFilter !== 'all') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserSearch('');
+                      setUserFilter('all');
+                    }}
+                    className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
+                  >
+                    Clear search and filters
+                  </button>
+                )}
+              </div>
+            ) : (
+              filteredUsers.map(u => (
             <div key={u.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="space-y-1">
                 <div className="flex items-center space-x-2">
@@ -529,7 +645,9 @@ export const AdminDashboard: React.FC = () => {
                 </button>
               </div>
             </div>
-          ))}
+              ))
+            )}
+          </div>
         </div>
       )}
 

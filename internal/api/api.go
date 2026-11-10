@@ -4397,10 +4397,23 @@ func (r *Router) handleAdminUsers(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	users, err := database.ListUsers(100, 0)
+	limit := 100
+	if l, err := strconv.Atoi(req.URL.Query().Get("limit")); err == nil && l > 0 && l <= 500 {
+		limit = l
+	}
+	offset := 0
+	if o, err := strconv.Atoi(req.URL.Query().Get("offset")); err == nil && o >= 0 {
+		offset = o
+	}
+	query := strings.TrimSpace(req.URL.Query().Get("q"))
+
+	users, err := database.SearchUsersAdmin(query, limit, offset)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	if users == nil {
+		users = []*database.User{}
 	}
 	jsonResponse(w, http.StatusOK, users)
 }

@@ -215,8 +215,8 @@ All administrative endpoints require **Super Administrator privileges** (`is_adm
     ```
 
 #### 2. User Account Administration
-- `GET /api/v1/admin/users` - List all registered user accounts with administrative status and creation limits.
-  - **Query Parameters**: `limit` (default: 100), `offset` (default: 0).
+- `GET /api/v1/admin/users` - List or search registered user accounts with administrative status and creation limits.
+  - **Query Parameters**: `q` (optional search keyword matching `username`, `email`, or `full_name`), `limit` (default: 100, max: 500), `offset` (default: 0).
   - **Response (200 OK)**: Array of User objects:
     ```json
     [
