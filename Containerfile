@@ -37,8 +37,10 @@ RUN go build -trimpath -ldflags="-s -w -X main.Version=1.3.0 -X progit.io/progit
 # Stage 3: Minimal Production Runtime (Target Platform)
 FROM docker.io/library/alpine:3.21
 
-# Install runtime essentials: Git, CA certificates, curl for health checks
-RUN apk add --no-cache git ca-certificates tzdata curl && \
+# Install runtime essentials: Git, CA certificates, curl for health checks, tini as PID 1 reaper
+RUN apk add --no-cache git ca-certificates tzdata curl tini && \
+    git config --system maintenance.autoDetach false && \
+    git config --system gc.autoDetach false && \
     addgroup -g 1000 progit && \
     adduser -u 1000 -G progit -s /bin/sh -D progit
 
@@ -73,5 +75,5 @@ EXPOSE 3000 3443 2222 80 443
 HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
   CMD curl -k -f https://localhost:3443/api/health || curl -k -f http://localhost:3000/api/health || exit 1
 
-ENTRYPOINT ["/usr/local/bin/progit"]
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/progit"]
 CMD ["web"]

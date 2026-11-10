@@ -74,7 +74,12 @@ func RunGitWithTimeout(timeout time.Duration, dir string, args ...string) ([]byt
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "git", args...)
+	fullArgs := make([]string, 0, len(args)+4)
+	fullArgs = append(fullArgs, "-c", "maintenance.autoDetach=false", "-c", "gc.autoDetach=false")
+	fullArgs = append(fullArgs, args...)
+
+	cmd := exec.CommandContext(ctx, "git", fullArgs...)
+	ConfigureGitCmd(cmd)
 	if dir != "" {
 		if abs, err := filepath.Abs(dir); err == nil {
 			dir = abs

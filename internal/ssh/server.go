@@ -1,6 +1,7 @@
 package ssh
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/pem"
@@ -12,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	gossh "golang.org/x/crypto/ssh"
 	"progit.io/progit/internal/config"
@@ -233,11 +235,39 @@ func (s *Server) executeGitCommand(channel gossh.Channel, req *gossh.Request, ra
 		return
 	}
 
-	cmd := exec.Command("git", gitService, repoPath)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		select {
+		case <-s.stopChan:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
+	cmd := exec.CommandContext(ctx, "git", "-c", "maintenance.autoDetach=false", "-c", "gc.autoDetach=false", gitService, repoPath)
+	git.ConfigureGitCmd(cmd)
 	cmd.Dir = repoPath
-	stdin, _ := cmd.StdinPipe()
-	stdout, _ := cmd.StdoutPipe()
-	stderr, _ := cmd.StderrPipe()
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		_ = req.Reply(false, nil)
+		return
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		_ = stdin.Close()
+		_ = req.Reply(false, nil)
+		return
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		_ = stdin.Close()
+		_ = stdout.Close()
+		_ = req.Reply(false, nil)
+		return
+	}
 
 	if err := cmd.Start(); err != nil {
 		_ = req.Reply(false, nil)
@@ -250,13 +280,23 @@ func (s *Server) executeGitCommand(channel gossh.Channel, req *gossh.Request, ra
 		_, _ = io.Copy(stdin, channel)
 		_ = stdin.Close()
 	}()
+
+	var ioWg sync.WaitGroup
+	ioWg.Add(2)
 	go func() {
-		_, _ = io.Copy(channel, stdout)
+		defer ioWg.Done()
+		if _, err := io.Copy(channel, stdout); err != nil {
+			cancel()
+		}
 	}()
 	go func() {
-		_, _ = io.Copy(channel.Stderr(), stderr)
+		defer ioWg.Done()
+		if _, err := io.Copy(channel.Stderr(), stderr); err != nil {
+			cancel()
+		}
 	}()
 
+	ioWg.Wait()
 	_ = cmd.Wait()
 
 	if isWrite {

@@ -171,7 +171,8 @@ func packetWrite(str string) []byte {
 func serveInfoRefs(w http.ResponseWriter, r *http.Request, repoPath, service string) {
 	serviceClean := strings.TrimPrefix(service, "git-")
 
-	cmd := exec.Command("git", serviceClean, "--stateless-rpc", "--advertise-refs", ".")
+	cmd := exec.CommandContext(r.Context(), "git", "-c", "maintenance.autoDetach=false", "-c", "gc.autoDetach=false", serviceClean, "--stateless-rpc", "--advertise-refs", ".")
+	ConfigureGitCmd(cmd)
 	cmd.Dir = repoPath
 	out, err := cmd.Output()
 	if err != nil {
@@ -206,7 +207,8 @@ func serveRPC(w http.ResponseWriter, r *http.Request, repoPath, service string, 
 	w.Header().Set("Cache-Control", "no-cache")
 
 	var stderr bytes.Buffer
-	cmd := exec.Command("git", service, "--stateless-rpc", repoPath)
+	cmd := exec.CommandContext(r.Context(), "git", "-c", "maintenance.autoDetach=false", "-c", "gc.autoDetach=false", service, "--stateless-rpc", repoPath)
+	ConfigureGitCmd(cmd)
 	cmd.Dir = repoPath
 	cmd.Stdin = reqBody
 	cmd.Stdout = w

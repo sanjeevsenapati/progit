@@ -33,6 +33,8 @@ import (
 var Version = "1.3.0"
 
 func main() {
+	maybeReapPID1()
+
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "version", "--version", "-v":
