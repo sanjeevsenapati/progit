@@ -77,6 +77,7 @@ func runMigrations(db *sql.DB) error {
 		avatar_url TEXT NOT NULL DEFAULT '',
 		is_admin BOOLEAN NOT NULL DEFAULT 0,
 		is_active BOOLEAN NOT NULL DEFAULT 1,
+		can_download BOOLEAN NOT NULL DEFAULT 1,
 		location TEXT NOT NULL DEFAULT '',
 		website TEXT NOT NULL DEFAULT '',
 		bio TEXT NOT NULL DEFAULT '',
@@ -133,6 +134,7 @@ func runMigrations(db *sql.DB) error {
 		enable_pages BOOLEAN NOT NULL DEFAULT 0,
 		pages_branch TEXT NOT NULL DEFAULT 'main',
 		pages_folder TEXT NOT NULL DEFAULT '/',
+		allow_download_and_pulls BOOLEAN NOT NULL DEFAULT 1,
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE(owner_id, name)
@@ -434,7 +436,9 @@ func runMigrations(db *sql.DB) error {
 	_, _ = db.Exec(`UPDATE repositories SET pages_branch = default_branch WHERE pages_branch = 'gh-pages' OR pages_branch = ''`)
 	_, _ = db.Exec(`ALTER TABLE users ADD COLUMN max_repo_creation INTEGER NOT NULL DEFAULT -1`)
 	_, _ = db.Exec(`ALTER TABLE users ADD COLUMN max_org_creation INTEGER NOT NULL DEFAULT -1`)
+	_, _ = db.Exec(`ALTER TABLE users ADD COLUMN can_download BOOLEAN NOT NULL DEFAULT 1`)
 	_, _ = db.Exec(`ALTER TABLE organizations ADD COLUMN max_repo_creation INTEGER NOT NULL DEFAULT -1`)
+	_, _ = db.Exec(`ALTER TABLE repositories ADD COLUMN allow_download_and_pulls BOOLEAN NOT NULL DEFAULT 1`)
 
 	_, _ = db.Exec(`
 		CREATE TABLE IF NOT EXISTS pull_reviews (
@@ -489,9 +493,9 @@ func CreateUser(username, email, passwordHash, fullName string, isAdmin bool) (*
 func GetUserByID(id int64) (*User, error) {
 	u := &User{}
 	err := DB.QueryRow(`
-		SELECT id, username, email, password_hash, full_name, avatar_url, is_admin, is_active, location, website, bio, max_repo_creation, max_org_creation, created_at, updated_at
+		SELECT id, username, email, password_hash, full_name, avatar_url, is_admin, is_active, can_download, location, website, bio, max_repo_creation, max_org_creation, created_at, updated_at
 		FROM users WHERE id = ?
-	`, id).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio, &u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt)
+	`, id).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.CanDownload, &u.Location, &u.Website, &u.Bio, &u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -501,9 +505,9 @@ func GetUserByID(id int64) (*User, error) {
 func GetUserByUsername(username string) (*User, error) {
 	u := &User{}
 	err := DB.QueryRow(`
-		SELECT id, username, email, password_hash, full_name, avatar_url, is_admin, is_active, location, website, bio, max_repo_creation, max_org_creation, created_at, updated_at
+		SELECT id, username, email, password_hash, full_name, avatar_url, is_admin, is_active, can_download, location, website, bio, max_repo_creation, max_org_creation, created_at, updated_at
 		FROM users WHERE username = ? COLLATE NOCASE
-	`, strings.TrimSpace(username)).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio, &u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt)
+	`, strings.TrimSpace(username)).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.CanDownload, &u.Location, &u.Website, &u.Bio, &u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -513,9 +517,9 @@ func GetUserByUsername(username string) (*User, error) {
 func GetUserByEmail(email string) (*User, error) {
 	u := &User{}
 	err := DB.QueryRow(`
-		SELECT id, username, email, password_hash, full_name, avatar_url, is_admin, is_active, location, website, bio, max_repo_creation, max_org_creation, created_at, updated_at
+		SELECT id, username, email, password_hash, full_name, avatar_url, is_admin, is_active, can_download, location, website, bio, max_repo_creation, max_org_creation, created_at, updated_at
 		FROM users WHERE email = ? COLLATE NOCASE
-	`, strings.TrimSpace(email)).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio, &u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt)
+	`, strings.TrimSpace(email)).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.CanDownload, &u.Location, &u.Website, &u.Bio, &u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -530,7 +534,7 @@ func CountUsers() (int, error) {
 
 func ListUsers(limit, offset int) ([]*User, error) {
 	rows, err := DB.Query(`
-		SELECT u.id, u.username, u.email, u.full_name, u.avatar_url, u.is_admin, u.is_active, u.location, u.website, u.bio, u.max_repo_creation, u.max_org_creation, u.created_at, u.updated_at,
+		SELECT u.id, u.username, u.email, u.full_name, u.avatar_url, u.is_admin, u.is_active, u.can_download, u.location, u.website, u.bio, u.max_repo_creation, u.max_org_creation, u.created_at, u.updated_at,
 		       (SELECT COUNT(*) FROM repositories r WHERE r.owner_id = u.id) AS num_repos,
 		       (SELECT COUNT(*) FROM org_members om WHERE om.user_id = u.id AND om.role = 'owner') AS num_orgs
 		FROM users u ORDER BY u.id ASC LIMIT ? OFFSET ?
@@ -543,7 +547,7 @@ func ListUsers(limit, offset int) ([]*User, error) {
 	var users []*User
 	for rows.Next() {
 		u := &User{}
-		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio, &u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt, &u.NumRepos, &u.NumOrgs); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.CanDownload, &u.Location, &u.Website, &u.Bio, &u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt, &u.NumRepos, &u.NumOrgs); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
@@ -572,7 +576,7 @@ func SearchUsersAdmin(query string, limit, offset int) ([]*User, error) {
 	prefixPattern := escaped + "%"
 
 	rows, err := DB.Query(`
-		SELECT u.id, u.username, u.email, u.full_name, u.avatar_url, u.is_admin, u.is_active, u.location, u.website, u.bio, u.max_repo_creation, u.max_org_creation, u.created_at, u.updated_at,
+		SELECT u.id, u.username, u.email, u.full_name, u.avatar_url, u.is_admin, u.is_active, u.can_download, u.location, u.website, u.bio, u.max_repo_creation, u.max_org_creation, u.created_at, u.updated_at,
 		       (SELECT COUNT(*) FROM repositories r WHERE r.owner_id = u.id) AS num_repos,
 		       (SELECT COUNT(*) FROM org_members om WHERE om.user_id = u.id AND om.role = 'owner') AS num_orgs
 		FROM users u
@@ -594,7 +598,7 @@ func SearchUsersAdmin(query string, limit, offset int) ([]*User, error) {
 	users := make([]*User, 0)
 	for rows.Next() {
 		u := &User{}
-		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio, &u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt, &u.NumRepos, &u.NumOrgs); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.FullName, &u.AvatarURL, &u.IsAdmin, &u.IsActive, &u.CanDownload, &u.Location, &u.Website, &u.Bio, &u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt, &u.NumRepos, &u.NumOrgs); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
@@ -640,6 +644,11 @@ func UpdateUserAdmin(userID int64, isAdmin bool) error {
 
 func UpdateUserStatus(userID int64, isActive bool) error {
 	_, err := DB.Exec(`UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, isActive, userID)
+	return err
+}
+
+func UpdateUserDownload(userID int64, canDownload bool) error {
+	_, err := DB.Exec(`UPDATE users SET can_download = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, canDownload, userID)
 	return err
 }
 
@@ -837,8 +846,8 @@ func DeleteSSHKey(userID, keyID int64) error {
 func CreateRepository(ownerID int64, name, description string, isPrivate bool) (*Repository, error) {
 	name = strings.TrimSpace(name)
 	res, err := DB.Exec(`
-		INSERT INTO repositories (owner_id, name, description, is_private, default_branch, enable_wiki, enable_pages, pages_branch, pages_folder)
-		VALUES (?, ?, ?, ?, 'main', 1, 0, 'main', '/')
+		INSERT INTO repositories (owner_id, name, description, is_private, default_branch, enable_wiki, enable_pages, pages_branch, pages_folder, allow_download_and_pulls)
+		VALUES (?, ?, ?, ?, 'main', 1, 0, 'main', '/', 1)
 	`, ownerID, name, description, isPrivate)
 	if err != nil {
 		return nil, err
@@ -852,13 +861,13 @@ func GetRepositoryByID(id int64) (*Repository, error) {
 	err := DB.QueryRow(`
 		SELECT r.id, r.owner_id, u.username, r.name, r.description, r.is_private, r.is_fork, r.fork_parent_id,
 		       r.default_branch, r.num_stars, r.num_forks, r.num_watches, r.num_issues, r.num_pulls, r.size_bytes, r.is_archived,
-		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.created_at, r.updated_at
+		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.allow_download_and_pulls, r.created_at, r.updated_at
 		FROM repositories r
 		JOIN users u ON u.id = r.owner_id
 		WHERE r.id = ?
 	`, id).Scan(&r.ID, &r.OwnerID, &r.OwnerName, &r.Name, &r.Description, &r.IsPrivate, &r.IsFork, &r.ForkParentID,
 		&r.DefaultBranch, &r.NumStars, &r.NumForks, &r.NumWatches, &r.NumIssues, &r.NumPulls, &r.SizeBytes, &r.IsArchived,
-		&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.CreatedAt, &r.UpdatedAt)
+		&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.AllowDownloadAndPulls, &r.CreatedAt, &r.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -881,13 +890,13 @@ func GetRepositoryByName(ownerUsername, repoName string) (*Repository, error) {
 	err := DB.QueryRow(`
 		SELECT r.id, r.owner_id, u.username, r.name, r.description, r.is_private, r.is_fork, r.fork_parent_id,
 		       r.default_branch, r.num_stars, r.num_forks, r.num_watches, r.num_issues, r.num_pulls, r.size_bytes, r.is_archived,
-		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.created_at, r.updated_at
+		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.allow_download_and_pulls, r.created_at, r.updated_at
 		FROM repositories r
 		JOIN users u ON u.id = r.owner_id
 		WHERE u.username = ? COLLATE NOCASE AND r.name = ? COLLATE NOCASE
 	`, strings.TrimSpace(ownerUsername), strings.TrimSpace(repoName)).Scan(&r.ID, &r.OwnerID, &r.OwnerName, &r.Name, &r.Description, &r.IsPrivate, &r.IsFork, &r.ForkParentID,
 		&r.DefaultBranch, &r.NumStars, &r.NumForks, &r.NumWatches, &r.NumIssues, &r.NumPulls, &r.SizeBytes, &r.IsArchived,
-		&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.CreatedAt, &r.UpdatedAt)
+		&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.AllowDownloadAndPulls, &r.CreatedAt, &r.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -918,9 +927,9 @@ func ForkRepository(parentRepo *Repository, newOwnerID int64, newRepoName string
 	}
 
 	res, err := DB.Exec(`
-		INSERT INTO repositories (owner_id, name, description, is_private, is_fork, fork_parent_id, default_branch, enable_wiki, enable_pages, pages_branch, pages_folder)
-		VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
-	`, newOwnerID, newRepoName, parentRepo.Description, parentRepo.IsPrivate, parentRepo.ID, parentRepo.DefaultBranch, parentRepo.EnableWiki, parentRepo.EnablePages, parentRepo.PagesBranch, parentRepo.PagesFolder)
+		INSERT INTO repositories (owner_id, name, description, is_private, is_fork, fork_parent_id, default_branch, enable_wiki, enable_pages, pages_branch, pages_folder, allow_download_and_pulls)
+		VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
+	`, newOwnerID, newRepoName, parentRepo.Description, parentRepo.IsPrivate, parentRepo.ID, parentRepo.DefaultBranch, parentRepo.EnableWiki, parentRepo.EnablePages, parentRepo.PagesBranch, parentRepo.PagesFolder, parentRepo.AllowDownloadAndPulls)
 	if err != nil {
 		return nil, err
 	}
@@ -936,7 +945,7 @@ func GetForks(parentRepoID int64) ([]*Repository, error) {
 	rows, err := DB.Query(`
 		SELECT r.id, r.owner_id, u.username, r.name, r.description, r.is_private, r.is_fork, r.fork_parent_id,
 		       r.default_branch, r.num_stars, r.num_forks, r.num_watches, r.num_issues, r.num_pulls, r.size_bytes, r.is_archived,
-		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.created_at, r.updated_at
+		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.allow_download_and_pulls, r.created_at, r.updated_at
 		FROM repositories r
 		JOIN users u ON u.id = r.owner_id
 		WHERE r.fork_parent_id = ?
@@ -952,7 +961,7 @@ func GetForks(parentRepoID int64) ([]*Repository, error) {
 		r := &Repository{}
 		if err := rows.Scan(&r.ID, &r.OwnerID, &r.OwnerName, &r.Name, &r.Description, &r.IsPrivate, &r.IsFork, &r.ForkParentID,
 			&r.DefaultBranch, &r.NumStars, &r.NumForks, &r.NumWatches, &r.NumIssues, &r.NumPulls, &r.SizeBytes, &r.IsArchived,
-			&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.CreatedAt, &r.UpdatedAt); err == nil {
+			&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.AllowDownloadAndPulls, &r.CreatedAt, &r.UpdatedAt); err == nil {
 			forks = append(forks, r)
 		}
 	}
@@ -963,7 +972,7 @@ func ListRepositories(limit, offset int, publicOnly bool) ([]*Repository, error)
 	query := `
 		SELECT r.id, r.owner_id, u.username, r.name, r.description, r.is_private, r.is_fork, r.fork_parent_id,
 		       r.default_branch, r.num_stars, r.num_forks, r.num_watches, r.num_issues, r.num_pulls, r.size_bytes, r.is_archived,
-		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.created_at, r.updated_at
+		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.allow_download_and_pulls, r.created_at, r.updated_at
 		FROM repositories r
 		JOIN users u ON u.id = r.owner_id
 	`
@@ -983,7 +992,7 @@ func ListRepositories(limit, offset int, publicOnly bool) ([]*Repository, error)
 		r := &Repository{}
 		if err := rows.Scan(&r.ID, &r.OwnerID, &r.OwnerName, &r.Name, &r.Description, &r.IsPrivate, &r.IsFork, &r.ForkParentID,
 			&r.DefaultBranch, &r.NumStars, &r.NumForks, &r.NumWatches, &r.NumIssues, &r.NumPulls, &r.SizeBytes, &r.IsArchived,
-			&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.AllowDownloadAndPulls, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, r)
@@ -1006,7 +1015,7 @@ func SearchRepositories(keyword string, userID int64, isAdmin bool, limit, offse
 	baseQuery := `
 		SELECT r.id, r.owner_id, u.username, r.name, r.description, r.is_private, r.is_fork, r.fork_parent_id,
 		       r.default_branch, r.num_stars, r.num_forks, r.num_watches, r.num_issues, r.num_pulls, r.size_bytes, r.is_archived,
-		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.created_at, r.updated_at
+		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.allow_download_and_pulls, r.created_at, r.updated_at
 		FROM repositories r
 		JOIN users u ON u.id = r.owner_id
 	`
@@ -1050,7 +1059,7 @@ func SearchRepositories(keyword string, userID int64, isAdmin bool, limit, offse
 		r := &Repository{}
 		if err := rows.Scan(&r.ID, &r.OwnerID, &r.OwnerName, &r.Name, &r.Description, &r.IsPrivate, &r.IsFork, &r.ForkParentID,
 			&r.DefaultBranch, &r.NumStars, &r.NumForks, &r.NumWatches, &r.NumIssues, &r.NumPulls, &r.SizeBytes, &r.IsArchived,
-			&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.AllowDownloadAndPulls, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, r)
@@ -1107,7 +1116,7 @@ func ListUserRepositories(userID int64, includePrivate bool) ([]*Repository, err
 	query := `
 		SELECT r.id, r.owner_id, u.username, r.name, r.description, r.is_private, r.is_fork, r.fork_parent_id,
 		       r.default_branch, r.num_stars, r.num_forks, r.num_watches, r.num_issues, r.num_pulls, r.size_bytes, r.is_archived,
-		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.created_at, r.updated_at
+		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.allow_download_and_pulls, r.created_at, r.updated_at
 		FROM repositories r
 		JOIN users u ON u.id = r.owner_id
 		WHERE r.owner_id = ?
@@ -1128,7 +1137,7 @@ func ListUserRepositories(userID int64, includePrivate bool) ([]*Repository, err
 		r := &Repository{}
 		if err := rows.Scan(&r.ID, &r.OwnerID, &r.OwnerName, &r.Name, &r.Description, &r.IsPrivate, &r.IsFork, &r.ForkParentID,
 			&r.DefaultBranch, &r.NumStars, &r.NumForks, &r.NumWatches, &r.NumIssues, &r.NumPulls, &r.SizeBytes, &r.IsArchived,
-			&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.AllowDownloadAndPulls, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, r)
@@ -1136,7 +1145,7 @@ func ListUserRepositories(userID int64, includePrivate bool) ([]*Repository, err
 	return list, rows.Err()
 }
 
-func UpdateRepositorySettings(repoID int64, description string, isPrivate, enableWiki, enablePages bool, pagesBranch, pagesFolder string) error {
+func UpdateRepositorySettings(repoID int64, description string, isPrivate, enableWiki, enablePages bool, pagesBranch, pagesFolder string, allowDownloadAndPulls bool) error {
 	if pagesBranch == "" {
 		pagesBranch = "gh-pages"
 	}
@@ -1145,9 +1154,9 @@ func UpdateRepositorySettings(repoID int64, description string, isPrivate, enabl
 	}
 	_, err := DB.Exec(`
 		UPDATE repositories 
-		SET description = ?, is_private = ?, enable_wiki = ?, enable_pages = ?, pages_branch = ?, pages_folder = ?, updated_at = CURRENT_TIMESTAMP
+		SET description = ?, is_private = ?, enable_wiki = ?, enable_pages = ?, pages_branch = ?, pages_folder = ?, allow_download_and_pulls = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, description, isPrivate, enableWiki, enablePages, pagesBranch, pagesFolder, repoID)
+	`, description, isPrivate, enableWiki, enablePages, pagesBranch, pagesFolder, allowDownloadAndPulls, repoID)
 	return err
 }
 
@@ -1297,7 +1306,7 @@ func ListStarredRepositories(userID int64) ([]*Repository, error) {
 	query := `
 		SELECT r.id, r.owner_id, u.username, r.name, r.description, r.is_private, r.is_fork, r.fork_parent_id,
 		       r.default_branch, r.num_stars, r.num_forks, r.num_watches, r.num_issues, r.num_pulls, r.size_bytes, r.is_archived,
-		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.created_at, r.updated_at
+		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.allow_download_and_pulls, r.created_at, r.updated_at
 		FROM repositories r
 		JOIN users u ON u.id = r.owner_id
 		JOIN stars s ON s.repo_id = r.id
@@ -1316,7 +1325,7 @@ func ListStarredRepositories(userID int64) ([]*Repository, error) {
 		if err := rows.Scan(
 			&r.ID, &r.OwnerID, &r.OwnerName, &r.Name, &r.Description, &r.IsPrivate, &r.IsFork, &r.ForkParentID,
 			&r.DefaultBranch, &r.NumStars, &r.NumForks, &r.NumWatches, &r.NumIssues, &r.NumPulls, &r.SizeBytes, &r.IsArchived,
-			&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.CreatedAt, &r.UpdatedAt,
+			&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.AllowDownloadAndPulls, &r.CreatedAt, &r.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1368,7 +1377,7 @@ func ListFollowers(userID int64, limit, offset int) ([]*User, error) {
 		limit = 50
 	}
 	query := `
-		SELECT u.id, u.username, u.email, u.full_name, u.avatar_url, u.is_admin, u.is_active,
+		SELECT u.id, u.username, u.email, u.full_name, u.avatar_url, u.is_admin, u.is_active, u.can_download,
 		       u.location, u.website, u.bio, u.max_repo_creation, u.max_org_creation, u.created_at, u.updated_at
 		FROM users u
 		JOIN follows f ON f.follower_id = u.id
@@ -1387,7 +1396,7 @@ func ListFollowers(userID int64, limit, offset int) ([]*User, error) {
 		var u User
 		if err := rows.Scan(
 			&u.ID, &u.Username, &u.Email, &u.FullName, &u.AvatarURL,
-			&u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio,
+			&u.IsAdmin, &u.IsActive, &u.CanDownload, &u.Location, &u.Website, &u.Bio,
 			&u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -1404,7 +1413,7 @@ func ListFollowing(userID int64, limit, offset int) ([]*User, error) {
 		limit = 50
 	}
 	query := `
-		SELECT u.id, u.username, u.email, u.full_name, u.avatar_url, u.is_admin, u.is_active,
+		SELECT u.id, u.username, u.email, u.full_name, u.avatar_url, u.is_admin, u.is_active, u.can_download,
 		       u.location, u.website, u.bio, u.max_repo_creation, u.max_org_creation, u.created_at, u.updated_at
 		FROM users u
 		JOIN follows f ON f.following_id = u.id
@@ -1423,7 +1432,7 @@ func ListFollowing(userID int64, limit, offset int) ([]*User, error) {
 		var u User
 		if err := rows.Scan(
 			&u.ID, &u.Username, &u.Email, &u.FullName, &u.AvatarURL,
-			&u.IsAdmin, &u.IsActive, &u.Location, &u.Website, &u.Bio,
+			&u.IsAdmin, &u.IsActive, &u.CanDownload, &u.Location, &u.Website, &u.Bio,
 			&u.MaxRepoCreation, &u.MaxOrgCreation, &u.CreatedAt, &u.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -1435,56 +1444,122 @@ func ListFollowing(userID int64, limit, offset int) ([]*User, error) {
 	return users, nil
 }
 
+func roleRank(role string) int {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "view_only":
+		return 1
+	case "read":
+		return 2
+	case "write":
+		return 3
+	case "admin":
+		return 4
+	default:
+		return 0
+	}
+}
+
+func IsValidRepoRole(role string) bool {
+	return roleRank(role) > 0
+}
+
+func GetRepoPermissions(user *User, repo *Repository) RepoPermissions {
+	var perms RepoPermissions
+	if repo == nil {
+		return perms
+	}
+
+	isSiteAdmin := user != nil && user.IsAdmin
+	isOwner := user != nil && user.ID == repo.OwnerID
+
+	maxRank := 0
+	hasCollab := false
+	if isSiteAdmin || isOwner {
+		maxRank = 4
+	} else if user != nil {
+		// 1. Direct collaborator check
+		var mode string
+		if err := DB.QueryRow(`SELECT mode FROM collaborators WHERE repo_id = ? AND user_id = ?`, repo.ID, user.ID).Scan(&mode); err == nil {
+			if r := roleRank(mode); r > 0 {
+				hasCollab = true
+				if r > maxRank {
+					maxRank = r
+				}
+			}
+		}
+
+		// 2. Organization check (if repo is owned by an organization)
+		var orgID int64
+		if err := DB.QueryRow(`SELECT id FROM organizations WHERE name = ? COLLATE NOCASE`, repo.OwnerName).Scan(&orgID); err == nil {
+			var role string
+			if err := DB.QueryRow(`SELECT role FROM org_members WHERE org_id = ? AND user_id = ?`, orgID, user.ID).Scan(&role); err == nil {
+				if role == "owner" || role == "admin" {
+					maxRank = 4
+				} else {
+					rows, err := DB.Query(`
+						SELECT t.permission
+						FROM team_members tm
+						JOIN teams t ON tm.team_id = t.id
+						LEFT JOIN team_repos tr ON t.id = tr.team_id
+						WHERE t.org_id = ? AND tm.user_id = ? AND (tr.repo_id = ? OR tr.repo_id IS NULL)
+					`, orgID, user.ID, repo.ID)
+					if err == nil {
+						hasTeam := false
+						bestTeamRank := 0
+						for rows.Next() {
+							var perm string
+							if scanErr := rows.Scan(&perm); scanErr == nil {
+								hasTeam = true
+								if r := roleRank(perm); r > bestTeamRank {
+									bestTeamRank = r
+								}
+							}
+						}
+						_ = rows.Close()
+						if hasTeam {
+							if bestTeamRank > maxRank {
+								maxRank = bestTeamRank
+							}
+						} else if !hasCollab && maxRank < 2 {
+							// Backwards-compatible default for org members with no teams assigned
+							maxRank = 2
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Public repository fallback (only when no explicit collaborator/org/owner grant applied)
+	if maxRank == 0 && !repo.IsPrivate {
+		maxRank = 2
+	}
+
+	perms.Read = maxRank >= 1
+	perms.Write = maxRank >= 3
+	perms.Admin = maxRank >= 4
+	perms.Download = perms.Read && maxRank >= 2
+
+	// Repo setting: when AllowDownloadAndPulls is disabled, block Read, View-Only, and anonymous/public downloads
+	if !repo.AllowDownloadAndPulls && !perms.Write && !perms.Admin {
+		perms.Download = false
+	}
+
+	// Global Admin User Restriction: block all downloads/clones/forks for restricted non-admin accounts
+	if user != nil && !user.CanDownload && !user.IsAdmin {
+		perms.Download = false
+	}
+
+	perms.ViewOnly = perms.Read && !perms.Download
+	return perms
+}
+
 func CanUserAccessRepo(user *User, repo *Repository, writeRequired bool) bool {
-	if !repo.IsPrivate && !writeRequired {
-		return true
+	perms := GetRepoPermissions(user, repo)
+	if writeRequired {
+		return perms.Write
 	}
-	if user == nil {
-		return false
-	}
-	if user.IsAdmin || user.ID == repo.OwnerID {
-		return true
-	}
-
-	// 1. Direct collaborator check
-	var mode string
-	err := DB.QueryRow(`SELECT mode FROM collaborators WHERE repo_id = ? AND user_id = ?`, repo.ID, user.ID).Scan(&mode)
-	if err == nil {
-		if !writeRequired {
-			return true
-		}
-		return mode == "write" || mode == "admin"
-	}
-
-	// 2. Organization check (if repo is owned by an organization)
-	var orgID int64
-	err = DB.QueryRow(`SELECT id FROM organizations WHERE name = ? COLLATE NOCASE`, repo.OwnerName).Scan(&orgID)
-	if err == nil {
-		var role string
-		err = DB.QueryRow(`SELECT role FROM org_members WHERE org_id = ? AND user_id = ?`, orgID, user.ID).Scan(&role)
-		if err == nil {
-			if role == "owner" || role == "admin" {
-				return true
-			}
-			if !writeRequired {
-				return true
-			}
-			// For regular members, check team permissions
-			var count int
-			_ = DB.QueryRow(`
-				SELECT COUNT(*) FROM team_members tm
-				JOIN teams t ON tm.team_id = t.id
-				LEFT JOIN team_repos tr ON t.id = tr.team_id
-				WHERE t.org_id = ? AND tm.user_id = ? AND (t.permission = 'write' OR t.permission = 'admin')
-				AND (tr.repo_id = ? OR tr.repo_id IS NULL)
-			`, orgID, user.ID, repo.ID).Scan(&count)
-			if count > 0 {
-				return true
-			}
-		}
-	}
-
-	return false
+	return perms.Read
 }
 
 // Issue Methods
@@ -2079,8 +2154,12 @@ func ListUserActivities(userID int64, limit int) ([]*Activity, error) {
 // Collaborator Methods
 
 func AddCollaborator(repoID, userID int64, mode string) error {
+	mode = strings.ToLower(strings.TrimSpace(mode))
 	if mode == "" {
 		mode = "write"
+	}
+	if !IsValidRepoRole(mode) {
+		return fmt.Errorf("invalid collaborator mode '%s': must be view_only, read, write, or admin", mode)
 	}
 	_, err := DB.Exec(`
 		INSERT INTO collaborators (repo_id, user_id, mode)
@@ -2355,8 +2434,12 @@ func CreateTeam(orgID int64, name, description, permission string) (*Team, error
 	if name == "" {
 		return nil, fmt.Errorf("team name required")
 	}
+	permission = strings.ToLower(strings.TrimSpace(permission))
 	if permission == "" {
 		permission = "write"
+	}
+	if !IsValidRepoRole(permission) {
+		return nil, fmt.Errorf("invalid team permission '%s': must be view_only, read, write, or admin", permission)
 	}
 	res, err := DB.Exec(`
 		INSERT INTO teams (org_id, name, description, permission)

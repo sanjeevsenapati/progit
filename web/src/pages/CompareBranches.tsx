@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository, Commit, FileDiff } from '../lib/api';
+import { api, Repository, RepoResponse, Commit, FileDiff } from '../lib/api';
 import { navigate } from '../lib/router';
 import { RepoNav } from '../components/RepoNav';
 import { showToast } from '../components/ModalDialog';
-import { GitPullRequest, ArrowRight, GitCommit, FileText, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { GitPullRequest, ArrowRight, GitCommit, FileText, CheckCircle2, AlertTriangle, Ban } from 'lucide-react';
 
 interface CompareBranchesProps {
   owner: string;
@@ -11,7 +11,9 @@ interface CompareBranchesProps {
 }
 
 export const CompareBranches: React.FC<CompareBranchesProps> = ({ owner, repo: repoName }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
+  const cachedRepo = api.getCachedRepo(owner, repoName);
+  const [repoData, setRepoData] = useState<Repository | null>(() => cachedRepo?.repository || null);
+  const [repoPermissions, setRepoPermissions] = useState<RepoResponse['permissions'] | undefined>(cachedRepo?.permissions);
   const [branches, setBranches] = useState<string[]>([]);
   const [baseBranch, setBaseBranch] = useState('main');
   const [headBranch, setHeadBranch] = useState('');
@@ -28,8 +30,13 @@ export const CompareBranches: React.FC<CompareBranchesProps> = ({ owner, repo: r
       try {
         const r = await api.getRepo(owner, repoName);
         setRepoData(r.repository);
+        setRepoPermissions(r.permissions);
         setBranches(r.branches || ['main']);
         setBaseBranch(r.repository.default_branch || 'main');
+
+        if (r.repository.allow_download_and_pulls === false) {
+          return;
+        }
 
         const otherBranches = (r.branches || []).filter(b => b !== r.repository.default_branch);
         if (otherBranches.length > 0) {
@@ -96,9 +103,34 @@ export const CompareBranches: React.FC<CompareBranchesProps> = ({ owner, repo: r
     return <div className="py-20 text-center text-sm text-gray-400">Loading...</div>;
   }
 
+  if (repoData.allow_download_and_pulls === false) {
+    return (
+      <div>
+        <RepoNav repo={repoData} permissions={repoPermissions} activeTab="pulls" />
+        <div className="max-w-xl mx-auto my-12 p-8 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-center space-y-4 shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-800">
+            <Ban className="w-6 h-6" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Pull Requests &amp; Compare Disabled</h2>
+          <p className="text-xs text-gray-500 dark:text-dark-muted leading-relaxed">
+            Downloads and Pull Requests are currently disabled for <strong>{owner}/{repoName}</strong> in Repository Settings.
+          </p>
+          <div className="pt-2">
+            <a
+              href={`/${owner}/${repoName}`}
+              className="inline-flex items-center px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm transition-colors"
+            >
+              Return to repository
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <RepoNav repo={repoData} activeTab="pulls" />
+      <RepoNav repo={repoData} permissions={repoPermissions} activeTab="pulls" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center">

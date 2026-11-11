@@ -51,7 +51,8 @@ Authentication endpoints (`/api/v1/auth/login`, `/api/v1/auth/register`) are rat
 - `GET /api/v1/explore?q={query}` - Public and authorized repository exploration with keyword search.
 - `POST /api/v1/repos` - Create a new repository.
   - Body: `{"name": "my-project", "description": "Demo project", "private": false, "auto_init": true, "readme": "Default"}`
-- `GET /api/v1/repos/:owner/:repo` - Retrieve repository metadata, permissions (`can_write`, `is_admin`), and stats.
+- `GET /api/v1/repos/:owner/:repo` - Retrieve repository metadata, permissions (`admin`, `write`, `read`, `download`, `view_only`), clone URLs (omitted when `download` is false), and stats.
+- `GET /api/v1/repos/:owner/:repo/archive?ref={branch_or_tag}&format=zip` - Download a ZIP archive of the specified branch, tag, or commit. Returns `403 Forbidden` when downloads are restricted for the caller or repository.
 - `POST /api/v1/repos/:owner/:repo/star` - Star or unstar a repository.
 
 ### 2.4 Code Browsing, Branches & Commits
@@ -64,7 +65,7 @@ Authentication endpoints (`/api/v1/auth/login`, `/api/v1/auth/register`) are rat
 - `GET /api/v1/repos/:owner/:repo/commits/:sha` - Get commit details and unified diffs.
 - `GET /api/v1/repos/:owner/:repo/tree?ref=main&path=src` - List files/subdirectories at a path.
 - `GET /api/v1/repos/:owner/:repo/blob?ref=main&path=README.md` - Get file content, size, and encoding.
-- `GET /api/v1/repos/:owner/:repo/raw?ref=main&path=image.png` - Stream raw file bytes with appropriate MIME type.
+- `GET /api/v1/repos/:owner/:repo/raw?ref=main&path=image.png` - Stream raw file bytes with appropriate MIME type (`403 Forbidden` when downloads are restricted).
 - `POST /api/v1/repos/:owner/:repo/contents/:path` - Create or edit a file online and commit to a branch.
   - Body: `{"content": "...", "message": "commit message", "branch": "main"}`
 - `DELETE /api/v1/repos/:owner/:repo/contents/:path` - Delete a file online.
@@ -74,7 +75,7 @@ Authentication endpoints (`/api/v1/auth/login`, `/api/v1/auth/register`) are rat
 ### 2.5 Collaborators & Permissions
 - `GET /api/v1/repos/:owner/:repo/collaborators` - List repository collaborators and permission levels.
 - `PUT /api/v1/repos/:owner/:repo/collaborators/:username` - Add or update collaborator.
-  - Body: `{"mode": "write"}` (`read`, `write`, `admin`)
+  - Body: `{"mode": "write"}` (`view_only`, `read`, `write`, `admin`). `view_only` grants Web UI browsing while blocking Download ZIP, Git clone/pull, raw file downloads, release asset downloads, and forking.
 - `DELETE /api/v1/repos/:owner/:repo/collaborators/:username` - Revoke collaborator access.
 
 ### 2.6 Issues & Assignees
@@ -167,7 +168,7 @@ Headers dispatched on deliveries:
   - Body: `{"slug": "Home", "title": "Home", "content": "# Architecture Overview...", "message": "Initial docs"}`
 - `DELETE /api/v1/repos/:owner/:repo/wiki/pages/:slug` - Delete wiki page. Requires write permissions. Returns `403 Forbidden` if disabled.
 - `GET /api/v1/repos/:owner/:repo/wiki/pages/:slug/history` - Get revision history for a wiki page. Returns `403 Forbidden` if disabled.
-- `PATCH /api/v1/repos/:owner/:repo/settings` - Toggle repository features including `enable_wiki: boolean`. Requires admin permissions.
+- `PATCH /api/v1/repos/:owner/:repo/settings` - Toggle repository features including `enable_wiki: boolean`, `enable_pages: boolean`, and `allow_download_and_pulls: boolean` (disables ZIP/Clone/Raw/Fork for non-write users and disables Pull Requests/Compare repo-wide with `403 Forbidden`). Requires admin permissions.
 
 ### 2.14 ProGit Pages Hosting
 - `GET /api/v1/repos/:owner/:repo/pages` - Inspect ProGit Pages configuration.
@@ -227,6 +228,7 @@ All administrative endpoints require **Super Administrator privileges** (`is_adm
         "full_name": "Super Admin",
         "is_admin": true,
         "is_active": true,
+        "can_download": true,
         "max_repo_creation": -1,
         "max_org_creation": -1,
         "num_repos": 12,
@@ -235,7 +237,7 @@ All administrative endpoints require **Super Administrator privileges** (`is_adm
       }
     ]
     ```
-- `POST /api/v1/admin/users` - Create a new user account with initial role and creation limits.
+- `POST /api/v1/admin/users` - Create a new user account with initial role, `can_download` flag, and creation limits.
   - **Request Body**:
     ```json
     {
@@ -244,23 +246,25 @@ All administrative endpoints require **Super Administrator privileges** (`is_adm
       "password": "TemporaryPassword123!",
       "full_name": "Developer One",
       "is_admin": false,
+      "can_download": true,
       "max_repo_creation": 10,
       "max_org_creation": 2
     }
     ```
   - **Response (201 Created)**: Created User object.
-- `PATCH /api/v1/admin/users/:id` - Update user administrative permissions, active state, or creation limits.
+- `PATCH /api/v1/admin/users/:id` - Update user administrative permissions, active state, `can_download` restriction, or creation limits.
   - **Request Body**:
     ```json
     {
       "is_admin": true,
       "is_active": true,
+      "can_download": true,
       "max_repo_creation": 20,
       "max_org_creation": 5
     }
     ```
   - **Response (200 OK)**: Updated User object.
-  - *Safety Guard*: Super Admins cannot demote (`is_admin: false`) or deactivate (`is_active: false`) their own account.
+  - *Safety Guard*: Super Admins cannot demote (`is_admin: false`), deactivate (`is_active: false`), or restrict downloads (`can_download: false`) on their own account.
 - `DELETE /api/v1/admin/users/:id` - Permanently delete a user account, revoke all tokens, and purge their repository directory on disk (`data/repositories/:username/`).
   - **Response (200 OK)**: `{"message": "User deleted successfully"}`.
   - *Safety Guard*: Super Admins cannot delete their own account.

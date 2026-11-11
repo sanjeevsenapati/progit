@@ -11,6 +11,7 @@ type User struct {
 	AvatarURL       string    `json:"avatar_url"`
 	IsAdmin         bool      `json:"is_admin"`
 	IsActive        bool      `json:"is_active"`
+	CanDownload     bool      `json:"can_download"`
 	Location        string    `json:"location"`
 	Website         string    `json:"website"`
 	Bio             string    `json:"bio"`
@@ -62,13 +63,22 @@ type Repository struct {
 	NumIssues     int       `json:"num_issues"`
 	NumPulls      int       `json:"num_pulls"`
 	SizeBytes     int64     `json:"size_bytes"`
-	IsArchived    bool      `json:"is_archived"`
-	EnableWiki    bool      `json:"enable_wiki"`
-	EnablePages   bool      `json:"enable_pages"`
-	PagesBranch   string    `json:"pages_branch"`
-	PagesFolder   string    `json:"pages_folder"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	IsArchived            bool      `json:"is_archived"`
+	EnableWiki            bool      `json:"enable_wiki"`
+	EnablePages           bool      `json:"enable_pages"`
+	PagesBranch           string    `json:"pages_branch"`
+	PagesFolder           string    `json:"pages_folder"`
+	AllowDownloadAndPulls bool      `json:"allow_download_and_pulls"`
+	CreatedAt             time.Time `json:"created_at"`
+	UpdatedAt             time.Time `json:"updated_at"`
+}
+
+type RepoPermissions struct {
+	Read     bool `json:"read"`
+	Download bool `json:"download"`
+	Write    bool `json:"write"`
+	Admin    bool `json:"admin"`
+	ViewOnly bool `json:"view_only"`
 }
 
 type WikiPageMeta struct {
@@ -248,7 +258,7 @@ type Team struct {
 	OrgID       int64     `json:"org_id"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
-	Permission  string    `json:"permission"` // "read", "write", "admin"
+	Permission  string    `json:"permission"` // "view_only", "read", "write", "admin"
 	NumMembers  int       `json:"num_members,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 }
@@ -267,7 +277,7 @@ type CollaboratorUser struct {
 	Email     string    `json:"email"`
 	FullName  string    `json:"full_name"`
 	AvatarURL string    `json:"avatar_url"`
-	Mode      string    `json:"mode"` // "read", "write", "admin"
+	Mode      string    `json:"mode"` // "view_only", "read", "write", "admin"
 	CreatedAt time.Time `json:"created_at"`
 }
 

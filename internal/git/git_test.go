@@ -1,6 +1,9 @@
 package git
 
 import (
+	"archive/zip"
+	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -356,6 +359,103 @@ func TestSecurityVulnerabilitiesRemediated(t *testing.T) {
 		if err := ImportRepository(u, "/tmp/should-fail.git", "", ""); err == nil {
 			t.Errorf("expected import URL '%s' to be rejected, but succeeded", u)
 		}
+	}
+}
+
+func TestArchiveZipAndRefValidation(t *testing.T) {
+	validRefs := []string{"main", "v1.2.3", "feature/my-branch", "0123456789abcdef"}
+	for _, r := range validRefs {
+		if err := ValidateGitRef(r); err != nil {
+			t.Errorf("expected ValidateGitRef(%q) to succeed, got error: %v", r, err)
+		}
+	}
+
+	invalidRefs := []string{
+		"",
+		"-upload-pack=evil",
+		"../main",
+		"main..other",
+		"/main",
+		"main/",
+		"main//sub",
+		"main@{0}",
+		"main.lock",
+		"bad ref",
+		"bad~1",
+		"bad^",
+		"bad:path",
+		"bad*glob",
+		"bad?char",
+		"bad[0]",
+		"bad\\slash",
+		"bad\nref",
+	}
+	for _, r := range invalidRefs {
+		if err := ValidateGitRef(r); err == nil {
+			t.Errorf("expected ValidateGitRef(%q) to fail, but succeeded", r)
+		}
+	}
+
+	tempDir, err := os.MkdirTemp("", "progit-archive-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	repoPath := filepath.Join(tempDir, "zip-test.git")
+	if err := InitRepositoryWithReadme(repoPath, "zip-test", "Archive test repo", "main", "Tester", "tester@example.com"); err != nil {
+		t.Fatalf("init repo: %v", err)
+	}
+	if _, _, err := SaveFile(repoPath, "main", "src/hello.txt", "hello archive zip!\n", "Tester", "tester@example.com", "Add hello.txt", ""); err != nil {
+		t.Fatalf("SaveFile failed: %v", err)
+	}
+
+	resolvedSHA, err := ResolveRef(repoPath, "main")
+	if err != nil || resolvedSHA == "" {
+		t.Fatalf("ResolveRef failed: sha=%q err=%v", resolvedSHA, err)
+	}
+
+	var buf bytes.Buffer
+	if err := CreateArchiveZip(repoPath, resolvedSHA, "zip-test-main", &buf); err != nil {
+		t.Fatalf("CreateArchiveZip failed: %v", err)
+	}
+
+	zr, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	if err != nil {
+		t.Fatalf("zip.NewReader failed: %v", err)
+	}
+
+	files := make(map[string]string)
+	for _, f := range zr.File {
+		if strings.Contains(f.Name, "/.git/") || strings.HasSuffix(f.Name, "/.git") {
+			t.Errorf("archive should not contain .git metadata: %s", f.Name)
+		}
+		if f.FileInfo().IsDir() {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatalf("open zip entry %s: %v", f.Name, err)
+		}
+		b, _ := io.ReadAll(rc)
+		_ = rc.Close()
+		files[f.Name] = string(b)
+	}
+
+	if _, ok := files["zip-test-main/README.md"]; !ok {
+		t.Errorf("expected zip-test-main/README.md in archive, got keys: %v", files)
+	}
+	if got := files["zip-test-main/src/hello.txt"]; got != "hello archive zip!\n" {
+		t.Errorf("expected hello.txt content %q, got %q", "hello archive zip!\n", got)
+	}
+
+	// Non-existent ref and bad SHA should fail cleanly
+	if _, err := ResolveRef(repoPath, "non-existent-branch"); err == nil {
+		t.Errorf("expected ResolveRef on non-existent branch to fail")
+	}
+	var badBuf bytes.Buffer
+	if err := CreateArchiveZip(repoPath, "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef", "bad", &badBuf); err == nil {
+		t.Errorf("expected CreateArchiveZip on unknown SHA to fail")
 	}
 }
 

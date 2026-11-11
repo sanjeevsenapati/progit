@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
 	"os"
@@ -1631,5 +1632,85 @@ func SearchCode(repoDir, ref, query string) ([]CodeMatch, error) {
 	}
 
 	return matches, nil
+}
+
+// ValidateGitRef validates a branch, tag, or commit ref against control characters,
+// path traversal, flag injection, and invalid git ref syntax.
+func ValidateGitRef(ref string) error {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return fmt.Errorf("ref cannot be empty")
+	}
+	if len(ref) > 256 {
+		return fmt.Errorf("ref too long")
+	}
+	if strings.HasPrefix(ref, "-") {
+		return fmt.Errorf("ref cannot start with '-'")
+	}
+	if strings.HasPrefix(ref, "/") || strings.HasSuffix(ref, "/") || strings.Contains(ref, "//") {
+		return fmt.Errorf("invalid ref path")
+	}
+	if strings.Contains(ref, "..") || strings.Contains(ref, "@{") || strings.HasSuffix(ref, ".lock") {
+		return fmt.Errorf("invalid ref sequence")
+	}
+	for _, r := range ref {
+		if r < 0x20 || r == 0x7f {
+			return fmt.Errorf("ref contains control character")
+		}
+		switch r {
+		case ' ', '~', '^', ':', '?', '*', '[', '\\':
+			return fmt.Errorf("ref contains invalid character")
+		}
+	}
+	return nil
+}
+
+// ResolveRef verifies and resolves a git branch, tag, or commit reference to a canonical commit/tree SHA.
+func ResolveRef(repoPath, ref string) (string, error) {
+	if err := ValidateGitRef(ref); err != nil {
+		return "", err
+	}
+	out, err := RunGit(repoPath, "rev-parse", "--verify", "--end-of-options", ref+"^{commit}")
+	if err != nil {
+		out, err = RunGit(repoPath, "rev-parse", "--verify", "--end-of-options", ref+"^{tree}")
+		if err != nil {
+			return "", err
+		}
+	}
+	sha := strings.TrimSpace(string(out))
+	if sha == "" {
+		return "", fmt.Errorf("empty resolved sha")
+	}
+	return sha, nil
+}
+
+// CreateArchiveZip streams a ZIP archive of resolvedSHA with the given folder prefix to out.
+func CreateArchiveZip(repoPath, resolvedSHA, prefix string, out io.Writer) error {
+	if err := ValidateGitRef(resolvedSHA); err != nil {
+		return err
+	}
+	prefix = strings.Trim(prefix, "/")
+	if abs, err := filepath.Abs(repoPath); err == nil {
+		repoPath = abs
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	args := []string{"-c", "maintenance.autoDetach=false", "-c", "gc.autoDetach=false", "archive", "--format=zip"}
+	if prefix != "" {
+		args = append(args, "--prefix="+prefix+"/")
+	}
+	args = append(args, resolvedSHA)
+
+	cmd := exec.CommandContext(ctx, "git", args...)
+	ConfigureGitCmd(cmd)
+	cmd.Dir = repoPath
+	var stderr bytes.Buffer
+	cmd.Stdout = out
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git archive failed: %w (stderr: %s)", err, stderr.String())
+	}
+	return nil
 }
 

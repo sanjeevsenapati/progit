@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository, Commit, BlameLine } from '../lib/api';
+import { api, Repository, RepoResponse, Commit, BlameLine } from '../lib/api';
 import { navigate } from '../lib/router';
 import { useTheme } from '../lib/theme';
 import { RepoNav } from '../components/RepoNav';
@@ -39,13 +39,16 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
   const { theme } = useTheme();
   const autoEditorTheme: PrettierTheme = theme === 'dark' ? 'prettier-dark' : 'prettier-light';
 
-  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
+  const cachedRepo = api.getCachedRepo(owner, repoName);
+  const [repoData, setRepoData] = useState<Repository | null>(() => cachedRepo?.repository || null);
+  const [repoPermissions, setRepoPermissions] = useState<RepoResponse['permissions'] | undefined>(cachedRepo?.permissions);
   const [branches, setBranches] = useState<string[]>([]);
   const [content, setContent] = useState('');
   const [size, setSize] = useState(0);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [canWrite, setCanWrite] = useState(false);
+  const [canWrite, setCanWrite] = useState(() => Boolean(cachedRepo?.can_write || cachedRepo?.permissions?.write));
+  const [canDownload, setCanDownload] = useState(() => cachedRepo?.permissions ? cachedRepo.permissions.download !== false : true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [latestCommit, setLatestCommit] = useState<Commit | null>(null);
 
@@ -105,8 +108,10 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
           api.getBlob(owner, repoName, branch, filePath),
         ]);
         setRepoData(r.repository);
+        setRepoPermissions(r.permissions);
         setBranches(r.branches || [branch]);
         setCanWrite(Boolean(r.can_write || r.permissions?.write));
+        setCanDownload(r.permissions ? r.permissions.download !== false : true);
         setContent(b.content);
         setSize(b.size);
 
@@ -170,7 +175,7 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
 
   return (
     <div>
-      <RepoNav repo={repoData} activeTab="code" />
+      <RepoNav repo={repoData} permissions={repoPermissions} activeTab="code" />
 
       <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-5">
         {/* Main Content: File Explorer Sidebar + File Content Viewer */}
@@ -370,25 +375,28 @@ export const FileView: React.FC<FileViewProps> = ({ owner, repo: repoName, branc
                     </a>
                   )}
 
-                  {/* Copy Raw */}
-                  <button
-                    type="button"
-                    onClick={handleCopy}
-                    className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text cursor-pointer"
-                  >
-                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copied ? 'Copied' : 'Copy'}</span>
-                  </button>
+                  {/* Copy & Raw Download (hidden when downloads restricted) */}
+                  {canDownload && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleCopy}
+                        className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text cursor-pointer"
+                      >
+                        {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copied ? 'Copied' : 'Copy'}</span>
+                      </button>
 
-                  {/* Raw Download */}
-                  <a
-                    href={`/api/v1/repos/${owner}/${repoName}/raw?ref=${branch}&path=${filePath}`}
-                    download={fileName}
-                    className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Raw</span>
-                  </a>
+                      <a
+                        href={`/api/v1/repos/${owner}/${repoName}/raw?ref=${encodeURIComponent(branch)}&path=${encodeURIComponent(filePath)}`}
+                        download={fileName}
+                        className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Raw</span>
+                      </a>
+                    </>
+                  )}
 
                   {/* Delete file */}
                   {canWrite && (

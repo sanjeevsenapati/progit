@@ -1,9 +1,13 @@
 package api
 
 import (
+	"archive/zip"
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -2755,6 +2759,547 @@ func TestAdminUsersSearch(t *testing.T) {
 	router.ServeHTTP(recEmpty, reqEmpty)
 	if strings.TrimSpace(recEmpty.Body.String()) != "[]" {
 		t.Fatalf("expected empty JSON array [] for no matches, got %s", recEmpty.Body.String())
+	}
+}
+
+func TestDownloadZipAndViewOnlyPermissions(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	passHash, _ := auth.HashPassword("StrongPass123!")
+	adminUser, err := database.CreateUser("zip_admin", "zip_admin@example.com", passHash, "Zip Admin", true)
+	if err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+	ownerUser, _ := database.CreateUser("zip_owner", "zip_owner@example.com", passHash, "Zip Owner", false)
+	viewUser, _ := database.CreateUser("zip_view", "zip_view@example.com", passHash, "Zip View", false)
+	restrictedUser, _ := database.CreateUser("zip_restricted", "zip_restricted@example.com", passHash, "Zip Restricted", false)
+	teamUser, _ := database.CreateUser("zip_teamview", "zip_teamview@example.com", passHash, "Zip Team View", false)
+
+	adminTok := "pgt_zip_admin_tok"
+	ownerTok := "pgt_zip_owner_tok"
+	viewTok := "pgt_zip_view_tok"
+	restrictedTok := "pgt_zip_restricted_tok"
+	teamTok := "pgt_zip_team_tok"
+	_, _ = database.CreateAccessToken(adminUser.ID, "tok", adminTok, "repo,user,admin")
+	_, _ = database.CreateAccessToken(ownerUser.ID, "tok", ownerTok, "repo,user")
+	_, _ = database.CreateAccessToken(viewUser.ID, "tok", viewTok, "repo,user")
+	_, _ = database.CreateAccessToken(restrictedUser.ID, "tok", restrictedTok, "repo,user")
+	_, _ = database.CreateAccessToken(teamUser.ID, "tok", teamTok, "repo,user")
+
+	doJSON := func(method, target, token string, body any) *httptest.ResponseRecorder {
+		var reader io.Reader
+		if body != nil {
+			b, _ := json.Marshal(body)
+			reader = bytes.NewReader(b)
+		}
+		req := httptest.NewRequest(method, target, reader)
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		if body != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		return rec
+	}
+
+	doSmartHTTP := func(method, target, username, secret string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, target, nil)
+		if username != "" {
+			creds := base64.StdEncoding.EncodeToString([]byte(username + ":" + secret))
+			req.Header.Set("Authorization", "Basic "+creds)
+		}
+		rec := httptest.NewRecorder()
+		if handled := git.HandleSmartHTTP(rec, req, router.cfg); !handled {
+			t.Fatalf("HandleSmartHTTP did not handle %s %s", method, target)
+		}
+		return rec
+	}
+
+	// 1. Owner creates public and private repositories with initial README
+	if rec := doJSON("POST", "/api/v1/repos", ownerTok, map[string]any{
+		"name":        "zip-public",
+		"description": "Public ZIP repo",
+		"private":     false,
+		"auto_init":   true,
+	}); rec.Code != http.StatusCreated {
+		t.Fatalf("create zip-public: got %d: %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON("POST", "/api/v1/repos", ownerTok, map[string]any{
+		"name":        "zip-private",
+		"description": "Private ZIP repo",
+		"private":     true,
+		"auto_init":   true,
+	}); rec.Code != http.StatusCreated {
+		t.Fatalf("create zip-private: got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	pubDir := filepath.Join(router.cfg.Repository.Root, ownerUser.Username, "zip-public.git")
+	if _, _, err := git.SaveFile(pubDir, "main", "src/app.go", "package main\n", "Zip Owner", "zip_owner@example.com", "Add app.go", ""); err != nil {
+		t.Fatalf("SaveFile pub: %v", err)
+	}
+	if _, err := git.RunGit(pubDir, "tag", "v1.0.0"); err != nil {
+		t.Fatalf("tag pub: %v", err)
+	}
+
+	// 2. Test Download ZIP endpoint (/archive)
+	recZip := doJSON("GET", "/api/v1/repos/zip_owner/zip-public/archive?ref=v1.0.0&format=zip", "", nil)
+	if recZip.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for public tag zip, got %d: %s", recZip.Code, recZip.Body.String())
+	}
+	if ct := recZip.Header().Get("Content-Type"); ct != "application/zip" {
+		t.Errorf("expected Content-Type application/zip, got %q", ct)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(recZip.Body.Bytes()), int64(recZip.Body.Len()))
+	if err != nil {
+		t.Fatalf("invalid zip payload: %v", err)
+	}
+	hasAppGo := false
+	for _, f := range zr.File {
+		if strings.HasSuffix(f.Name, "/src/app.go") {
+			hasAppGo = true
+		}
+	}
+	if !hasAppGo {
+		t.Errorf("expected src/app.go in tag archive")
+	}
+
+	// Default ref & format fallback
+	if recDef := doJSON("GET", "/api/v1/repos/zip_owner/zip-public/archive", "", nil); recDef.Code != http.StatusOK {
+		t.Errorf("expected 200 OK for default archive fallback, got %d", recDef.Code)
+	}
+	// Unsupported format -> 400
+	if recBadFmt := doJSON("GET", "/api/v1/repos/zip_owner/zip-public/archive?ref=main&format=tar", "", nil); recBadFmt.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for tar format, got %d", recBadFmt.Code)
+	}
+	// Path traversal / invalid ref -> 400
+	if recBadRef := doJSON("GET", "/api/v1/repos/zip_owner/zip-public/archive?ref=..%2Fetc&format=zip", "", nil); recBadRef.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid ref, got %d", recBadRef.Code)
+	}
+	// Non-existent ref -> 404
+	if recMissRef := doJSON("GET", "/api/v1/repos/zip_owner/zip-public/archive?ref=no-such-branch&format=zip", "", nil); recMissRef.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for unknown ref, got %d", recMissRef.Code)
+	}
+	// Private repo anonymous archive -> 404
+	if recPrivAnon := doJSON("GET", "/api/v1/repos/zip_owner/zip-private/archive?ref=main&format=zip", "", nil); recPrivAnon.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for unauthenticated private archive, got %d", recPrivAnon.Code)
+	}
+
+	// 3. Create release + asset on zip-private
+	recRel := doJSON("POST", "/api/v1/repos/zip_owner/zip-private/releases", ownerTok, map[string]any{
+		"tag_name": "v1.0",
+		"title":    "Private Release",
+	})
+	if recRel.Code != http.StatusCreated {
+		t.Fatalf("create release: got %d: %s", recRel.Code, recRel.Body.String())
+	}
+	var relObj struct {
+		ID int64 `json:"id"`
+	}
+	_ = json.Unmarshal(recRel.Body.Bytes(), &relObj)
+
+	var mpBuf bytes.Buffer
+	mw := multipart.NewWriter(&mpBuf)
+	fw, _ := mw.CreateFormFile("file", "artifact.bin")
+	_, _ = fw.Write([]byte("secret-binary-payload"))
+	_ = mw.Close()
+	reqAsset := httptest.NewRequest("POST", fmt.Sprintf("/api/v1/repos/zip_owner/zip-private/releases/%d/assets", relObj.ID), &mpBuf)
+	reqAsset.Header.Set("Authorization", "Bearer "+ownerTok)
+	reqAsset.Header.Set("Content-Type", mw.FormDataContentType())
+	recAsset := httptest.NewRecorder()
+	router.ServeHTTP(recAsset, reqAsset)
+	if recAsset.Code != http.StatusCreated {
+		t.Fatalf("upload release asset: got %d: %s", recAsset.Code, recAsset.Body.String())
+	}
+	var assetObj struct {
+		ID int64 `json:"id"`
+	}
+	_ = json.Unmarshal(recAsset.Body.Bytes(), &assetObj)
+	assetDownloadURL := fmt.Sprintf("/api/v1/repos/zip_owner/zip-private/releases/%d/assets/%d/download", relObj.ID, assetObj.ID)
+
+	// 4. Test 'view_only' Collaborator Role
+	if recBadMode := doJSON("PUT", "/api/v1/repos/zip_owner/zip-private/collaborators/zip_view", ownerTok, map[string]string{"mode": "bogus"}); recBadMode.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid collaborator mode, got %d", recBadMode.Code)
+	}
+	if recAddView := doJSON("PUT", "/api/v1/repos/zip_owner/zip-private/collaborators/zip_view", ownerTok, map[string]string{"mode": "view_only"}); recAddView.Code != http.StatusOK {
+		t.Fatalf("add view_only collaborator: got %d: %s", recAddView.Code, recAddView.Body.String())
+	}
+
+	// View-only user can browse tree/blob/commits, sees view_only=true & empty clone URLs
+	if rec := doJSON("GET", "/api/v1/repos/zip_owner/zip-private/tree", viewTok, nil); rec.Code != http.StatusOK {
+		t.Errorf("view_only user should access /tree (got %d)", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/zip_owner/zip-private/blob?path=README.md", viewTok, nil); rec.Code != http.StatusOK {
+		t.Errorf("view_only user should access /blob (got %d)", rec.Code)
+	}
+	recViewRepo := doJSON("GET", "/api/v1/repos/zip_owner/zip-private", viewTok, nil)
+	if recViewRepo.Code != http.StatusOK {
+		t.Fatalf("view_only get repo: got %d", recViewRepo.Code)
+	}
+	var viewRepoPayload struct {
+		Permissions  database.RepoPermissions `json:"permissions"`
+		CloneURLHTTP string                   `json:"clone_url_http"`
+		CloneURLSSH  string                   `json:"clone_url_ssh"`
+	}
+	_ = json.Unmarshal(recViewRepo.Body.Bytes(), &viewRepoPayload)
+	if !viewRepoPayload.Permissions.ViewOnly || viewRepoPayload.Permissions.Download || !viewRepoPayload.Permissions.Read || viewRepoPayload.Permissions.Write {
+		t.Errorf("unexpected view_only permissions: %+v", viewRepoPayload.Permissions)
+	}
+	if viewRepoPayload.CloneURLHTTP != "" || viewRepoPayload.CloneURLSSH != "" {
+		t.Errorf("expected clone URLs to be hidden for view_only user, got http=%q ssh=%q", viewRepoPayload.CloneURLHTTP, viewRepoPayload.CloneURLSSH)
+	}
+
+	// View-only user blocked (403) on archive, raw, release asset download, fork, Smart HTTP clone/pull
+	if rec := doJSON("GET", "/api/v1/repos/zip_owner/zip-private/archive?ref=main&format=zip", viewTok, nil); rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 on /archive for view_only, got %d", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/zip_owner/zip-private/raw?path=README.md", viewTok, nil); rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 on /raw for view_only, got %d", rec.Code)
+	}
+	if rec := doJSON("GET", assetDownloadURL, viewTok, nil); rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 on release asset download for view_only, got %d", rec.Code)
+	}
+	if rec := doJSON("POST", "/api/v1/repos/zip_owner/zip-private/forks", viewTok, map[string]any{}); rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 on /forks for view_only, got %d", rec.Code)
+	}
+	if rec := doSmartHTTP("GET", "/zip_owner/zip-private.git/info/refs?service=git-upload-pack", "zip_view", viewTok); rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 on Smart HTTP info/refs for view_only, got %d", rec.Code)
+	}
+	if rec := doSmartHTTP("POST", "/zip_owner/zip-private.git/git-upload-pack", "zip_view", viewTok); rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 on Smart HTTP git-upload-pack for view_only, got %d", rec.Code)
+	}
+
+	// 5. Test Global Admin User Restriction (users.can_download = false)
+	// Self-restricting admin returns 400
+	if rec := doJSON("PATCH", fmt.Sprintf("/api/v1/admin/users/%d", adminUser.ID), adminTok, map[string]any{"can_download": false}); rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 when admin tries to restrict self, got %d", rec.Code)
+	}
+	// Make restrictedUser a WRITE collaborator on zip-private to verify global restriction overrides write role
+	_ = database.AddCollaborator(func() int64 {
+		r, _ := database.GetRepositoryByName("zip_owner", "zip-private")
+		return r.ID
+	}(), restrictedUser.ID, "write")
+
+	canDLFalse := false
+	recAdminRestrict := doJSON("PATCH", fmt.Sprintf("/api/v1/admin/users/%d", restrictedUser.ID), adminTok, map[string]any{"can_download": canDLFalse})
+	if recAdminRestrict.Code != http.StatusOK {
+		t.Fatalf("admin restrict download: got %d: %s", recAdminRestrict.Code, recAdminRestrict.Body.String())
+	}
+	var updatedRestricted database.User
+	_ = json.Unmarshal(recAdminRestrict.Body.Bytes(), &updatedRestricted)
+	if updatedRestricted.CanDownload {
+		t.Errorf("expected can_download=false in PATCH response")
+	}
+
+	// Restricted user can browse UI tree & blob, but blocked on all download paths
+	if rec := doJSON("GET", "/api/v1/repos/zip_owner/zip-private/tree", restrictedTok, nil); rec.Code != http.StatusOK {
+		t.Errorf("restricted user should browse /tree, got %d", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/zip_owner/zip-public/archive?ref=main&format=zip", restrictedTok, nil); rec.Code != http.StatusForbidden {
+		t.Errorf("restricted user should get 403 on public repo /archive, got %d", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/zip_owner/zip-private/raw?path=README.md", restrictedTok, nil); rec.Code != http.StatusForbidden {
+		t.Errorf("restricted user should get 403 on /raw, got %d", rec.Code)
+	}
+	if rec := doJSON("GET", assetDownloadURL, restrictedTok, nil); rec.Code != http.StatusForbidden {
+		t.Errorf("restricted user should get 403 on asset download, got %d", rec.Code)
+	}
+	if rec := doJSON("POST", "/api/v1/repos/zip_owner/zip-public/forks", restrictedTok, map[string]any{}); rec.Code != http.StatusForbidden {
+		t.Errorf("restricted user should get 403 on /forks, got %d", rec.Code)
+	}
+	if rec := doSmartHTTP("GET", "/zip_owner/zip-private.git/info/refs?service=git-upload-pack", "zip_restricted", restrictedTok); rec.Code != http.StatusForbidden {
+		t.Errorf("restricted user should get 403 on Smart HTTP upload-pack, got %d", rec.Code)
+	}
+
+	// Admin creates a new user directly with can_download=false
+	recCreateRestr := doJSON("POST", "/api/v1/admin/users", adminTok, map[string]any{
+		"username":     "zip_created_ro",
+		"email":        "zip_created_ro@example.com",
+		"password":     "Password123!",
+		"can_download": false,
+	})
+	if recCreateRestr.Code != http.StatusCreated {
+		t.Fatalf("admin create download-restricted user: got %d: %s", recCreateRestr.Code, recCreateRestr.Body.String())
+	}
+	var createdRO database.User
+	_ = json.Unmarshal(recCreateRestr.Body.Bytes(), &createdRO)
+	if createdRO.CanDownload {
+		t.Errorf("expected created user to have can_download=false")
+	}
+
+	// Admin re-enables downloads for restrictedUser
+	if rec := doJSON("PATCH", fmt.Sprintf("/api/v1/admin/users/%d", restrictedUser.ID), adminTok, map[string]any{"can_download": true}); rec.Code != http.StatusOK {
+		t.Fatalf("admin allow download: got %d", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/zip_owner/zip-private/archive?ref=main&format=zip", restrictedTok, nil); rec.Code != http.StatusOK {
+		t.Errorf("restored user should get 200 on /archive, got %d", rec.Code)
+	}
+	if rec := doJSON("GET", assetDownloadURL, restrictedTok, nil); rec.Code != http.StatusOK {
+		t.Errorf("restored user should get 200 on asset download, got %d", rec.Code)
+	}
+	if rec := doSmartHTTP("GET", "/zip_owner/zip-private.git/info/refs?service=git-upload-pack", "zip_restricted", restrictedTok); rec.Code != http.StatusOK {
+		t.Errorf("restored user should get 200 on Smart HTTP info/refs, got %d", rec.Code)
+	}
+
+	// 6. Test Org Team 'view_only'
+	if rec := doJSON("POST", "/api/v1/orgs", ownerTok, map[string]any{"name": "zip-sec-org", "full_name": "Zip Sec Org"}); rec.Code != http.StatusCreated {
+		t.Fatalf("create org: got %d: %s", rec.Code, rec.Body.String())
+	}
+	org, _ := database.GetOrgByName("zip-sec-org")
+	_ = database.AddOrgMember(org.ID, teamUser.ID, "member")
+
+	recTeam := doJSON("POST", "/api/v1/orgs/zip-sec-org/teams", ownerTok, map[string]any{
+		"name":       "Auditors",
+		"permission": "view_only",
+	})
+	if recTeam.Code != http.StatusCreated {
+		t.Fatalf("create view_only team: got %d: %s", recTeam.Code, recTeam.Body.String())
+	}
+	var teamObj database.Team
+	_ = json.Unmarshal(recTeam.Body.Bytes(), &teamObj)
+	if recMem := doJSON("POST", fmt.Sprintf("/api/v1/orgs/zip-sec-org/teams/%d/members", teamObj.ID), ownerTok, map[string]string{"username": "zip_teamview"}); recMem.Code != http.StatusOK {
+		t.Fatalf("add team member: got %d: %s", recMem.Code, recMem.Body.String())
+	}
+	if recOrgRepo := doJSON("POST", "/api/v1/repos", ownerTok, map[string]any{
+		"owner":     "zip-sec-org",
+		"name":      "org-private",
+		"private":   true,
+		"auto_init": true,
+	}); recOrgRepo.Code != http.StatusCreated {
+		t.Fatalf("create org repo: got %d: %s", recOrgRepo.Code, recOrgRepo.Body.String())
+	}
+
+	if rec := doJSON("GET", "/api/v1/repos/zip-sec-org/org-private/tree", teamTok, nil); rec.Code != http.StatusOK {
+		t.Errorf("org view_only team member should browse /tree, got %d", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/zip-sec-org/org-private/archive?ref=main&format=zip", teamTok, nil); rec.Code != http.StatusForbidden {
+		t.Errorf("org view_only team member should get 403 on /archive, got %d", rec.Code)
+	}
+	if rec := doSmartHTTP("GET", "/zip-sec-org/org-private.git/info/refs?service=git-upload-pack", "zip_teamview", teamTok); rec.Code != http.StatusForbidden {
+		t.Errorf("org view_only team member should get 403 on Smart HTTP upload-pack, got %d", rec.Code)
+	}
+}
+
+func TestRepoAllowDownloadAndPullsCombinedSetting(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	passHash, _ := auth.HashPassword("StrongPass123!")
+	owner, _ := database.CreateUser("comb_owner", "comb_owner@example.com", passHash, "Owner", false)
+	writer, _ := database.CreateUser("comb_writer", "comb_writer@example.com", passHash, "Writer", false)
+	reader, _ := database.CreateUser("comb_reader", "comb_reader@example.com", passHash, "Reader", false)
+	viewer, _ := database.CreateUser("comb_viewer", "comb_viewer@example.com", passHash, "Viewer", false)
+	publicUser, _ := database.CreateUser("comb_public", "comb_public@example.com", passHash, "Public", false)
+	siteAdmin, _ := database.CreateUser("comb_admin", "comb_admin@example.com", passHash, "Admin", true)
+
+	ownerTok := "pgt_comb_owner"
+	writerTok := "pgt_comb_writer"
+	readerTok := "pgt_comb_reader"
+	viewerTok := "pgt_comb_viewer"
+	publicTok := "pgt_comb_public"
+	adminTok := "pgt_comb_admin"
+	_, _ = database.CreateAccessToken(owner.ID, "tok", ownerTok, "repo,user")
+	_, _ = database.CreateAccessToken(writer.ID, "tok", writerTok, "repo,user")
+	_, _ = database.CreateAccessToken(reader.ID, "tok", readerTok, "repo,user")
+	_, _ = database.CreateAccessToken(viewer.ID, "tok", viewerTok, "repo,user")
+	_, _ = database.CreateAccessToken(publicUser.ID, "tok", publicTok, "repo,user")
+	_, _ = database.CreateAccessToken(siteAdmin.ID, "tok", adminTok, "repo,user,admin")
+
+	doJSON := func(method, target, token string, body any) *httptest.ResponseRecorder {
+		var reader io.Reader
+		if body != nil {
+			b, _ := json.Marshal(body)
+			reader = bytes.NewReader(b)
+		}
+		req := httptest.NewRequest(method, target, reader)
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		if body != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		return rec
+	}
+
+	doSmartHTTP := func(method, target, username, secret string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, target, nil)
+		if username != "" {
+			creds := base64.StdEncoding.EncodeToString([]byte(username + ":" + secret))
+			req.Header.Set("Authorization", "Basic "+creds)
+		}
+		rec := httptest.NewRecorder()
+		_ = git.HandleSmartHTTP(rec, req, router.cfg)
+		return rec
+	}
+
+	// 1. Create public repo with a feature branch and an open PR before disabling the setting
+	if rec := doJSON("POST", "/api/v1/repos", ownerTok, map[string]any{
+		"name":      "locked-repo",
+		"private":   false,
+		"auto_init": true,
+	}); rec.Code != http.StatusCreated {
+		t.Fatalf("create repo: got %d: %s", rec.Code, rec.Body.String())
+	}
+	repoDir := filepath.Join(router.cfg.Repository.Root, owner.Username, "locked-repo.git")
+	if err := git.CreateBranch(repoDir, "feature", "main"); err != nil {
+		t.Fatalf("create feature branch: %v", err)
+	}
+	if _, _, err := git.SaveFile(repoDir, "feature", "feature.txt", "feature change\n", "Owner", "comb_owner@example.com", "Feature commit", ""); err != nil {
+		t.Fatalf("SaveFile feature: %v", err)
+	}
+
+	recPR := doJSON("POST", "/api/v1/repos/comb_owner/locked-repo/pulls", ownerTok, map[string]any{
+		"title":       "Initial Feature PR",
+		"content":     "PR body",
+		"head_branch": "feature",
+		"base_branch": "main",
+	})
+	if recPR.Code != http.StatusCreated {
+		t.Fatalf("create initial PR: got %d: %s", recPR.Code, recPR.Body.String())
+	}
+
+	// Add collaborators
+	_ = doJSON("PUT", "/api/v1/repos/comb_owner/locked-repo/collaborators/comb_writer", ownerTok, map[string]string{"mode": "write"})
+	_ = doJSON("PUT", "/api/v1/repos/comb_owner/locked-repo/collaborators/comb_reader", ownerTok, map[string]string{"mode": "read"})
+	_ = doJSON("PUT", "/api/v1/repos/comb_owner/locked-repo/collaborators/comb_viewer", ownerTok, map[string]string{"mode": "view_only"})
+
+	// Non-admin cannot change repo settings
+	if rec := doJSON("PATCH", "/api/v1/repos/comb_owner/locked-repo/settings", readerTok, map[string]any{"allow_download_and_pulls": false}); rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for read collab changing settings, got %d", rec.Code)
+	}
+
+	// 2. Owner disables AllowDownloads & Pull Requests with ONE combined setting
+	recSettings := doJSON("PATCH", "/api/v1/repos/comb_owner/locked-repo/settings", ownerTok, map[string]any{
+		"allow_download_and_pulls": false,
+	})
+	if recSettings.Code != http.StatusOK {
+		t.Fatalf("update settings: got %d: %s", recSettings.Code, recSettings.Body.String())
+	}
+
+	// 3. Anonymous, public user, Read collaborator, and View-Only collaborator can browse UI but CANNOT download/clone/fork
+	for _, tc := range []struct {
+		label string
+		tok   string
+		user  string
+	}{
+		{"anonymous", "", ""},
+		{"public", publicTok, "comb_public"},
+		{"read", readerTok, "comb_reader"},
+		{"view_only", viewerTok, "comb_viewer"},
+	} {
+		if rec := doJSON("GET", "/api/v1/repos/comb_owner/locked-repo/tree", tc.tok, nil); rec.Code != http.StatusOK {
+			t.Errorf("%s should still view /tree (got %d)", tc.label, rec.Code)
+		}
+		if rec := doJSON("GET", "/api/v1/repos/comb_owner/locked-repo/blob?path=README.md", tc.tok, nil); rec.Code != http.StatusOK {
+			t.Errorf("%s should still view /blob (got %d)", tc.label, rec.Code)
+		}
+		recRepo := doJSON("GET", "/api/v1/repos/comb_owner/locked-repo", tc.tok, nil)
+		var rp struct {
+			Repository struct {
+				AllowDownloadAndPulls bool `json:"allow_download_and_pulls"`
+			} `json:"repository"`
+			Permissions  database.RepoPermissions `json:"permissions"`
+			CloneURLHTTP string                   `json:"clone_url_http"`
+		}
+		_ = json.Unmarshal(recRepo.Body.Bytes(), &rp)
+		if rp.Repository.AllowDownloadAndPulls || rp.Permissions.Download || !rp.Permissions.ViewOnly || rp.CloneURLHTTP != "" {
+			t.Errorf("%s unexpected repo payload: %+v", tc.label, rp)
+		}
+		if rec := doJSON("GET", "/api/v1/repos/comb_owner/locked-repo/archive?ref=main&format=zip", tc.tok, nil); rec.Code != http.StatusForbidden {
+			t.Errorf("%s expected 403 on /archive, got %d", tc.label, rec.Code)
+		}
+		if rec := doJSON("GET", "/api/v1/repos/comb_owner/locked-repo/raw?path=README.md", tc.tok, nil); rec.Code != http.StatusForbidden {
+			t.Errorf("%s expected 403 on /raw, got %d", tc.label, rec.Code)
+		}
+		if tc.tok != "" {
+			if rec := doJSON("POST", "/api/v1/repos/comb_owner/locked-repo/forks", tc.tok, map[string]any{}); rec.Code != http.StatusForbidden {
+				t.Errorf("%s expected 403 on /forks, got %d", tc.label, rec.Code)
+			}
+			if rec := doSmartHTTP("GET", "/comb_owner/locked-repo.git/info/refs?service=git-upload-pack", tc.user, tc.tok); rec.Code != http.StatusForbidden {
+				t.Errorf("%s expected 403 on Smart HTTP upload-pack, got %d", tc.label, rec.Code)
+			}
+		} else {
+			// Anonymous Smart HTTP prompts 401 so Write collaborators can authenticate
+			if rec := doSmartHTTP("GET", "/comb_owner/locked-repo.git/info/refs?service=git-upload-pack", "", ""); rec.Code != http.StatusUnauthorized {
+				t.Errorf("anonymous expected 401 auth prompt on Smart HTTP when allow_download_and_pulls=false, got %d", rec.Code)
+			}
+		}
+	}
+
+	// 4. Write collaborator, Owner, and Super Admin STILL succeed on ZIP, Raw, Clone, Fork
+	for _, tc := range []struct {
+		label string
+		tok   string
+		user  string
+	}{
+		{"write", writerTok, "comb_writer"},
+		{"owner", ownerTok, "comb_owner"},
+		{"superadmin", adminTok, "comb_admin"},
+	} {
+		if rec := doJSON("GET", "/api/v1/repos/comb_owner/locked-repo/archive?ref=main&format=zip", tc.tok, nil); rec.Code != http.StatusOK {
+			t.Errorf("%s expected 200 on /archive when allow_download_and_pulls=false, got %d", tc.label, rec.Code)
+		}
+		if rec := doJSON("GET", "/api/v1/repos/comb_owner/locked-repo/raw?path=README.md", tc.tok, nil); rec.Code != http.StatusOK {
+			t.Errorf("%s expected 200 on /raw when allow_download_and_pulls=false, got %d", tc.label, rec.Code)
+		}
+		if rec := doSmartHTTP("GET", "/comb_owner/locked-repo.git/info/refs?service=git-upload-pack", tc.user, tc.tok); rec.Code != http.StatusOK {
+			t.Errorf("%s expected 200 on Smart HTTP upload-pack when allow_download_and_pulls=false, got %d", tc.label, rec.Code)
+		}
+	}
+	if recFork := doJSON("POST", "/api/v1/repos/comb_owner/locked-repo/forks", writerTok, map[string]any{}); recFork.Code != http.StatusCreated {
+		t.Errorf("write collaborator should be able to fork when allow_download_and_pulls=false, got %d: %s", recFork.Code, recFork.Body.String())
+	}
+
+	// 5. ALL Pull Request & Compare endpoints return 403 repo-wide (even for Owner & Write)
+	prChecks := []struct {
+		method string
+		path   string
+		body   any
+	}{
+		{"GET", "/api/v1/repos/comb_owner/locked-repo/pulls", nil},
+		{"POST", "/api/v1/repos/comb_owner/locked-repo/pulls", map[string]any{"title": "Blocked", "head_branch": "feature", "base_branch": "main"}},
+		{"GET", "/api/v1/repos/comb_owner/locked-repo/pulls/1", nil},
+		{"GET", "/api/v1/repos/comb_owner/locked-repo/pulls/1/diff", nil},
+		{"GET", "/api/v1/repos/comb_owner/locked-repo/compare?base=main&head=feature", nil},
+		{"POST", "/api/v1/repos/comb_owner/locked-repo/pulls/1/merge", map[string]any{"merge_style": "merge"}},
+		{"GET", "/api/v1/repos/comb_owner/locked-repo/pulls/1/reviews", nil},
+		{"POST", "/api/v1/repos/comb_owner/locked-repo/pulls/1/reviews", map[string]any{"state": "APPROVED", "content": "LGTM"}},
+		{"GET", "/api/v1/repos/comb_owner/locked-repo/pulls/1/reviews/comments", nil},
+		{"POST", "/api/v1/repos/comb_owner/locked-repo/pulls/1/reviews/comments", map[string]any{"file_path": "README.md", "line_number": 1, "content": "note"}},
+	}
+	for _, chk := range prChecks {
+		if rec := doJSON(chk.method, chk.path, ownerTok, chk.body); rec.Code != http.StatusForbidden {
+			t.Errorf("expected 403 Forbidden for owner %s %s when PRs disabled, got %d: %s", chk.method, chk.path, rec.Code, rec.Body.String())
+		}
+		if rec := doJSON(chk.method, chk.path, writerTok, chk.body); rec.Code != http.StatusForbidden {
+			t.Errorf("expected 403 Forbidden for writer %s %s when PRs disabled, got %d", chk.method, chk.path, rec.Code)
+		}
+	}
+
+	// Private repo existence is still protected (404, not 403) for unauthorized users
+	if rec := doJSON("PATCH", "/api/v1/repos/comb_owner/locked-repo/settings", ownerTok, map[string]any{"is_private": true, "allow_download_and_pulls": false}); rec.Code != http.StatusOK {
+		t.Fatalf("set private: got %d", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/comb_owner/locked-repo/pulls", publicTok, nil); rec.Code != http.StatusNotFound {
+		t.Errorf("unauthorized user on private repo with disabled PRs must receive 404, got %d", rec.Code)
+	}
+
+	// 6. Re-enable AllowDownloads & Pull Requests -> PRs, compare, and Read downloads work again
+	if rec := doJSON("PATCH", "/api/v1/repos/comb_owner/locked-repo/settings", ownerTok, map[string]any{"is_private": false, "allow_download_and_pulls": true}); rec.Code != http.StatusOK {
+		t.Fatalf("re-enable setting: got %d", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/comb_owner/locked-repo/pulls", readerTok, nil); rec.Code != http.StatusOK {
+		t.Errorf("expected 200 OK on /pulls after re-enabling, got %d", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/comb_owner/locked-repo/compare?base=main&head=feature", readerTok, nil); rec.Code != http.StatusOK {
+		t.Errorf("expected 200 OK on /compare after re-enabling, got %d", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/comb_owner/locked-repo/archive?ref=main&format=zip", readerTok, nil); rec.Code != http.StatusOK {
+		t.Errorf("expected 200 OK on /archive for read collab after re-enabling, got %d", rec.Code)
 	}
 }
 

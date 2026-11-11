@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository, PullRequest } from '../lib/api';
+import { api, Repository, RepoResponse, PullRequest } from '../lib/api';
 import { useAuth } from '../lib/theme';
 import { RepoNav } from '../components/RepoNav';
-import { GitPullRequest, CheckCircle2, GitMerge, Plus } from 'lucide-react';
+import { GitPullRequest, CheckCircle2, GitMerge, Plus, Ban } from 'lucide-react';
 
 interface PullsListProps {
   owner: string;
@@ -11,7 +11,9 @@ interface PullsListProps {
 
 export const PullsList: React.FC<PullsListProps> = ({ owner, repo: repoName }) => {
   const { user } = useAuth();
-  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
+  const cachedRepo = api.getCachedRepo(owner, repoName);
+  const [repoData, setRepoData] = useState<Repository | null>(() => cachedRepo?.repository || null);
+  const [repoPermissions, setRepoPermissions] = useState<RepoResponse['permissions'] | undefined>(cachedRepo?.permissions);
   const [pulls, setPulls] = useState<PullRequest[]>([]);
   const [stateFilter, setStateFilter] = useState<'open' | 'closed'>('open');
   const [loading, setLoading] = useState(true);
@@ -21,6 +23,12 @@ export const PullsList: React.FC<PullsListProps> = ({ owner, repo: repoName }) =
       try {
         const r = await api.getRepo(owner, repoName);
         setRepoData(r.repository);
+        setRepoPermissions(r.permissions);
+
+        if (r.repository.allow_download_and_pulls === false) {
+          setPulls([]);
+          return;
+        }
 
         const list = await api.listPulls(owner, repoName, stateFilter);
         setPulls(list || []);
@@ -41,9 +49,34 @@ export const PullsList: React.FC<PullsListProps> = ({ owner, repo: repoName }) =
     return <div className="py-20 text-center text-sm">Repository not found</div>;
   }
 
+  if (repoData.allow_download_and_pulls === false) {
+    return (
+      <div>
+        <RepoNav repo={repoData} permissions={repoPermissions} activeTab="pulls" />
+        <div className="max-w-xl mx-auto my-12 p-8 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-center space-y-4 shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-800">
+            <Ban className="w-6 h-6" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Pull Requests Disabled</h2>
+          <p className="text-xs text-gray-500 dark:text-dark-muted leading-relaxed">
+            Downloads and Pull Requests are currently disabled for <strong>{owner}/{repoName}</strong> in Repository Settings.
+          </p>
+          <div className="pt-2">
+            <a
+              href={`/${owner}/${repoName}`}
+              className="inline-flex items-center px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm transition-colors"
+            >
+              Return to repository
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <RepoNav repo={repoData} activeTab="pulls" />
+      <RepoNav repo={repoData} permissions={repoPermissions} activeTab="pulls" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         <div className="flex items-center justify-between">

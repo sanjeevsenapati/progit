@@ -69,21 +69,41 @@ func HandleSmartHTTP(w http.ResponseWriter, r *http.Request, cfg *config.Config)
 		return true
 	}
 
-	// Authenticate user if private repository or push operation
-	var authUser *database.User
-	if repo.IsPrivate || !isPull {
-		user, ok := authenticateHTTPBasic(r)
-		if !ok {
+	// Authenticate user and verify access/download permissions
+	authUser, hasAuth := authenticateHTTPBasic(r)
+	perms := database.GetRepoPermissions(authUser, repo)
+	if !isPull {
+		if !hasAuth {
 			askBasicAuth(w)
 			return true
 		}
-		if !database.CanUserAccessRepo(user, repo, !isPull) {
+		if !perms.Write {
 			w.Header().Set("Content-Type", "text/plain")
 			w.WriteHeader(http.StatusForbidden)
 			_, _ = w.Write([]byte("Access denied to repository"))
 			return true
 		}
-		authUser = user
+	} else {
+		if !perms.Read {
+			if !hasAuth {
+				askBasicAuth(w)
+				return true
+			}
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte("Access denied to repository"))
+			return true
+		}
+		if !perms.Download {
+			if !hasAuth {
+				askBasicAuth(w)
+				return true
+			}
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte("Repository download and git clone/pull are restricted for your account or this repository"))
+			return true
+		}
 	}
 
 	switch {

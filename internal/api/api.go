@@ -228,6 +228,7 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/tree", r.handleGetTree)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/blob", r.handleGetBlob)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/raw", r.handleGetRaw)
+	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/archive", r.handleDownloadArchive)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/blame", r.handleGetBlame)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/recent-pushes", r.handleGetRecentPushes)
 	r.mux.HandleFunc("GET /api/v1/repos/{owner}/{repo}/code-search", r.handleSearchRepoCode)
@@ -1636,7 +1637,8 @@ func (r *Router) handleGetRepo(w http.ResponseWriter, req *http.Request) {
 		isStarred = database.HasStarred(user.ID, repo.ID)
 	}
 
-	canWrite := database.CanUserAccessRepo(user, repo, true)
+	perms := database.GetRepoPermissions(user, repo)
+	canWrite := perms.Write
 	canAdmin := r.canAdminRepo(user, repo)
 
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
@@ -1644,21 +1646,21 @@ func (r *Router) handleGetRepo(w http.ResponseWriter, req *http.Request) {
 	tags, _ := git.GetTags(repoDir)
 
 	rootURL := strings.TrimRight(r.cfg.Server.RootURL, "/") + "/"
-	httpCloneURL := fmt.Sprintf("%s%s/%s.git", rootURL, owner, repoName)
-	var sshCloneURL string
-	if r.cfg.SSH.Port == 22 {
-		sshCloneURL = fmt.Sprintf("git@%s:%s/%s.git", r.cfg.Server.Domain, owner, repoName)
-	} else {
-		sshCloneURL = fmt.Sprintf("ssh://git@%s:%d/%s/%s.git", r.cfg.Server.Domain, r.cfg.SSH.Port, owner, repoName)
-	}
-	var wikiCloneURLHTTP string
-	var wikiCloneURLSSH string
-	if repo.EnableWiki {
-		wikiCloneURLHTTP = fmt.Sprintf("%s%s/%s.wiki.git", rootURL, owner, repoName)
+	var httpCloneURL, sshCloneURL, wikiCloneURLHTTP, wikiCloneURLSSH string
+	if perms.Download {
+		httpCloneURL = fmt.Sprintf("%s%s/%s.git", rootURL, owner, repoName)
 		if r.cfg.SSH.Port == 22 {
-			wikiCloneURLSSH = fmt.Sprintf("git@%s:%s/%s.wiki.git", r.cfg.Server.Domain, owner, repoName)
+			sshCloneURL = fmt.Sprintf("git@%s:%s/%s.git", r.cfg.Server.Domain, owner, repoName)
 		} else {
-			wikiCloneURLSSH = fmt.Sprintf("ssh://git@%s:%d/%s/%s.wiki.git", r.cfg.Server.Domain, r.cfg.SSH.Port, owner, repoName)
+			sshCloneURL = fmt.Sprintf("ssh://git@%s:%d/%s/%s.git", r.cfg.Server.Domain, r.cfg.SSH.Port, owner, repoName)
+		}
+		if repo.EnableWiki {
+			wikiCloneURLHTTP = fmt.Sprintf("%s%s/%s.wiki.git", rootURL, owner, repoName)
+			if r.cfg.SSH.Port == 22 {
+				wikiCloneURLSSH = fmt.Sprintf("git@%s:%s/%s.wiki.git", r.cfg.Server.Domain, owner, repoName)
+			} else {
+				wikiCloneURLSSH = fmt.Sprintf("ssh://git@%s:%d/%s/%s.wiki.git", r.cfg.Server.Domain, r.cfg.SSH.Port, owner, repoName)
+			}
 		}
 	}
 	pagesURL := fmt.Sprintf("%spages/%s/%s/", rootURL, owner, repoName)
@@ -1668,9 +1670,11 @@ func (r *Router) handleGetRepo(w http.ResponseWriter, req *http.Request) {
 		"is_starred": isStarred,
 		"can_write":  canWrite,
 		"permissions": map[string]bool{
-			"admin": canAdmin,
-			"write": canWrite,
-			"read":  true,
+			"admin":     canAdmin,
+			"write":     perms.Write,
+			"read":      perms.Read,
+			"download":  perms.Download,
+			"view_only": perms.ViewOnly,
 		},
 		"branches":            branches,
 		"tags":                tags,
@@ -2036,8 +2040,13 @@ func (r *Router) handleGetBlob(w http.ResponseWriter, req *http.Request) {
 func (r *Router) handleGetRaw(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
-	_, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	repo, user, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
 	if !ok {
+		return
+	}
+	perms := database.GetRepoPermissions(user, repo)
+	if !perms.Download {
+		jsonError(w, http.StatusForbidden, "Download is restricted for your account or this repository")
 		return
 	}
 	ref := req.URL.Query().Get("ref")
@@ -2052,6 +2061,81 @@ func (r *Router) handleGetRaw(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(bytes)
+}
+
+func (r *Router) handleDownloadArchive(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+
+	repo, user, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
+		return
+	}
+
+	perms := database.GetRepoPermissions(user, repo)
+	if !perms.Download {
+		jsonError(w, http.StatusForbidden, "Download is restricted for your account or this repository")
+		return
+	}
+
+	format := strings.ToLower(strings.TrimSpace(req.URL.Query().Get("format")))
+	if format != "" && format != "zip" {
+		jsonError(w, http.StatusBadRequest, "Unsupported archive format: only zip is supported")
+		return
+	}
+
+	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
+	rawRef := strings.TrimSpace(req.URL.Query().Get("ref"))
+	ref := rawRef
+	if ref == "" {
+		ref = repo.DefaultBranch
+		if ref == "" {
+			ref = git.GetDefaultBranch(repoDir)
+		}
+	}
+
+	if err := git.ValidateGitRef(ref); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid reference")
+		return
+	}
+
+	resolvedSHA, err := git.ResolveRef(repoDir, ref)
+	if err != nil && rawRef == "" {
+		if fallback := git.GetDefaultBranch(repoDir); fallback != "" && fallback != ref {
+			if sha, err2 := git.ResolveRef(repoDir, fallback); err2 == nil {
+				ref = fallback
+				resolvedSHA = sha
+				err = nil
+			}
+		}
+		if err != nil {
+			if branches, bErr := git.GetBranches(repoDir); bErr == nil && len(branches) > 0 {
+				if sha, err2 := git.ResolveRef(repoDir, branches[0]); err2 == nil {
+					ref = branches[0]
+					resolvedSHA = sha
+					err = nil
+				}
+			}
+		}
+	}
+	if err != nil {
+		jsonError(w, http.StatusNotFound, "Repository is empty or reference not found")
+		return
+	}
+
+	safeName := strings.NewReplacer("/", "-", "\\", "-", "\"", "", "\r", "", "\n", "").Replace(repo.Name)
+	safeRef := strings.NewReplacer("/", "-", "\\", "-", "\"", "", "\r", "", "\n", "", "..", "-").Replace(ref)
+	prefix := fmt.Sprintf("%s-%s", safeName, safeRef)
+	filename := prefix + ".zip"
+
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+
+	if err := git.CreateArchiveZip(repoDir, resolvedSHA, prefix, w); err != nil {
+		log.Printf("[ProGit] Failed to create archive zip for %s/%s@%s: %v", owner, repoName, ref, err)
+	}
 }
 
 // Online File Operations Handlers
@@ -2643,6 +2727,10 @@ func (r *Router) handleListPulls(w http.ResponseWriter, req *http.Request) {
 	if !ok {
 		return
 	}
+	if !repo.AllowDownloadAndPulls {
+		jsonError(w, http.StatusForbidden, "Pull requests are disabled for this repository")
+		return
+	}
 
 	issues, err := database.ListIssues(repo.ID, true, state)
 	if err != nil {
@@ -2674,6 +2762,14 @@ func (r *Router) handleCreatePull(w http.ResponseWriter, req *http.Request) {
 	repo, err := database.GetRepositoryByName(owner, repoName)
 	if err != nil || repo == nil {
 		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+	if !database.CanUserAccessRepo(user, repo, false) {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+	if !repo.AllowDownloadAndPulls {
+		jsonError(w, http.StatusForbidden, "Pull requests are disabled for this repository")
 		return
 	}
 
@@ -2723,6 +2819,10 @@ func (r *Router) handleGetPull(w http.ResponseWriter, req *http.Request) {
 	if !ok {
 		return
 	}
+	if !repo.AllowDownloadAndPulls {
+		jsonError(w, http.StatusForbidden, "Pull requests are disabled for this repository")
+		return
+	}
 
 	issue, err := database.GetIssueByIndex(repo.ID, index)
 	if err != nil || issue == nil || !issue.IsPull {
@@ -2747,6 +2847,10 @@ func (r *Router) handleGetPullDiff(w http.ResponseWriter, req *http.Request) {
 
 	repo, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
 	if !ok {
+		return
+	}
+	if !repo.AllowDownloadAndPulls {
+		jsonError(w, http.StatusForbidden, "Pull requests are disabled for this repository")
 		return
 	}
 
@@ -2775,8 +2879,12 @@ func (r *Router) handleGetPullDiff(w http.ResponseWriter, req *http.Request) {
 func (r *Router) handleCompareBranches(w http.ResponseWriter, req *http.Request) {
 	owner := req.PathValue("owner")
 	repoName := req.PathValue("repo")
-	_, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	repo, _, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
 	if !ok {
+		return
+	}
+	if !repo.AllowDownloadAndPulls {
+		jsonError(w, http.StatusForbidden, "Pull requests are disabled for this repository")
 		return
 	}
 	base := req.URL.Query().Get("base")
@@ -2809,6 +2917,14 @@ func (r *Router) handleMergePull(w http.ResponseWriter, req *http.Request) {
 	repo, err := database.GetRepositoryByName(owner, repoName)
 	if err != nil || repo == nil {
 		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+	if !database.CanUserAccessRepo(user, repo, false) {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+	if !repo.AllowDownloadAndPulls {
+		jsonError(w, http.StatusForbidden, "Pull requests are disabled for this repository")
 		return
 	}
 
@@ -2906,6 +3022,10 @@ func (r *Router) handleListPullReviews(w http.ResponseWriter, req *http.Request)
 	if !ok {
 		return
 	}
+	if !repo.AllowDownloadAndPulls {
+		jsonError(w, http.StatusForbidden, "Pull requests are disabled for this repository")
+		return
+	}
 
 	issue, err := database.GetIssueByIndex(repo.ID, index)
 	if err != nil || issue == nil {
@@ -2945,6 +3065,14 @@ func (r *Router) handleCreatePullReview(w http.ResponseWriter, req *http.Request
 	repo, err := database.GetRepositoryByName(owner, repoName)
 	if err != nil || repo == nil {
 		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+	if !database.CanUserAccessRepo(user, repo, false) {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+	if !repo.AllowDownloadAndPulls {
+		jsonError(w, http.StatusForbidden, "Pull requests are disabled for this repository")
 		return
 	}
 
@@ -2989,6 +3117,10 @@ func (r *Router) handleListPullReviewComments(w http.ResponseWriter, req *http.R
 	if !ok {
 		return
 	}
+	if !repo.AllowDownloadAndPulls {
+		jsonError(w, http.StatusForbidden, "Pull requests are disabled for this repository")
+		return
+	}
 
 	issue, err := database.GetIssueByIndex(repo.ID, index)
 	if err != nil || issue == nil {
@@ -3022,6 +3154,14 @@ func (r *Router) handleCreatePullReviewComment(w http.ResponseWriter, req *http.
 	repo, err := database.GetRepositoryByName(owner, repoName)
 	if err != nil || repo == nil {
 		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+	if !database.CanUserAccessRepo(user, repo, false) {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+	if !repo.AllowDownloadAndPulls {
+		jsonError(w, http.StatusForbidden, "Pull requests are disabled for this repository")
 		return
 	}
 
@@ -3076,9 +3216,14 @@ func (r *Router) handleForkRepo(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Permission to access parent repository
-	if !database.CanUserAccessRepo(user, parentRepo, false) {
+	// Permission to access and download parent repository
+	perms := database.GetRepoPermissions(user, parentRepo)
+	if !perms.Read {
 		jsonError(w, http.StatusForbidden, "Cannot fork private repository without access")
+		return
+	}
+	if !perms.Download {
+		jsonError(w, http.StatusForbidden, "Forking and code downloads are restricted for your account or this repository")
 		return
 	}
 
@@ -3515,7 +3660,7 @@ func (r *Router) handleUpdatePagesConfig(w http.ResponseWriter, req *http.Reques
 		body.PagesFolder = "/"
 	}
 
-	if err := database.UpdateRepositorySettings(repo.ID, repo.Description, repo.IsPrivate, repo.EnableWiki, body.EnablePages, body.PagesBranch, body.PagesFolder); err != nil {
+	if err := database.UpdateRepositorySettings(repo.ID, repo.Description, repo.IsPrivate, repo.EnableWiki, body.EnablePages, body.PagesBranch, body.PagesFolder, repo.AllowDownloadAndPulls); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -3553,12 +3698,13 @@ func (r *Router) handleUpdateRepoSettings(w http.ResponseWriter, req *http.Reque
 	}
 
 	var body struct {
-		Description *string `json:"description"`
-		IsPrivate   *bool   `json:"is_private"`
-		EnableWiki  *bool   `json:"enable_wiki"`
-		EnablePages *bool   `json:"enable_pages"`
-		PagesBranch *string `json:"pages_branch"`
-		PagesFolder *string `json:"pages_folder"`
+		Description           *string `json:"description"`
+		IsPrivate             *bool   `json:"is_private"`
+		EnableWiki            *bool   `json:"enable_wiki"`
+		EnablePages           *bool   `json:"enable_pages"`
+		PagesBranch           *string `json:"pages_branch"`
+		PagesFolder           *string `json:"pages_folder"`
+		AllowDownloadAndPulls *bool   `json:"allow_download_and_pulls"`
 	}
 	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 		jsonError(w, http.StatusBadRequest, "Invalid request body")
@@ -3581,6 +3727,10 @@ func (r *Router) handleUpdateRepoSettings(w http.ResponseWriter, req *http.Reque
 	if body.EnablePages != nil {
 		pages = *body.EnablePages
 	}
+	allowDownloadAndPulls := repo.AllowDownloadAndPulls
+	if body.AllowDownloadAndPulls != nil {
+		allowDownloadAndPulls = *body.AllowDownloadAndPulls
+	}
 	pBranch := repo.PagesBranch
 	if body.PagesBranch != nil {
 		pBranch = strings.TrimSpace(*body.PagesBranch)
@@ -3599,7 +3749,7 @@ func (r *Router) handleUpdateRepoSettings(w http.ResponseWriter, req *http.Reque
 		pFolder = "/"
 	}
 
-	if err := database.UpdateRepositorySettings(repo.ID, desc, priv, wiki, pages, pBranch, pFolder); err != nil {
+	if err := database.UpdateRepositorySettings(repo.ID, desc, priv, wiki, pages, pBranch, pFolder, allowDownloadAndPulls); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -4431,6 +4581,7 @@ func (r *Router) handleAdminCreateUser(w http.ResponseWriter, req *http.Request)
 		Password        string `json:"password"`
 		FullName        string `json:"full_name"`
 		IsAdmin         bool   `json:"is_admin"`
+		CanDownload     *bool  `json:"can_download"`
 		MaxRepoCreation *int   `json:"max_repo_creation"`
 		MaxOrgCreation  *int   `json:"max_org_creation"`
 	}
@@ -4470,8 +4621,13 @@ func (r *Router) handleAdminCreateUser(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
+	if body.CanDownload != nil {
+		_ = database.UpdateUserDownload(newUser.ID, *body.CanDownload)
+	}
 	if body.MaxRepoCreation != nil || body.MaxOrgCreation != nil {
 		_ = database.UpdateUserLimits(newUser.ID, body.MaxRepoCreation, body.MaxOrgCreation)
+	}
+	if body.CanDownload != nil || body.MaxRepoCreation != nil || body.MaxOrgCreation != nil {
 		if refreshed, err := database.GetUserByID(newUser.ID); err == nil && refreshed != nil {
 			newUser = refreshed
 		}
@@ -4504,6 +4660,7 @@ func (r *Router) handleAdminUpdateUser(w http.ResponseWriter, req *http.Request)
 	var body struct {
 		IsAdmin         *bool `json:"is_admin"`
 		IsActive        *bool `json:"is_active"`
+		CanDownload     *bool `json:"can_download"`
 		MaxRepoCreation *int  `json:"max_repo_creation"`
 		MaxOrgCreation  *int  `json:"max_org_creation"`
 	}
@@ -4512,7 +4669,7 @@ func (r *Router) handleAdminUpdateUser(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	// Safety check: Cannot demote or deactivate yourself
+	// Safety check: Cannot demote, deactivate, or restrict downloads on yourself
 	if targetUser.ID == currentAdmin.ID {
 		if body.IsAdmin != nil && !*body.IsAdmin {
 			jsonError(w, http.StatusBadRequest, "You cannot remove administrator privileges from yourself")
@@ -4520,6 +4677,10 @@ func (r *Router) handleAdminUpdateUser(w http.ResponseWriter, req *http.Request)
 		}
 		if body.IsActive != nil && !*body.IsActive {
 			jsonError(w, http.StatusBadRequest, "You cannot deactivate your own account")
+			return
+		}
+		if body.CanDownload != nil && !*body.CanDownload {
+			jsonError(w, http.StatusBadRequest, "You cannot restrict code downloads on your own administrator account")
 			return
 		}
 	}
@@ -4535,6 +4696,13 @@ func (r *Router) handleAdminUpdateUser(w http.ResponseWriter, req *http.Request)
 			jsonError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+	}
+	if body.CanDownload != nil {
+		if err := database.UpdateUserDownload(targetID, *body.CanDownload); err != nil {
+			jsonError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		database.CreateActivity(currentAdmin.ID, currentAdmin.Username, nil, "", "admin_update_user", fmt.Sprintf("Admin updated @%s download permission (can_download=%v)", targetUser.Username, *body.CanDownload))
 	}
 	if body.MaxRepoCreation != nil || body.MaxOrgCreation != nil {
 		if err := database.UpdateUserLimits(targetID, body.MaxRepoCreation, body.MaxOrgCreation); err != nil {
@@ -4800,8 +4968,13 @@ func (r *Router) handleAddCollaborator(w http.ResponseWriter, req *http.Request)
 		Mode string `json:"mode"`
 	}
 	_ = json.NewDecoder(req.Body).Decode(&body)
+	body.Mode = strings.ToLower(strings.TrimSpace(body.Mode))
 	if body.Mode == "" {
 		body.Mode = "write"
+	}
+	if !database.IsValidRepoRole(body.Mode) {
+		jsonError(w, http.StatusBadRequest, "Invalid collaborator mode: must be view_only, read, write, or admin")
+		return
 	}
 
 	if err := database.AddCollaborator(repo.ID, targetUser.ID, body.Mode); err != nil {
@@ -5615,7 +5788,16 @@ func (r *Router) handleCreateOrgTeam(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	team, err := database.CreateTeam(org.ID, body.Name, body.Description, body.Permission)
+	perm := strings.ToLower(strings.TrimSpace(body.Permission))
+	if perm == "" {
+		perm = "write"
+	}
+	if !database.IsValidRepoRole(perm) {
+		jsonError(w, http.StatusBadRequest, "Invalid team permission: must be view_only, read, write, or admin")
+		return
+	}
+
+	team, err := database.CreateTeam(org.ID, body.Name, body.Description, perm)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -6927,9 +7109,28 @@ func (r *Router) handleUploadReleaseAsset(w http.ResponseWriter, req *http.Reque
 }
 
 func (r *Router) handleDownloadReleaseAsset(w http.ResponseWriter, req *http.Request) {
+	owner := req.PathValue("owner")
+	repoName := req.PathValue("repo")
+	repo, user, ok := r.getRepoWithAccess(w, req, owner, repoName, false)
+	if !ok {
+		return
+	}
+	perms := database.GetRepoPermissions(user, repo)
+	if !perms.Download {
+		jsonError(w, http.StatusForbidden, "Download is restricted for your account or this repository")
+		return
+	}
+
+	releaseID, _ := strconv.ParseInt(req.PathValue("id"), 10, 64)
+	rel, err := database.GetReleaseByID(releaseID)
+	if err != nil || rel == nil || rel.RepoID != repo.ID {
+		jsonError(w, http.StatusNotFound, "Release not found")
+		return
+	}
+
 	assetID, _ := strconv.ParseInt(req.PathValue("asset_id"), 10, 64)
 	asset, err := database.GetReleaseAsset(assetID)
-	if err != nil || asset == nil {
+	if err != nil || asset == nil || asset.ReleaseID != rel.ID {
 		jsonError(w, http.StatusNotFound, "Release asset not found")
 		return
 	}

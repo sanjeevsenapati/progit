@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository, BranchDetail } from '../lib/api';
+import { api, Repository, RepoResponse, BranchDetail } from '../lib/api';
 import { RepoNav } from '../components/RepoNav';
 import { 
   GitBranch, 
@@ -25,6 +25,7 @@ interface BranchesProps {
 export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => {
   const cachedRepo = api.getCachedRepo(owner, repoName);
   const [repoData, setRepoData] = useState<Repository | null>(() => cachedRepo?.repository || null);
+  const [repoPermissions, setRepoPermissions] = useState<RepoResponse['permissions'] | undefined>(cachedRepo?.permissions);
   const [branchDetails, setBranchDetails] = useState<BranchDetail[]>([]);
   const [filterQuery, setFilterQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'all'>('overview');
@@ -48,6 +49,7 @@ export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => 
       setLoading(true);
       const r = await api.getRepo(owner, repoName);
       setRepoData(r.repository);
+      setRepoPermissions(r.permissions);
       setCanWrite(Boolean(r.can_write || r.permissions?.write));
       setBaseBranch(r.repository.default_branch || 'main');
 
@@ -153,6 +155,7 @@ export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => 
   }
 
   const defaultBranchName = repoData.default_branch || 'main';
+  const pullsEnabled = repoData.allow_download_and_pulls !== false;
   const defaultBranchObj = branchDetails.find(b => b.is_default || b.name === defaultBranchName);
   const otherBranches = branchDetails.filter(b => !(b.is_default || b.name === defaultBranchName));
 
@@ -165,7 +168,7 @@ export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => 
 
   return (
     <div>
-      <RepoNav repo={repoData} activeTab="branches" />
+      <RepoNav repo={repoData} permissions={repoPermissions} activeTab="branches" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Header & Controls */}
@@ -353,14 +356,16 @@ export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => 
 
                       <div className="flex items-center space-x-2 shrink-0">
                         {/* Compare / New Pull Request */}
-                        <a
-                          href={`/${owner}/${repoName}/compare?base=${defaultBranchName}&head=${b.name}`}
-                          className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold rounded-md border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover hover:bg-gray-50 text-gray-700 dark:text-dark-text shadow-sm"
-                          title="Compare and create a pull request"
-                        >
-                          <GitPullRequest className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                          <span>New pull request</span>
-                        </a>
+                        {pullsEnabled && (
+                          <a
+                            href={`/${owner}/${repoName}/compare?base=${defaultBranchName}&head=${b.name}`}
+                            className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold rounded-md border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover hover:bg-gray-50 text-gray-700 dark:text-dark-text shadow-sm"
+                            title="Compare and create a pull request"
+                          >
+                            <GitPullRequest className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span>New pull request</span>
+                          </a>
+                        )}
 
                         {/* Delete branch */}
                         {canWrite && (
@@ -435,13 +440,15 @@ export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => 
                   <div className="flex items-center space-x-2 shrink-0">
                     {!(b.is_default || b.name === defaultBranchName) && (
                       <>
-                        <a
-                          href={`/${owner}/${repoName}/compare?base=${defaultBranchName}&head=${b.name}`}
-                          className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold rounded-md border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover hover:bg-gray-50 text-gray-700 dark:text-dark-text shadow-sm"
-                        >
-                          <GitPullRequest className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                          <span>Compare</span>
-                        </a>
+                        {pullsEnabled && (
+                          <a
+                            href={`/${owner}/${repoName}/compare?base=${defaultBranchName}&head=${b.name}`}
+                            className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold rounded-md border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover hover:bg-gray-50 text-gray-700 dark:text-dark-text shadow-sm"
+                          >
+                            <GitPullRequest className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span>Compare</span>
+                          </a>
+                        )}
 
                         {canWrite && (
                           <button

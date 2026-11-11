@@ -379,3 +379,172 @@ func TestForksAndPullReviews(t *testing.T) {
 		t.Errorf("expected 2 inline review comments, got %d", len(allInline))
 	}
 }
+
+func TestDownloadPermissionsAndViewOnly(t *testing.T) {
+	_, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	hash := "$2a$10$dummyhashfortesting0000000000000000000000000000000000000"
+	admin, err := CreateUser("perm-admin", "perm-admin@example.com", hash, "Super Admin", true)
+	if err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+	owner, _ := CreateUser("perm-owner", "perm-owner@example.com", hash, "Owner", false)
+	viewUser, _ := CreateUser("perm-view", "perm-view@example.com", hash, "View Only User", false)
+	readUser, _ := CreateUser("perm-read", "perm-read@example.com", hash, "Read User", false)
+	writeUser, _ := CreateUser("perm-write", "perm-write@example.com", hash, "Write User", false)
+	collabAdmin, _ := CreateUser("perm-cadmin", "perm-cadmin@example.com", hash, "Repo Admin Collab", false)
+	publicUser, _ := CreateUser("perm-public", "perm-public@example.com", hash, "Public Visitor", false)
+
+	// 1. Validate repo roles
+	for _, role := range []string{"view_only", "read", "write", "admin"} {
+		if !IsValidRepoRole(role) {
+			t.Errorf("expected IsValidRepoRole(%q) = true", role)
+		}
+	}
+	for _, invalid := range []string{"", "owner", "superuser"} {
+		if IsValidRepoRole(invalid) {
+			t.Errorf("expected IsValidRepoRole(%q) = false", invalid)
+		}
+	}
+
+	privRepo, err := CreateRepository(owner.ID, "priv-dl-repo", "Private repo", true)
+	if err != nil {
+		t.Fatalf("create private repo: %v", err)
+	}
+	if err := AddCollaborator(privRepo.ID, viewUser.ID, "invalid_role"); err == nil {
+		t.Errorf("expected error for invalid collaborator role")
+	}
+	if err := AddCollaborator(privRepo.ID, viewUser.ID, "view_only"); err != nil {
+		t.Fatalf("add view_only collaborator: %v", err)
+	}
+	if err := AddCollaborator(privRepo.ID, readUser.ID, "read"); err != nil {
+		t.Fatalf("add read collaborator: %v", err)
+	}
+	if err := AddCollaborator(privRepo.ID, writeUser.ID, "write"); err != nil {
+		t.Fatalf("add write collaborator: %v", err)
+	}
+	if err := AddCollaborator(privRepo.ID, collabAdmin.ID, "admin"); err != nil {
+		t.Fatalf("add admin collaborator: %v", err)
+	}
+
+	// Private repo permissions matrix
+	pView := GetRepoPermissions(viewUser, privRepo)
+	if !pView.Read || pView.Write || pView.Admin || pView.Download || !pView.ViewOnly {
+		t.Errorf("unexpected view_only perms: %+v", pView)
+	}
+	pRead := GetRepoPermissions(readUser, privRepo)
+	if !pRead.Read || pRead.Write || !pRead.Download || pRead.ViewOnly {
+		t.Errorf("unexpected read perms: %+v", pRead)
+	}
+	pWrite := GetRepoPermissions(writeUser, privRepo)
+	if !pWrite.Read || !pWrite.Write || pWrite.Admin || !pWrite.Download || pWrite.ViewOnly {
+		t.Errorf("unexpected write perms: %+v", pWrite)
+	}
+	pCollabAdmin := GetRepoPermissions(collabAdmin, privRepo)
+	if !pCollabAdmin.Read || !pCollabAdmin.Write || !pCollabAdmin.Admin || !pCollabAdmin.Download {
+		t.Errorf("unexpected admin collab perms: %+v", pCollabAdmin)
+	}
+	pPublicOnPriv := GetRepoPermissions(publicUser, privRepo)
+	if pPublicOnPriv.Read || pPublicOnPriv.Download {
+		t.Errorf("outsider should have no access to private repo: %+v", pPublicOnPriv)
+	}
+
+	// 2. Org team with view_only permission
+	org, err := CreateOrganization("sec-org", "Security Org", "", "", "", owner.ID)
+	if err != nil {
+		t.Fatalf("create org: %v", err)
+	}
+	if _, err := CreateTeam(org.ID, "bad-team", "", "bogus"); err == nil {
+		t.Errorf("expected error for invalid team permission")
+	}
+	viewTeam, err := CreateTeam(org.ID, "Contractors", "External reviewers", "view_only")
+	if err != nil {
+		t.Fatalf("create view_only team: %v", err)
+	}
+	_ = AddOrgMember(org.ID, publicUser.ID, "member")
+	_ = AddTeamMember(viewTeam.ID, publicUser.ID)
+
+	orgUser, _ := GetUserByUsername("sec-org")
+	orgRepo, err := CreateRepository(orgUser.ID, "org-vault", "Org private repo", true)
+	if err != nil {
+		t.Fatalf("create org repo: %v", err)
+	}
+	pOrgView := GetRepoPermissions(publicUser, orgRepo)
+	if !pOrgView.Read || pOrgView.Write || pOrgView.Download || !pOrgView.ViewOnly {
+		t.Errorf("expected org view_only team member to have ViewOnly=true, Download=false; got %+v", pOrgView)
+	}
+
+	// 3. Global User Download Restriction (users.can_download = false)
+	if err := UpdateUserDownload(writeUser.ID, false); err != nil {
+		t.Fatalf("UpdateUserDownload failed: %v", err)
+	}
+	writeUserUpdated, _ := GetUserByID(writeUser.ID)
+	if writeUserUpdated.CanDownload {
+		t.Errorf("expected writeUserUpdated.CanDownload == false")
+	}
+	pRestrictedWrite := GetRepoPermissions(writeUserUpdated, privRepo)
+	if !pRestrictedWrite.Read || !pRestrictedWrite.Write || pRestrictedWrite.Download || !pRestrictedWrite.ViewOnly {
+		t.Errorf("restricted user should have Download=false, ViewOnly=true even as write collaborator: %+v", pRestrictedWrite)
+	}
+	// Restricted owner cannot download either
+	_ = UpdateUserDownload(owner.ID, false)
+	ownerRestricted, _ := GetUserByID(owner.ID)
+	pOwnerRestricted := GetRepoPermissions(ownerRestricted, privRepo)
+	if !pOwnerRestricted.Admin || pOwnerRestricted.Download || !pOwnerRestricted.ViewOnly {
+		t.Errorf("restricted non-admin owner should have Download=false: %+v", pOwnerRestricted)
+	}
+	// Super Admin remains immune to can_download=false
+	_ = UpdateUserDownload(admin.ID, false)
+	adminUpdated, _ := GetUserByID(admin.ID)
+	pSuperAdmin := GetRepoPermissions(adminUpdated, privRepo)
+	if !pSuperAdmin.Admin || !pSuperAdmin.Download || pSuperAdmin.ViewOnly {
+		t.Errorf("Super Admin should stay immune to download restriction: %+v", pSuperAdmin)
+	}
+	// Restore owner and writeUser
+	_ = UpdateUserDownload(owner.ID, true)
+	_ = UpdateUserDownload(writeUser.ID, true)
+	ownerRestored, _ := GetUserByID(owner.ID)
+	writeRestored, _ := GetUserByID(writeUser.ID)
+
+	// 4. Combined Repository Setting: AllowDownloadAndPulls = false
+	pubRepo, err := CreateRepository(ownerRestored.ID, "pub-restricted-repo", "Public repo", false)
+	if err != nil {
+		t.Fatalf("create pub repo: %v", err)
+	}
+	_ = AddCollaborator(pubRepo.ID, writeRestored.ID, "write")
+	_ = AddCollaborator(pubRepo.ID, readUser.ID, "read")
+	_ = AddCollaborator(pubRepo.ID, viewUser.ID, "view_only")
+	_ = AddCollaborator(pubRepo.ID, collabAdmin.ID, "admin")
+
+	if err := UpdateRepositorySettings(pubRepo.ID, pubRepo.Description, false, pubRepo.EnableWiki, pubRepo.EnablePages, pubRepo.PagesBranch, pubRepo.PagesFolder, false); err != nil {
+		t.Fatalf("UpdateRepositorySettings failed: %v", err)
+	}
+	pubRepoLocked, _ := GetRepositoryByID(pubRepo.ID)
+	if pubRepoLocked.AllowDownloadAndPulls {
+		t.Fatalf("expected AllowDownloadAndPulls == false")
+	}
+
+	// Anonymous, Read, View-Only blocked; Write, Repo Admin, Owner, Super Admin allowed
+	if p := GetRepoPermissions(nil, pubRepoLocked); !p.Read || p.Download || !p.ViewOnly {
+		t.Errorf("anonymous visitor on locked public repo should have Read=true, Download=false: %+v", p)
+	}
+	if p := GetRepoPermissions(readUser, pubRepoLocked); !p.Read || p.Download || !p.ViewOnly {
+		t.Errorf("read collaborator on locked repo should have Download=false: %+v", p)
+	}
+	if p := GetRepoPermissions(viewUser, pubRepoLocked); !p.Read || p.Download || !p.ViewOnly {
+		t.Errorf("view_only collaborator on locked repo should have Download=false: %+v", p)
+	}
+	if p := GetRepoPermissions(writeRestored, pubRepoLocked); !p.Write || !p.Download || p.ViewOnly {
+		t.Errorf("write collaborator on locked repo should still have Download=true: %+v", p)
+	}
+	if p := GetRepoPermissions(collabAdmin, pubRepoLocked); !p.Admin || !p.Download || p.ViewOnly {
+		t.Errorf("repo admin on locked repo should still have Download=true: %+v", p)
+	}
+	if p := GetRepoPermissions(ownerRestored, pubRepoLocked); !p.Admin || !p.Download || p.ViewOnly {
+		t.Errorf("repo owner on locked repo should still have Download=true: %+v", p)
+	}
+	if p := GetRepoPermissions(adminUpdated, pubRepoLocked); !p.Admin || !p.Download || p.ViewOnly {
+		t.Errorf("super admin on locked repo should still have Download=true: %+v", p)
+	}
+}

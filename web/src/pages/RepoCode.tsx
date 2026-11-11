@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository, TreeEntry, Commit, RecentPush } from '../lib/api';
+import { api, Repository, RepoResponse, TreeEntry, Commit, RecentPush } from '../lib/api';
 import { RepoNav } from '../components/RepoNav';
 import { MarkdownViewer } from '../components/MarkdownViewer';
 import { showToast } from '../components/ModalDialog';
@@ -21,7 +21,8 @@ import {
   FilePlus,
   History,
   GitCommit,
-  DownloadCloud
+  DownloadCloud,
+  Eye
 } from 'lucide-react';
 
 interface RepoCodeProps {
@@ -65,7 +66,9 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
   const [cloneTab, setCloneTab] = useState<'http' | 'ssh'>('http');
   const [showCloneModal, setShowCloneModal] = useState(false);
   const [showAddFileModal, setShowAddFileModal] = useState(false);
+  const [repoPermissions, setRepoPermissions] = useState<RepoResponse['permissions'] | undefined>(cachedRepo?.permissions);
   const [canWrite, setCanWrite] = useState(() => Boolean(cachedRepo?.can_write || cachedRepo?.permissions?.write));
+  const [canDownload, setCanDownload] = useState(() => cachedRepo?.permissions ? cachedRepo.permissions.download !== false : true);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
@@ -102,8 +105,10 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
       try {
         const data = await api.getRepo(owner, repoName);
         setRepoData(data.repository);
+        setRepoPermissions(data.permissions);
         setIsStarred(data.is_starred);
         setCanWrite(Boolean(data.can_write || data.permissions?.write));
+        setCanDownload(data.permissions ? data.permissions.download !== false : true);
         setBranches(data.branches || ['main']);
         const branch = data.branches?.[0] || 'main';
         if (data.branches?.length > 0) {
@@ -112,9 +117,13 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
         setCloneHTTP(data.clone_url_http);
         setCloneSSH(data.clone_url_ssh);
 
-        api.getRecentPushes(owner, repoName).then(res => {
-          setRecentPushes(res?.recent_pushes || []);
-        }).catch(() => {});
+        if (data.repository.allow_download_and_pulls !== false) {
+          api.getRecentPushes(owner, repoName).then(res => {
+            setRecentPushes(res?.recent_pushes || []);
+          }).catch(() => {});
+        } else {
+          setRecentPushes([]);
+        }
 
         const treeData = await api.getTree(owner, repoName, branch, initialPath);
         setEntries(treeData.entries || []);
@@ -222,6 +231,7 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
     <div>
       <RepoNav
         repo={repoData}
+        permissions={repoPermissions}
         isStarred={isStarred}
         onToggleStar={handleToggleStar}
         activeTab="code"
@@ -389,95 +399,117 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
               </div>
             )}
 
-            {/* Clone Popover Button */}
-            <div className="relative">
-              <button
-                onClick={() => setShowCloneModal(!showCloneModal)}
-                className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-xs transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                <span>Code</span>
-              </button>
+            {/* Clone & Download ZIP Popover Button */}
+            {canDownload ? (
+              <div className="relative">
+                <button
+                  onClick={() => setShowCloneModal(!showCloneModal)}
+                  className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-xs transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Code</span>
+                </button>
 
-            {showCloneModal && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl shadow-2xl bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border p-4 text-xs z-50 space-y-3">
-                <div className="flex space-x-2 border-b border-gray-200 dark:border-dark-border pb-2">
-                  <button
-                    onClick={() => setCloneTab('http')}
-                    className={`font-semibold pb-1 border-b-2 transition-colors ${
-                      cloneTab === 'http'
-                        ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-dark-muted dark:hover:text-dark-text'
-                    }`}
-                  >
-                    HTTPS / HTTP
-                  </button>
-                  <button
-                    onClick={() => setCloneTab('ssh')}
-                    className={`font-semibold pb-1 border-b-2 transition-colors ${
-                      cloneTab === 'ssh'
-                        ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-dark-muted dark:hover:text-dark-text'
-                    }`}
-                  >
-                    SSH
-                  </button>
-                </div>
-
-                <div className="flex items-center space-x-1.5">
-                  <input
-                    type="text"
-                    readOnly
-                    value={cloneTab === 'http' ? cloneHTTP : cloneSSH}
-                    className="flex-1 px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-dark-bg border border-gray-300 dark:border-dark-border text-xs font-mono text-gray-800 dark:text-dark-text select-all"
-                  />
-                  <button
-                    onClick={() => handleCopyClone(cloneTab === 'http' ? cloneHTTP : cloneSSH)}
-                    className="p-1.5 rounded-lg border border-gray-300 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-hover"
-                    title="Copy URL"
-                  >
-                    {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-gray-500" />}
-                  </button>
-                </div>
-
-                {cloneTab === 'http' && (
-                  <div className="pt-2 border-t border-gray-100 dark:border-dark-border space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-dark-muted">
-                      <span>Bypass self-signed SSL:</span>
+                {showCloneModal && (
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl shadow-2xl bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border p-4 text-xs z-50 space-y-3">
+                    <div className="flex space-x-2 border-b border-gray-200 dark:border-dark-border pb-2">
                       <button
-                        type="button"
-                        onClick={() => handleCopyClone(`git -c http.sslVerify=false clone ${cloneHTTP}`)}
-                        className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline inline-flex items-center space-x-1 cursor-pointer"
+                        onClick={() => setCloneTab('http')}
+                        className={`font-semibold pb-1 border-b-2 transition-colors ${
+                          cloneTab === 'http'
+                            ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-dark-muted dark:hover:text-dark-text'
+                        }`}
                       >
-                        <Copy className="w-3 h-3" />
-                        <span>Copy command</span>
+                        HTTPS / HTTP
+                      </button>
+                      <button
+                        onClick={() => setCloneTab('ssh')}
+                        className={`font-semibold pb-1 border-b-2 transition-colors ${
+                          cloneTab === 'ssh'
+                            ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-dark-muted dark:hover:text-dark-text'
+                        }`}
+                      >
+                        SSH
                       </button>
                     </div>
-                    <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-dark-muted">
-                      <span>Root CA Certificate:</span>
-                      <a
-                        href="/api/v1/server/cert"
-                        download="progit-cert.pem"
-                        className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline inline-flex items-center space-x-1 cursor-pointer"
+
+                    <div className="flex items-center space-x-1.5">
+                      <input
+                        type="text"
+                        readOnly
+                        value={cloneTab === 'http' ? cloneHTTP : cloneSSH}
+                        className="flex-1 px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-dark-bg border border-gray-300 dark:border-dark-border text-xs font-mono text-gray-800 dark:text-dark-text select-all"
+                      />
+                      <button
+                        onClick={() => handleCopyClone(cloneTab === 'http' ? cloneHTTP : cloneSSH)}
+                        className="p-1.5 rounded-lg border border-gray-300 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-hover"
+                        title="Copy URL"
                       >
-                        <Download className="w-3 h-3" />
-                        <span>Download (.pem)</span>
+                        {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-gray-500" />}
+                      </button>
+                    </div>
+
+                    {cloneTab === 'http' && (
+                      <div className="pt-2 border-t border-gray-100 dark:border-dark-border space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-dark-muted">
+                          <span>Bypass self-signed SSL:</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyClone(`git -c http.sslVerify=false clone ${cloneHTTP}`)}
+                            className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline inline-flex items-center space-x-1 cursor-pointer"
+                          >
+                            <Copy className="w-3 h-3" />
+                            <span>Copy command</span>
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-dark-muted">
+                          <span>Root CA Certificate:</span>
+                          <a
+                            href="/api/v1/server/cert"
+                            download="progit-cert.pem"
+                            className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline inline-flex items-center space-x-1 cursor-pointer"
+                          >
+                            <Download className="w-3 h-3" />
+                            <span>Download (.pem)</span>
+                          </a>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t border-gray-100 dark:border-dark-border">
+                      <a
+                        href={api.getArchiveUrl(owner, repoName, currentBranch)}
+                        download={`${repoName}-${currentBranch}.zip`}
+                        onClick={() => setShowCloneModal(false)}
+                        className="flex items-center justify-center space-x-2 w-full px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 font-semibold transition-colors"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Download ZIP ({currentBranch})</span>
                       </a>
                     </div>
+
+                    <p className="text-xs text-gray-500 dark:text-dark-muted">
+                      Use Git or download an archive snapshot of this branch.
+                    </p>
                   </div>
                 )}
-
-                <p className="text-xs text-gray-500 dark:text-dark-muted">
-                  Use Git or checkout with SVN using the web URL.
-                </p>
               </div>
+            ) : (
+              <span
+                title="Downloads and Git clone/pull are restricted for your access on this repository"
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-semibold text-xs"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>View Only</span>
+              </span>
             )}
           </div>
         </div>
-      </div>
 
         {/* Recently Pushed Branches Banner with 1-click Compare & PR */}
-        {recentPushes.length > 0 && (
+        {repoData.allow_download_and_pulls !== false && recentPushes.length > 0 && (
           <div className="space-y-2 mb-4">
             {recentPushes.map((rp) => (
               <div
@@ -533,99 +565,105 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
                 </div>
 
                 {/* Clone switcher & URL */}
-                <div className="flex items-center space-x-2 shrink-0">
-                  <div className="inline-flex rounded-lg p-0.5 bg-gray-100 dark:bg-dark-hover border border-gray-200 dark:border-dark-border text-xs font-semibold">
-                    <button
-                      type="button"
-                      onClick={() => setCloneTab('http')}
-                      className={`px-2.5 py-1 rounded-md transition-colors ${
-                        cloneTab === 'http'
-                          ? 'bg-white dark:bg-dark-surface text-emerald-600 dark:text-emerald-400 shadow-xs'
-                          : 'text-gray-500 dark:text-dark-muted hover:text-gray-800 dark:hover:text-white'
-                      }`}
-                    >
-                      HTTPS
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCloneTab('ssh')}
-                      className={`px-2.5 py-1 rounded-md transition-colors ${
-                        cloneTab === 'ssh'
-                          ? 'bg-white dark:bg-dark-surface text-emerald-600 dark:text-emerald-400 shadow-xs'
-                          : 'text-gray-500 dark:text-dark-muted hover:text-gray-800 dark:hover:text-white'
-                      }`}
-                    >
-                      SSH
-                    </button>
-                  </div>
+                {canDownload && (
+                  <div className="flex items-center space-x-2 shrink-0">
+                    <div className="inline-flex rounded-lg p-0.5 bg-gray-100 dark:bg-dark-hover border border-gray-200 dark:border-dark-border text-xs font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => setCloneTab('http')}
+                        className={`px-2.5 py-1 rounded-md transition-colors ${
+                          cloneTab === 'http'
+                            ? 'bg-white dark:bg-dark-surface text-emerald-600 dark:text-emerald-400 shadow-xs'
+                            : 'text-gray-500 dark:text-dark-muted hover:text-gray-800 dark:hover:text-white'
+                        }`}
+                      >
+                        HTTPS
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCloneTab('ssh')}
+                        className={`px-2.5 py-1 rounded-md transition-colors ${
+                          cloneTab === 'ssh'
+                            ? 'bg-white dark:bg-dark-surface text-emerald-600 dark:text-emerald-400 shadow-xs'
+                            : 'text-gray-500 dark:text-dark-muted hover:text-gray-800 dark:hover:text-white'
+                        }`}
+                      >
+                        SSH
+                      </button>
+                    </div>
 
-                  <div className="flex items-center space-x-1">
-                    <input
-                      type="text"
-                      readOnly
-                      value={selectedCloneUrl}
-                      className="w-56 sm:w-72 px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-dark-bg border border-gray-300 dark:border-dark-border text-xs font-mono text-gray-800 dark:text-dark-text select-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleCopyCode(selectedCloneUrl, 'quick')}
-                      className="p-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-100 dark:hover:bg-dark-hover text-gray-600 dark:text-dark-text shadow-xs transition-colors cursor-pointer"
-                      title="Copy clone URL"
-                    >
-                      {copiedQuick ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                    </button>
+                    <div className="flex items-center space-x-1">
+                      <input
+                        type="text"
+                        readOnly
+                        value={selectedCloneUrl}
+                        className="w-56 sm:w-72 px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-dark-bg border border-gray-300 dark:border-dark-border text-xs font-mono text-gray-800 dark:text-dark-text select-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleCopyCode(selectedCloneUrl, 'quick')}
+                        className="p-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-100 dark:hover:bg-dark-hover text-gray-600 dark:text-dark-text shadow-xs transition-colors cursor-pointer"
+                        title="Copy clone URL"
+                      >
+                        {copiedQuick ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
             {/* Terminal Card 1: create a new repo on the command line */}
-            <div className="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-xs p-5 space-y-3">
-              <h4 className="font-bold text-gray-900 dark:text-white text-sm">
-                …or create a new repository on the command line
-              </h4>
-              <div className="relative rounded-xl bg-gray-900 dark:bg-black/90 border border-gray-800 p-4 text-xs font-mono text-gray-200 overflow-x-auto shadow-inner">
-                <button
-                  type="button"
-                  onClick={() => handleCopyCode(block1Commands, 'block1')}
-                  className="absolute top-3 right-3 p-1.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 transition-colors shadow-xs cursor-pointer"
-                  title="Copy commands"
-                >
-                  {copiedBlock1 ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                </button>
-                <div className="space-y-1">
-                  <div><span className="text-emerald-400">echo</span> &quot;# {repoName}&quot; &gt;&gt; README.md</div>
-                  <div><span className="text-emerald-400">git</span> init</div>
-                  <div><span className="text-emerald-400">git</span> add README.md</div>
-                  <div><span className="text-emerald-400">git</span> commit -m &quot;first commit&quot;</div>
-                  <div><span className="text-emerald-400">git</span> branch -M {currentBranch || 'main'}</div>
-                  <div><span className="text-emerald-400">git</span> remote add origin {selectedCloneUrl}</div>
-                  <div><span className="text-emerald-400">git</span> push -u origin {currentBranch || 'main'}</div>
+            {canDownload && (
+              <div className="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-xs p-5 space-y-3">
+                <h4 className="font-bold text-gray-900 dark:text-white text-sm">
+                  …or create a new repository on the command line
+                </h4>
+                <div className="relative rounded-xl bg-gray-900 dark:bg-black/90 border border-gray-800 p-4 text-xs font-mono text-gray-200 overflow-x-auto shadow-inner">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyCode(block1Commands, 'block1')}
+                    className="absolute top-3 right-3 p-1.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 transition-colors shadow-xs cursor-pointer"
+                    title="Copy commands"
+                  >
+                    {copiedBlock1 ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                  <div className="space-y-1">
+                    <div><span className="text-emerald-400">echo</span> &quot;# {repoName}&quot; &gt;&gt; README.md</div>
+                    <div><span className="text-emerald-400">git</span> init</div>
+                    <div><span className="text-emerald-400">git</span> add README.md</div>
+                    <div><span className="text-emerald-400">git</span> commit -m &quot;first commit&quot;</div>
+                    <div><span className="text-emerald-400">git</span> branch -M {currentBranch || 'main'}</div>
+                    <div><span className="text-emerald-400">git</span> remote add origin {selectedCloneUrl}</div>
+                    <div><span className="text-emerald-400">git</span> push -u origin {currentBranch || 'main'}</div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Terminal Card 2: push an existing repository from the command line */}
-            <div className="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-xs p-5 space-y-3">
-              <h4 className="font-bold text-gray-900 dark:text-white text-sm">
-                …or push an existing repository from the command line
-              </h4>
-              <div className="relative rounded-xl bg-gray-900 dark:bg-black/90 border border-gray-800 p-4 text-xs font-mono text-gray-200 overflow-x-auto shadow-inner">
-                <button
-                  type="button"
-                  onClick={() => handleCopyCode(block2Commands, 'block2')}
-                  className="absolute top-3 right-3 p-1.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 transition-colors shadow-xs cursor-pointer"
-                  title="Copy commands"
-                >
-                  {copiedBlock2 ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                </button>
-                <div className="space-y-1">
-                  <div><span className="text-emerald-400">git</span> remote add origin {selectedCloneUrl}</div>
-                  <div><span className="text-emerald-400">git</span> branch -M {currentBranch || 'main'}</div>
-                  <div><span className="text-emerald-400">git</span> push -u origin {currentBranch || 'main'}</div>
+            {canDownload && (
+              <div className="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-xs p-5 space-y-3">
+                <h4 className="font-bold text-gray-900 dark:text-white text-sm">
+                  …or push an existing repository from the command line
+                </h4>
+                <div className="relative rounded-xl bg-gray-900 dark:bg-black/90 border border-gray-800 p-4 text-xs font-mono text-gray-200 overflow-x-auto shadow-inner">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyCode(block2Commands, 'block2')}
+                    className="absolute top-3 right-3 p-1.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 transition-colors shadow-xs cursor-pointer"
+                    title="Copy commands"
+                  >
+                    {copiedBlock2 ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                  <div className="space-y-1">
+                    <div><span className="text-emerald-400">git</span> remote add origin {selectedCloneUrl}</div>
+                    <div><span className="text-emerald-400">git</span> branch -M {currentBranch || 'main'}</div>
+                    <div><span className="text-emerald-400">git</span> push -u origin {currentBranch || 'main'}</div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Card 3: import code from another repository */}
             <div className="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-xs p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

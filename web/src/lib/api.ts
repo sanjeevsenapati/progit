@@ -6,6 +6,7 @@ export interface User {
   avatar_url: string;
   is_admin: boolean;
   is_active: boolean;
+  can_download?: boolean;
   location: string;
   website: string;
   bio: string;
@@ -37,6 +38,7 @@ export interface Repository {
   num_pulls: number;
   size_bytes: number;
   is_archived: boolean;
+  allow_download_and_pulls?: boolean;
   enable_wiki?: boolean;
   enable_pages?: boolean;
   pages_branch?: string;
@@ -356,7 +358,13 @@ export interface RepoResponse {
   repository: Repository;
   is_starred: boolean;
   can_write?: boolean;
-  permissions?: { admin: boolean; write: boolean; read: boolean };
+  permissions?: {
+    admin: boolean;
+    write: boolean;
+    read: boolean;
+    download?: boolean;
+    view_only?: boolean;
+  };
   branches: string[];
   tags: string[];
   clone_url_http: string;
@@ -533,6 +541,13 @@ export const api = {
       latest_commit?: Commit | null;
       total_commits?: number;
     }>(`/api/v1/repos/${owner}/${repo}/tree?${params.toString()}`);
+  },
+
+  getArchiveUrl(owner: string, repo: string, ref?: string, format: 'zip' = 'zip') {
+    const params = new URLSearchParams();
+    if (ref) params.set('ref', ref);
+    if (format) params.set('format', format);
+    return `/api/v1/repos/${owner}/${repo}/archive?${params.toString()}`;
   },
 
   async getBlob(owner: string, repo: string, ref: string, path: string) {
@@ -864,6 +879,7 @@ export const api = {
     enable_pages?: boolean;
     pages_branch?: string;
     pages_folder?: string;
+    allow_download_and_pulls?: boolean;
   }) {
     const res = await fetchJSON<Repository>(`/api/v1/repos/${owner}/${repo}/settings`, {
       method: 'PATCH',
@@ -971,6 +987,7 @@ export const api = {
     password: string;
     full_name: string;
     is_admin: boolean;
+    can_download?: boolean;
     max_repo_creation?: number;
     max_org_creation?: number;
   }) {
@@ -980,7 +997,7 @@ export const api = {
     });
   },
 
-  async adminUpdateUser(id: number, data: { is_admin?: boolean; is_active?: boolean; max_repo_creation?: number; max_org_creation?: number }) {
+  async adminUpdateUser(id: number, data: { is_admin?: boolean; is_active?: boolean; can_download?: boolean; max_repo_creation?: number; max_org_creation?: number }) {
     return fetchJSON<User>(`/api/v1/admin/users/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),

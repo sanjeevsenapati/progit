@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Repository, Organization, api } from '../lib/api';
+import { Repository, RepoResponse, Organization, api } from '../lib/api';
 import { useAuth } from '../lib/theme';
 import { navigate } from '../lib/router';
 import { 
@@ -18,20 +18,25 @@ import {
   X,
   AlertCircle,
   Loader2,
-  Archive
+  Archive,
+  Eye
 } from 'lucide-react';
 
 interface RepoNavProps {
   repo: Repository;
+  permissions?: RepoResponse['permissions'];
   isStarred?: boolean;
   onToggleStar?: () => void;
   activeTab: 'code' | 'issues' | 'pulls' | 'commits' | 'branches' | 'settings' | 'wiki' | 'pages' | 'projects';
 }
 
-export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar, activeTab }) => {
+export const RepoNav: React.FC<RepoNavProps> = ({ repo, permissions, isStarred, onToggleStar, activeTab }) => {
   const { user } = useAuth();
   const basePath = `/${repo.owner_name}/${repo.name}`;
-  const canAdmin = !!(user && (user.is_admin || user.username === repo.owner_name || (repo as any).permissions?.admin));
+  const perms = permissions || (repo as any).permissions || api.getCachedRepo(repo.owner_name, repo.name)?.permissions;
+  const canAdmin = !!(user && (user.is_admin || user.username === repo.owner_name || perms?.admin));
+  const canDownload = perms ? perms.download !== false : true;
+  const isViewOnly = Boolean(perms?.view_only || !canDownload);
 
   const [showForkModal, setShowForkModal] = useState(false);
   const [orgs, setOrgs] = useState<Organization[]>([]);
@@ -109,6 +114,15 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar,
                   Archived
                 </span>
               )}
+              {isViewOnly && (
+                <span
+                  title="Code downloads, Raw files, Forking, and Git clone/pull are disabled for your access on this repository"
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-300 dark:border-amber-800 ml-2"
+                >
+                  <Eye className="w-3 h-3 mr-1" />
+                  View Only
+                </span>
+              )}
             </div>
 
             {repo.is_fork && repo.fork_parent && (
@@ -140,17 +154,19 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar,
               </span>
             </button>
 
-            <button
-              onClick={handleForkClick}
-              title="Fork this repository"
-              className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-md border border-gray-300 dark:border-dark-border bg-gray-50 dark:bg-dark-hover hover:bg-gray-100 dark:hover:bg-dark-border/60 text-gray-700 dark:text-dark-text shadow-sm transition-colors cursor-pointer"
-            >
-              <GitFork className="w-3.5 h-3.5 mr-1.5" />
-              <span>Fork</span>
-              <span className="ml-2 pl-2 border-l border-gray-300 dark:border-dark-border font-bold">
-                {repo.num_forks}
-              </span>
-            </button>
+            {canDownload && (
+              <button
+                onClick={handleForkClick}
+                title="Fork this repository"
+                className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-md border border-gray-300 dark:border-dark-border bg-gray-50 dark:bg-dark-hover hover:bg-gray-100 dark:hover:bg-dark-border/60 text-gray-700 dark:text-dark-text shadow-sm transition-colors cursor-pointer"
+              >
+                <GitFork className="w-3.5 h-3.5 mr-1.5" />
+                <span>Fork</span>
+                <span className="ml-2 pl-2 border-l border-gray-300 dark:border-dark-border font-bold">
+                  {repo.num_forks}
+                </span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -185,22 +201,24 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, isStarred, onToggleStar,
             )}
           </a>
 
-          <a
-            href={`${basePath}/pulls`}
-            className={`flex items-center space-x-2 py-3 px-3 border-b-2 font-medium transition-colors whitespace-nowrap ${
-              activeTab === 'pulls'
-                ? 'border-emerald-600 text-gray-900 dark:text-white font-semibold'
-                : 'border-transparent text-gray-500 dark:text-dark-muted hover:text-gray-700 dark:hover:text-dark-text'
-            }`}
-          >
-            <GitPullRequest className="w-4 h-4" />
-            <span>Pull Requests</span>
-            {repo.num_pulls > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 rounded-full text-xs bg-gray-100 dark:bg-dark-hover text-gray-600 dark:text-dark-muted">
-                {repo.num_pulls}
-              </span>
-            )}
-          </a>
+          {repo.allow_download_and_pulls !== false && (
+            <a
+              href={`${basePath}/pulls`}
+              className={`flex items-center space-x-2 py-3 px-3 border-b-2 font-medium transition-colors whitespace-nowrap ${
+                activeTab === 'pulls'
+                  ? 'border-emerald-600 text-gray-900 dark:text-white font-semibold'
+                  : 'border-transparent text-gray-500 dark:text-dark-muted hover:text-gray-700 dark:hover:text-dark-text'
+              }`}
+            >
+              <GitPullRequest className="w-4 h-4" />
+              <span>Pull Requests</span>
+              {repo.num_pulls > 0 && (
+                <span className="ml-1 px-1.5 py-0.2 rounded-full text-xs bg-gray-100 dark:bg-dark-hover text-gray-600 dark:text-dark-muted">
+                  {repo.num_pulls}
+                </span>
+              )}
+            </a>
+          )}
 
           <a
             href={`${basePath}/commits`}

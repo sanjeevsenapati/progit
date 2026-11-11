@@ -22,6 +22,8 @@ import {
   Edit3,
   SlidersHorizontal,
   Search,
+  Download,
+  Ban,
   X
 } from 'lucide-react';
 
@@ -34,7 +36,7 @@ export const AdminDashboard: React.FC = () => {
 
   // User search & filter
   const [userSearch, setUserSearch] = useState('');
-  const [userFilter, setUserFilter] = useState<'all' | 'admin' | 'standard' | 'suspended'>('all');
+  const [userFilter, setUserFilter] = useState<'all' | 'admin' | 'standard' | 'suspended' | 'restricted'>('all');
   const [userSearching, setUserSearching] = useState(false);
   const userSearchRef = useRef('');
   const searchSeqRef = useRef(0);
@@ -47,6 +49,7 @@ export const AdminDashboard: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [newFullName, setNewFullName] = useState('');
   const [newIsAdmin, setNewIsAdmin] = useState(false);
+  const [newCanDownload, setNewCanDownload] = useState(true);
   const [newMaxRepo, setNewMaxRepo] = useState(-1);
   const [newMaxOrg, setNewMaxOrg] = useState(-1);
   const [modalLoading, setModalLoading] = useState(false);
@@ -162,6 +165,34 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleToggleDownload = async (u: User) => {
+    const currentlyAllowed = u.can_download !== false;
+    const nextAllowed = !currentlyAllowed;
+    const confirmed = await showModalConfirm({
+      title: currentlyAllowed ? 'Restrict User Downloads' : 'Allow User Downloads',
+      message: currentlyAllowed
+        ? `Restrict @${u.username} from downloading ZIP archives, Raw files, Release assets, Forking repositories, and running git clone/pull across all repositories? They will still be able to view code in the web browser.`
+        : `Restore code download, ZIP archive, Fork, and git clone/pull permissions for @${u.username}?`,
+      confirmText: currentlyAllowed ? 'Restrict Download' : 'Allow Download',
+      cancelText: 'Cancel',
+      isDanger: currentlyAllowed,
+    });
+    if (!confirmed) return;
+
+    try {
+      await api.adminUpdateUser(u.id, { can_download: nextAllowed });
+      setStatusMsg({
+        type: 'success',
+        text: nextAllowed
+          ? `Restored download and Git clone/pull permissions for @${u.username}.`
+          : `Restricted downloads and Git clone/pull for @${u.username} (web view-only).`,
+      });
+      loadData();
+    } catch (err: any) {
+      setStatusMsg({ type: 'error', text: err.message || 'Failed to update download permission.' });
+    }
+  };
+
   const handleDeleteUser = async (u: User) => {
     const confirmed = await showModalConfirm({
       title: 'Delete User Account',
@@ -270,6 +301,7 @@ export const AdminDashboard: React.FC = () => {
         password: newPassword,
         full_name: newFullName,
         is_admin: newIsAdmin,
+        can_download: newIsAdmin ? true : newCanDownload,
         max_repo_creation: Number(newMaxRepo),
         max_org_creation: Number(newMaxOrg),
       });
@@ -279,6 +311,7 @@ export const AdminDashboard: React.FC = () => {
       setNewPassword('');
       setNewFullName('');
       setNewIsAdmin(false);
+      setNewCanDownload(true);
       setNewMaxRepo(-1);
       setNewMaxOrg(-1);
       setStatusMsg({ type: 'success', text: `User @${newUsername} created successfully.` });
@@ -312,6 +345,7 @@ export const AdminDashboard: React.FC = () => {
     if (userFilter === 'admin' && !u.is_admin) return false;
     if (userFilter === 'standard' && u.is_admin) return false;
     if (userFilter === 'suspended' && u.is_active) return false;
+    if (userFilter === 'restricted' && (u.is_admin || u.can_download !== false)) return false;
     return true;
   });
 
@@ -522,13 +556,14 @@ export const AdminDashboard: React.FC = () => {
             <div className="flex items-center space-x-2">
               <select
                 value={userFilter}
-                onChange={e => setUserFilter(e.target.value as 'all' | 'admin' | 'standard' | 'suspended')}
+                onChange={e => setUserFilter(e.target.value as 'all' | 'admin' | 'standard' | 'suspended' | 'restricted')}
                 aria-label="Filter users by role or status"
                 className="px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 <option value="all">All Users</option>
                 <option value="admin">Super Admins</option>
                 <option value="standard">Standard Users</option>
+                <option value="restricted">Download Restricted</option>
                 <option value="suspended">Suspended</option>
               </select>
 
@@ -583,6 +618,11 @@ export const AdminDashboard: React.FC = () => {
                       Suspended
                     </span>
                   )}
+                  {!u.is_admin && u.can_download === false && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                      Download Restricted
+                    </span>
+                  )}
                 </div>
                 <div className="text-xs text-gray-500 dark:text-dark-muted flex items-center space-x-2">
                   <span>{u.email}</span>
@@ -600,7 +640,7 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => handleOpenEditLimits(u)}
                   title="Configure repository and organization creation limits"
@@ -609,6 +649,21 @@ export const AdminDashboard: React.FC = () => {
                   <SlidersHorizontal className="w-3.5 h-3.5" />
                   <span>Limits</span>
                 </button>
+
+                {!u.is_admin && (
+                  <button
+                    onClick={() => handleToggleDownload(u)}
+                    title={u.can_download !== false ? 'Restrict code downloads, ZIP archives, Forking, and Git clone/pull (view-only)' : 'Allow code downloads and Git clone/pull'}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors flex items-center space-x-1 ${
+                      u.can_download !== false
+                        ? 'border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40'
+                        : 'border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                    }`}
+                  >
+                    {u.can_download !== false ? <Ban className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />}
+                    <span>{u.can_download !== false ? 'Restrict Download' : 'Allow Download'}</span>
+                  </button>
+                )}
 
                 <button
                   onClick={() => handleToggleAdmin(u)}
@@ -821,6 +876,19 @@ export const AdminDashboard: React.FC = () => {
                 />
                 <label htmlFor="isAdminCheckbox" className="text-xs font-medium text-gray-700 dark:text-dark-text">
                   Grant Administrator Privileges
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="canDownloadCheckbox"
+                  checked={newIsAdmin || newCanDownload}
+                  disabled={newIsAdmin}
+                  onChange={e => setNewCanDownload(e.target.checked)}
+                  className="rounded text-emerald-600 focus:ring-emerald-500 disabled:opacity-50"
+                />
+                <label htmlFor="canDownloadCheckbox" className="text-xs font-medium text-gray-700 dark:text-dark-text">
+                  Allow code downloads, ZIP &amp; Git clone/pull
                 </label>
               </div>
 

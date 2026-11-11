@@ -518,8 +518,12 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
                         {t.name}
                       </span>
                     </div>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 uppercase">
-                      {t.permission}
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                      t.permission === 'view_only'
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                        : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400'
+                    }`}>
+                      {t.permission === 'view_only' ? 'View Only' : t.permission}
                     </span>
                   </div>
 
@@ -823,7 +827,8 @@ export const OrgView: React.FC<OrgViewProps> = ({ orgName }) => {
                 >
                   <option value="write">Write (Can push, edit files, and upload)</option>
                   <option value="admin">Admin (Can push and manage repository settings)</option>
-                  <option value="read">Read (Can view and clone only)</option>
+                  <option value="read">Read (Browse code and clone)</option>
+                  <option value="view_only">View Only (Browse web UI only, no downloads)</option>
                 </select>
               </div>
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository, PullRequest, Comment, FileDiff, PullReview, PullReviewComment } from '../lib/api';
+import { api, Repository, RepoResponse, PullRequest, Comment, FileDiff, PullReview, PullReviewComment } from '../lib/api';
 import { useAuth } from '../lib/theme';
 import { RepoNav } from '../components/RepoNav';
 import { 
@@ -19,7 +19,8 @@ import {
   Clock,
   Trash2,
   Columns,
-  Split
+  Split,
+  Ban
 } from 'lucide-react';
 import { detectLanguage, highlightCode } from '../lib/codeEditor';
 
@@ -118,7 +119,9 @@ function parseDiffPatch(patch: string): ParsedDiffLine[] {
 
 export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, index }) => {
   const { user } = useAuth();
-  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
+  const cachedRepo = api.getCachedRepo(owner, repoName);
+  const [repoData, setRepoData] = useState<Repository | null>(() => cachedRepo?.repository || null);
+  const [repoPermissions, setRepoPermissions] = useState<RepoResponse['permissions'] | undefined>(cachedRepo?.permissions);
   const [canWriteRepo, setCanWriteRepo] = useState(false);
   const [pull, setPull] = useState<PullRequest | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -156,8 +159,17 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
 
   const loadData = async () => {
     try {
-      const [r, p, cList, revList, revComments, diffData] = await Promise.all([
-        api.getRepo(owner, repoName),
+      const r = await api.getRepo(owner, repoName);
+      setRepoData(r.repository);
+      setRepoPermissions(r.permissions);
+      setCanWriteRepo(Boolean(r.can_write || r.permissions?.write || r.permissions?.admin));
+
+      if (r.repository.allow_download_and_pulls === false) {
+        setPull(null);
+        return;
+      }
+
+      const [p, cList, revList, revComments, diffData] = await Promise.all([
         api.getPull(owner, repoName, index),
         api.listComments(owner, repoName, index).catch(() => []),
         api.listPullReviews(owner, repoName, index).catch(() => []),
@@ -165,8 +177,6 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
         api.getPullDiff(owner, repoName, index).catch(() => ({ base_branch: '', head_branch: '', files: [], mergeable: true })),
       ]);
 
-      setRepoData(r.repository);
-      setCanWriteRepo(Boolean(r.can_write || r.permissions?.write || r.permissions?.admin));
       setPull(p);
       setComments(cList || []);
       setReviews(revList || []);
@@ -258,6 +268,31 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
     return <div className="py-20 text-center text-sm text-gray-400">Loading pull request...</div>;
   }
 
+  if (repoData && repoData.allow_download_and_pulls === false) {
+    return (
+      <div>
+        <RepoNav repo={repoData} permissions={repoPermissions} activeTab="pulls" />
+        <div className="max-w-xl mx-auto my-12 p-8 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-center space-y-4 shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-800">
+            <Ban className="w-6 h-6" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Pull Requests Disabled</h2>
+          <p className="text-xs text-gray-500 dark:text-dark-muted leading-relaxed">
+            Downloads and Pull Requests are currently disabled for <strong>{owner}/{repoName}</strong> in Repository Settings.
+          </p>
+          <div className="pt-2">
+            <a
+              href={`/${owner}/${repoName}`}
+              className="inline-flex items-center px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm transition-colors"
+            >
+              Return to repository
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!repoData || !pull || !pull.issue) {
     return <div className="py-20 text-center text-sm">Pull request not found</div>;
   }
@@ -292,7 +327,7 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
 
   return (
     <div>
-      <RepoNav repo={repoData} activeTab="pulls" />
+      <RepoNav repo={repoData} permissions={repoPermissions} activeTab="pulls" />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Header */}

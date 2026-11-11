@@ -202,10 +202,24 @@ func (s *Server) executeGitCommand(channel gossh.Channel, req *gossh.Request, ra
 		_ = req.Reply(false, nil)
 		return
 	}
-	if !database.CanUserAccessRepo(authUser, repo, isWrite) {
-		_, _ = channel.Stderr().Write([]byte("Access denied to repository\n"))
-		_ = req.Reply(false, nil)
-		return
+	repoPerms := database.GetRepoPermissions(authUser, repo)
+	if isWrite {
+		if !repoPerms.Write {
+			_, _ = channel.Stderr().Write([]byte("Access denied to repository\n"))
+			_ = req.Reply(false, nil)
+			return
+		}
+	} else {
+		if !repoPerms.Read {
+			_, _ = channel.Stderr().Write([]byte("Access denied to repository\n"))
+			_ = req.Reply(false, nil)
+			return
+		}
+		if !repoPerms.Download {
+			_, _ = channel.Stderr().Write([]byte("Repository download and git clone/pull are restricted for your account or this repository\n"))
+			_ = req.Reply(false, nil)
+			return
+		}
 	}
 
 	var repoPath string
@@ -299,7 +313,7 @@ func (s *Server) executeGitCommand(channel gossh.Channel, req *gossh.Request, ra
 	ioWg.Wait()
 	_ = cmd.Wait()
 
-	if isWrite {
+	if isWrite && repo.AllowDownloadAndPulls {
 		rootURL := strings.TrimRight(s.cfg.Server.RootURL, "/")
 		prMsg := fmt.Sprintf("\nremote: \nremote: To create a pull request on ProGit, visit:\nremote:   %s/%s/%s/pulls/new\nremote: \n", rootURL, ownerName, cleanRepoName)
 		_, _ = channel.Stderr().Write([]byte(prMsg))

@@ -87,10 +87,16 @@ Administrators can update core server parameters live from the Admin Dashboard:
 - **Persistence**: Configuration is automatically saved to `/data/config/app.ini` so it survives container restarts.
 
 ### 2.2 User Management
+- **Search & Filter Users**:
+  - Use the live search box in the **Users** tab to filter accounts by `username`, `email`, or `full_name`, and narrow the list with status filters (`All`, `Admins`, `Standard`, `Suspended`, or `Download Restricted`).
 - **Add New User**:
   - Click **Create User** in the admin header.
   - Fill in Username, Email, Full Name, and Password.
-  - Check **Grant Administrator Privileges** if the user should also have admin rights.
+  - Check **Grant Administrator Privileges** if the user should also have admin rights, or uncheck **Allow code downloads, ZIP & Git clone/pull** to provision the account in download-restricted (view-only) mode.
+- **Restrict / Allow Code Downloads (`can_download`)**:
+  - Click **Restrict Download** (and confirm **Confirm Restrict**) on any non-administrator user row to globally revoke code downloads, ZIP archives, raw file downloads, release asset downloads, forking, and Git `clone`/`pull` (HTTP & SSH) across all repositories while keeping Web UI code browsing intact.
+  - Click **Allow Download** (and **Confirm Allow**) to restore download and clone access at any time.
+  - *Safety Guard*: Super Administrators (`is_admin = true`) cannot restrict their own account and remain exempt from global download restrictions.
 - **Promote / Demote Admins**:
   - Click **Make Admin** on any standard user to grant full administrative rights.
   - Click **Demote** to convert an administrator back to a standard user.
@@ -105,8 +111,9 @@ Administrators can update core server parameters live from the Admin Dashboard:
 - **Global Repository Oversight**:
   - Switch to the **Repositories** tab to see all public and private repositories across all users and organizations.
 - **Repository Feature Controls**:
-  - Each repository provides granular toggles under **Settings > Features** for **Wikis** (`enable_wiki`) and **ProGit Pages** (`enable_pages`).
-  - When disabled, backend endpoints enforce 403 Forbidden checks, and navigation items are dynamically hidden.
+  - Each repository provides granular toggles under **Settings > Features** for **Allow Downloads (ZIP / Clone) & Pull Requests** (`allow_download_and_pulls`), **Wikis** (`enable_wiki`), and **ProGit Pages** (`enable_pages`).
+  - When **Allow Downloads & Pull Requests** is disabled, `Read`, `View-Only`, and anonymous/public visitors cannot download ZIP archives, raw files, fork, or `git clone`/`git pull` (returning `403 Forbidden`), while `Write` collaborators, Repo Admins, Repo Owners, and Super Admins retain download/clone access; Pull Requests and Compare endpoints are disabled repository-wide (`403 Forbidden`), and related navigation/clone UI elements are hidden.
+  - When Wikis or Pages are disabled, backend endpoints enforce `403 Forbidden` checks and navigation items are dynamically hidden.
 - **Administrative Delete**:
   - Click **Delete Repo** to immediately remove any repository from SQLite and purge the bare repository tree from disk.
 
@@ -129,9 +136,9 @@ All admin endpoints require an active session or Personal Access Token from a us
 | `POST` | `/api/v1/install` | Complete setup wizard and create Super Admin |
 | `GET` | `/api/v1/admin/stats` | System telemetry, runtime metrics, and storage paths |
 | `PUT` | `/api/v1/admin/config` | Update application name, domain, root URL, and ports |
-| `GET` | `/api/v1/admin/users` | List all users across the system |
-| `POST` | `/api/v1/admin/users` | Admin creates user account with optional admin flag |
-| `PATCH` | `/api/v1/admin/users/{id}` | Update user (toggle `is_admin` or `is_active`) |
+| `GET` | `/api/v1/admin/users` | List or search users (`?q=`) across the system |
+| `POST` | `/api/v1/admin/users` | Admin creates user account with optional `is_admin` / `can_download` flags |
+| `PATCH` | `/api/v1/admin/users/{id}` | Update user (`is_admin`, `is_active`, `can_download`, creation limits) |
 | `DELETE` | `/api/v1/admin/users/{id}` | Delete user account and all repositories |
 | `GET` | `/api/v1/admin/repos` | List all repositories across the system |
 | `DELETE` | `/api/v1/admin/repos/{id}` | Admin deletes any repository from database and disk |
@@ -318,9 +325,9 @@ Or authenticate via the browser session cookie (`progit_session`). Unauthenticat
 | Method | Endpoint | Description | Scope / Edition |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/admin/stats` | System telemetry, runtime metrics, and memory statistics | Open Source & Enterprise |
-| `GET` | `/api/v1/admin/users` | List all users with roles, quotas, and repo counts | Open Source & Enterprise |
-| `POST` | `/api/v1/admin/users` | Create a new user with role and creation limits | Open Source & Enterprise |
-| `PATCH` | `/api/v1/admin/users/{id}` | Update admin status, active state, or creation limits | Open Source & Enterprise |
+| `GET` | `/api/v1/admin/users` | List or search users (`?q=`) across the system | Open Source & Enterprise |
+| `POST` | `/api/v1/admin/users` | Create a new user with role, `can_download`, and creation limits | Open Source & Enterprise |
+| `PATCH` | `/api/v1/admin/users/{id}` | Update admin status, active state, `can_download`, or creation limits | Open Source & Enterprise |
 | `DELETE` | `/api/v1/admin/users/{id}` | Permanently delete user and delete repository files | Open Source & Enterprise |
 | `GET` | `/api/v1/admin/repos` | List all repositories across the entire instance | Open Source & Enterprise |
 | `DELETE` | `/api/v1/admin/repos/{id}` | Permanently delete any repository and disk storage | Open Source & Enterprise |
@@ -389,19 +396,21 @@ curl -X POST "https://git.company.com/api/v1/admin/users" \
     "password": "SecurePassword123!",
     "full_name": "Developer One",
     "is_admin": false,
+    "can_download": true,
     "max_repo_creation": 10,
     "max_org_creation": 2
   }'
 ```
 
-**Update User Privileges & Limits:**
+**Update User Privileges, Download Permission & Limits:**
 ```bash
 curl -X PATCH "https://git.company.com/api/v1/admin/users/4" \
   -H "Authorization: Bearer <ADMIN_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{
-    "is_admin": true,
+    "is_admin": false,
     "is_active": true,
+    "can_download": false,
     "max_repo_creation": 25,
     "max_org_creation": 5
   }'

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository, CollaboratorUser, Webhook, WebhookDelivery, BranchProtection } from '../lib/api';
+import { api, Repository, RepoResponse, CollaboratorUser, Webhook, WebhookDelivery, BranchProtection } from '../lib/api';
 import { useAuth } from '../lib/theme';
 import { navigate } from '../lib/router';
 import { RepoNav } from '../components/RepoNav';
@@ -9,6 +9,7 @@ import {
   Trash2, 
   AlertTriangle, 
   BookOpen, 
+  Download,
   Globe, 
   Check, 
   ExternalLink,
@@ -42,7 +43,9 @@ interface RepoSettingsProps {
 
 export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoName }) => {
   const { user } = useAuth();
-  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
+  const cachedRepo = api.getCachedRepo(owner, repoName);
+  const [repoData, setRepoData] = useState<Repository | null>(() => cachedRepo?.repository || null);
+  const [repoPermissions, setRepoPermissions] = useState<RepoResponse['permissions'] | undefined>(cachedRepo?.permissions);
   const [canAdmin, setCanAdmin] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -94,6 +97,7 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
   const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [enableWiki, setEnableWiki] = useState(true);
+  const [allowDownloadAndPulls, setAllowDownloadAndPulls] = useState(true);
   const [enablePages, setEnablePages] = useState(false);
   const [pagesBranch, setPagesBranch] = useState('main');
   const [pagesFolder, setPagesFolder] = useState('/');
@@ -103,12 +107,14 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
       try {
         const r = await api.getRepo(owner, repoName);
         setRepoData(r.repository);
-        const hasAdminAccess = !!(user && (user.is_admin || user.username === owner || (r as any).permissions?.admin));
+        setRepoPermissions(r.permissions);
+        const hasAdminAccess = !!(user && (user.is_admin || user.username === owner || r.permissions?.admin));
         setCanAdmin(hasAdminAccess);
 
         setDescription(r.repository.description || '');
         setIsPrivate(r.repository.is_private);
         setEnableWiki(r.repository.enable_wiki !== false);
+        setAllowDownloadAndPulls(r.repository.allow_download_and_pulls !== false);
         setEnablePages(r.repository.enable_pages === true);
         setPagesBranch(r.repository.pages_branch || r.repository.default_branch || 'main');
         setPagesFolder(r.repository.pages_folder || '/');
@@ -378,11 +384,13 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
         description,
         is_private: isPrivate,
         enable_wiki: enableWiki,
+        allow_download_and_pulls: allowDownloadAndPulls,
         enable_pages: enablePages,
         pages_branch: pagesBranch,
         pages_folder: pagesFolder,
       });
       setRepoData(updated);
+      setAllowDownloadAndPulls(updated.allow_download_and_pulls !== false);
       setSuccessMessage('Repository settings updated successfully');
       showToast('Repository settings updated successfully');
       setTimeout(() => setSuccessMessage(''), 4000);
@@ -436,7 +444,7 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
   if (!canAdmin) {
     return (
       <div>
-        <RepoNav repo={repoData} activeTab="settings" />
+        <RepoNav repo={repoData} permissions={repoPermissions} activeTab="settings" />
         <div className="max-w-xl mx-auto my-16 p-8 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-center space-y-4 shadow-2xl">
           <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto border border-red-200 dark:border-red-900/50">
             <ShieldAlert className="w-6 h-6" />
@@ -462,7 +470,7 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
 
   return (
     <div>
-      <RepoNav repo={repoData} activeTab="settings" />
+      <RepoNav repo={repoData} permissions={repoPermissions} activeTab="settings" />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {successMessage && (
@@ -554,6 +562,42 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
                   id="enable_wiki_toggle"
                   checked={enableWiki}
                   onChange={e => setEnableWiki(e.target.checked)}
+                  className="w-5 h-5 text-emerald-600 rounded border-gray-300 dark:border-dark-border focus:ring-emerald-500 cursor-pointer"
+                />
+              </div>
+            </label>
+
+            {/* Combined Download ZIP / Clone & Pull Requests Feature Toggle */}
+            <label className="flex items-start justify-between p-4 rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50/60 dark:bg-dark-hover/30 hover:bg-gray-100/60 dark:hover:bg-dark-hover/60 transition-colors cursor-pointer">
+              <div className="space-y-1 pr-4">
+                <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                  <Download className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span className="font-semibold text-sm text-gray-900 dark:text-white">
+                    Allow Downloads (ZIP / Clone) &amp; Pull Requests
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                    allowDownloadAndPulls
+                      ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300'
+                      : 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
+                  }`}>
+                    {allowDownloadAndPulls ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-dark-muted max-w-xl">
+                  Controls repository Download ZIP, Git clone/pull, Raw file downloads, Forking, and Pull Requests from one setting.
+                </p>
+                <p className="text-[11px] text-gray-400 dark:text-dark-muted">
+                  {allowDownloadAndPulls
+                    ? 'Pull Requests are enabled and authorized users can download ZIP archives, raw files, fork, and clone via Git.'
+                    : 'Pull Requests are disabled repository-wide. Only Write/Admin collaborators and owners can download or clone code; Read, View-Only, and public visitors can only browse in the web UI.'}
+                </p>
+              </div>
+              <div className="flex items-center pt-1">
+                <input
+                  type="checkbox"
+                  id="allow_download_and_pulls_toggle"
+                  checked={allowDownloadAndPulls}
+                  onChange={e => setAllowDownloadAndPulls(e.target.checked)}
                   className="w-5 h-5 text-emerald-600 rounded border-gray-300 dark:border-dark-border focus:ring-emerald-500 cursor-pointer"
                 />
               </div>
@@ -845,7 +889,8 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
             >
               <option value="write">Write (Edit & Upload)</option>
               <option value="admin">Admin (Manage settings)</option>
-              <option value="read">Read Only</option>
+              <option value="read">Read (Browse & Clone)</option>
+              <option value="view_only">View Only (Browse UI Only)</option>
             </select>
             <button
               type="submit"
@@ -882,9 +927,11 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
                         ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300'
                         : c.mode === 'write'
                         ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                        : c.mode === 'view_only'
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
                         : 'bg-gray-100 text-gray-700 dark:bg-dark-hover dark:text-gray-300'
                     }`}>
-                      {c.mode}
+                      {c.mode === 'view_only' ? 'View Only' : c.mode}
                     </span>
                     <button
                       type="button"
