@@ -160,7 +160,13 @@ ProGit features a responsive, full-featured web code editor with live syntax hig
 
 ## 5. Repository Settings & Branch Protection
 
-### 5.1 Branch Protection Rules
+### 5.1 Default Branch Settings
+Repository owners and administrators can customize a repository's default branch at any stage:
+- **During Creation (`/new`)**: Specify an optional **Default Branch** (pre-filled from the server's global default branch configured by the administrator, e.g., `main`, `master`, or `trunk`).
+- **General Settings (`Settings > General Settings`)**: Switch the **Default Branch** from the dropdown (or edit it on empty repositories before the first push) and click **Save Settings**. ProGit atomically updates both the database metadata and the bare repository's Git `HEAD` symbolic ref.
+- **Branches Page (`Branches`)**: Click **Set default** on any non-default branch to promote it immediately; once switched away from an older default branch (such as `master` or `main`), that legacy branch can also be deleted safely.
+
+### 5.2 Branch Protection Rules
 Protect important branches like `main` or release branches:
 1. Navigate to **Settings > Branch Protection Rules**.
 2. Enter the target branch name (e.g., `main`).
@@ -169,7 +175,7 @@ Protect important branches like `main` or release branches:
    - **Prevent force pushes**: Blocks destructive force-pushes (`git push --force`) and branch deletion.
 4. Click **Save Protection Rule**.
 
-### 5.2 Access Controls & Collaborators
+### 5.3 Access Controls & Collaborators
 - **Combined Repository Feature Toggle (`Allow Downloads & Pull Requests`)**: Under **Settings > Features**, repository owners and admins can disable **Allow Downloads (ZIP / Clone) & Pull Requests** with a single switch. When disabled:
   - `Write` collaborators, Repo Admins, Repo Owners, and Super Admins retain ZIP download, Git clone/pull, Raw file, and Fork access.
   - `Read`, `View-Only`, and anonymous/public visitors can still browse code in the Web UI, while Download ZIP, Git clone/pull, Raw, `Copy`, and Fork are hidden/blocked (`403 Forbidden`).
