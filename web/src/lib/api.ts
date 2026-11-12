@@ -866,10 +866,12 @@ export const api = {
   },
 
   async updatePagesConfig(owner: string, repo: string, data: { enable_pages: boolean; pages_branch: string; pages_folder: string }) {
-    return fetchJSON<{ message: string; repository: Repository; pages_url: string }>(`/api/v1/repos/${owner}/${repo}/pages`, {
+    const res = await fetchJSON<{ message: string; repository: Repository; pages_url: string }>(`/api/v1/repos/${owner}/${repo}/pages`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    this.clearRepoCache(owner, repo);
+    return res;
   },
 
   async updateRepoSettings(owner: string, repo: string, data: {

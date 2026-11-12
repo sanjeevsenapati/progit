@@ -3303,6 +3303,209 @@ func TestRepoAllowDownloadAndPullsCombinedSetting(t *testing.T) {
 	}
 }
 
+func TestProGitPagesPermissionsAndPublicURL(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
+
+	owner, err := database.CreateUser("pages_owner", "pages_owner@example.com", "hash", "Pages Owner", false)
+	if err != nil {
+		t.Fatalf("create owner: %v", err)
+	}
+	writer, _ := database.CreateUser("pages_writer", "pages_writer@example.com", "hash", "Pages Writer", false)
+	viewer, _ := database.CreateUser("pages_viewer", "pages_viewer@example.com", "hash", "Pages Viewer", false)
+	stranger, _ := database.CreateUser("pages_stranger", "pages_stranger@example.com", "hash", "Pages Stranger", false)
+
+	ownerTok := "pgt_pages_owner"
+	writerTok := "pgt_pages_writer"
+	viewerTok := "pgt_pages_viewer"
+	strangerTok := "pgt_pages_stranger"
+	_, _ = database.CreateAccessToken(owner.ID, "tok-owner", ownerTok, "repo,user")
+	_, _ = database.CreateAccessToken(writer.ID, "tok-writer", writerTok, "repo,user")
+	_, _ = database.CreateAccessToken(viewer.ID, "tok-viewer", viewerTok, "repo,user")
+	_, _ = database.CreateAccessToken(stranger.ID, "tok-stranger", strangerTok, "repo,user")
+
+	pubRepo, err := database.CreateRepository(owner.ID, "site-public", "Public site repo", false)
+	if err != nil {
+		t.Fatalf("create pubRepo: %v", err)
+	}
+	privRepo, err := database.CreateRepository(owner.ID, "site-private", "Private site repo", true)
+	if err != nil {
+		t.Fatalf("create privRepo: %v", err)
+	}
+
+	initRepoContent := func(r *database.Repository, htmlTitle string) {
+		rDir := filepath.Join(router.cfg.Repository.Root, owner.Username, r.Name+".git")
+		if err := git.InitBareRepository(rDir, "main"); err != nil {
+			t.Fatalf("init bare repo %s: %v", r.Name, err)
+		}
+		if _, _, err := git.SaveFile(rDir, "main", "index.html", "<html><body><h1>"+htmlTitle+"</h1></body></html>", "pages_owner", "pages_owner@example.com", "Init site", ""); err != nil {
+			t.Fatalf("commit %s: %v", r.Name, err)
+		}
+	}
+	initRepoContent(pubRepo, "Public Site Live")
+	initRepoContent(privRepo, "Private Site Live")
+
+	_ = database.AddCollaborator(pubRepo.ID, writer.ID, "write")
+	_ = database.AddCollaborator(privRepo.ID, viewer.ID, "view_only")
+
+	doJSON := func(method, path, tok string, body any) *httptest.ResponseRecorder {
+		var rdr io.Reader
+		if body != nil {
+			b, _ := json.Marshal(body)
+			rdr = bytes.NewReader(b)
+		}
+		req := httptest.NewRequest(method, path, rdr)
+		if tok != "" {
+			req.Header.Set("Authorization", "Bearer "+tok)
+		}
+		if body != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		return rec
+	}
+
+	// 1. When Pages is DISABLED:
+	// - GET /pages config endpoint is restricted to owner/admin only (401 unauth, 403 non-owner)
+	if rec := doJSON("GET", "/api/v1/repos/pages_owner/site-public/pages", "", nil); rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for anonymous GET /pages config, got %d", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/pages_owner/site-public/pages", writerTok, nil); rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for non-owner write collaborator GET /pages config, got %d", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/pages_owner/site-public/pages", strangerTok, nil); rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for non-owner user GET /pages config, got %d", rec.Code)
+	}
+	if rec := doJSON("POST", "/api/v1/repos/pages_owner/site-public/pages", writerTok, map[string]any{"enable_pages": true}); rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for non-owner POST /pages config, got %d", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/pages_owner/site-public/pages", ownerTok, nil); rec.Code != http.StatusOK {
+		t.Errorf("expected 200 for owner GET /pages config, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// - GET /repos/{owner}/{repo} must omit pages_url while disabled
+	recDisabledRepo := doJSON("GET", "/api/v1/repos/pages_owner/site-public", "", nil)
+	if recDisabledRepo.Code != http.StatusOK {
+		t.Fatalf("expected 200 for public GET repo, got %d", recDisabledRepo.Code)
+	}
+	var disabledPayload map[string]any
+	_ = json.Unmarshal(recDisabledRepo.Body.Bytes(), &disabledPayload)
+	if u, _ := disabledPayload["pages_url"].(string); u != "" {
+		t.Errorf("expected empty pages_url when pages disabled, got %q", u)
+	}
+
+	// - Unauthorized visitor to private repo /pages config gets 404 (not 401/403 leaking private repo)
+	if rec := doJSON("GET", "/api/v1/repos/pages_owner/site-private/pages", "", nil); rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for anonymous GET private /pages config, got %d", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/pages_owner/site-private/pages", strangerTok, nil); rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for stranger GET private /pages config, got %d", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/pages_owner/site-private/pages", viewerTok, nil); rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for non-owner viewer on private repo GET /pages config, got %d", rec.Code)
+	}
+	// Private repo /pages/ must return 403 Auth Required BEFORE revealing Pages Disabled
+	if rec := doJSON("GET", "/pages/pages_owner/site-private/", "", nil); rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 on private repo /pages/ for anonymous visitor even when disabled, got %d", rec.Code)
+	}
+
+	// 2. Owner ENABLES Pages on public repo:
+	recEnablePub := doJSON("POST", "/api/v1/repos/pages_owner/site-public/pages", ownerTok, map[string]any{
+		"enable_pages": true,
+		"pages_branch": "main",
+		"pages_folder": "/",
+	})
+	if recEnablePub.Code != http.StatusOK {
+		t.Fatalf("owner enable public pages: got %d (%s)", recEnablePub.Code, recEnablePub.Body.String())
+	}
+
+	// - pages_url is now visible in GET /repos/{owner}/{repo} to anonymous public visitors AND collaborators!
+	for label, tok := range map[string]string{"anonymous": "", "stranger": strangerTok, "writer": writerTok, "owner": ownerTok} {
+		rec := doJSON("GET", "/api/v1/repos/pages_owner/site-public", tok, nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s GET public repo failed: %d", label, rec.Code)
+		}
+		var payload map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &payload)
+		if u, _ := payload["pages_url"].(string); !strings.HasSuffix(u, "/pages/pages_owner/site-public/") {
+			t.Errorf("%s expected non-empty pages_url ending with /pages/pages_owner/site-public/, got %q", label, u)
+		}
+	}
+
+	// - GET /pages config endpoint REMAINS blocked for anonymous and non-owners even when Pages is enabled!
+	if rec := doJSON("GET", "/api/v1/repos/pages_owner/site-public/pages", "", nil); rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for anonymous GET /pages config when enabled, got %d", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/pages_owner/site-public/pages", strangerTok, nil); rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for stranger GET /pages config when enabled, got %d", rec.Code)
+	}
+	if rec := doJSON("GET", "/api/v1/repos/pages_owner/site-public/pages", writerTok, nil); rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for write collab GET /pages config when enabled, got %d", rec.Code)
+	}
+
+	// - Published Pages site /pages/{owner}/{repo}/ IS accessible to everyone anonymously!
+	recPubSite := doJSON("GET", "/pages/pages_owner/site-public/", "", nil)
+	if recPubSite.Code != http.StatusOK || !strings.Contains(recPubSite.Body.String(), "Public Site Live") {
+		t.Errorf("expected public site served to anonymous visitor, got %d: %s", recPubSite.Code, recPubSite.Body.String())
+	}
+
+	// 3. Owner ENABLES Pages on private repo:
+	// - Authorized view_only collaborator sees pages_url and can visit /pages/, unauthorized visitor gets 403
+	if rec := doJSON("POST", "/api/v1/repos/pages_owner/site-private/pages", ownerTok, map[string]any{
+		"enable_pages": true,
+		"pages_branch": "main",
+		"pages_folder": "/",
+	}); rec.Code != http.StatusOK {
+		t.Fatalf("owner enable private pages: got %d", rec.Code)
+	}
+	recPrivRepoViewer := doJSON("GET", "/api/v1/repos/pages_owner/site-private", viewerTok, nil)
+	if recPrivRepoViewer.Code != http.StatusOK {
+		t.Fatalf("viewer GET private repo failed: %d", recPrivRepoViewer.Code)
+	}
+	var privViewerPayload map[string]any
+	_ = json.Unmarshal(recPrivRepoViewer.Body.Bytes(), &privViewerPayload)
+	if u, _ := privViewerPayload["pages_url"].(string); !strings.HasSuffix(u, "/pages/pages_owner/site-private/") {
+		t.Errorf("authorized viewer expected pages_url on private repo, got %q", u)
+	}
+	if rec := doJSON("GET", "/pages/pages_owner/site-private/", "", nil); rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for anonymous visitor on private repo /pages/, got %d", rec.Code)
+	}
+	recPrivSiteViewer := doJSON("GET", "/pages/pages_owner/site-private/", viewerTok, nil)
+	if recPrivSiteViewer.Code != http.StatusOK || !strings.Contains(recPrivSiteViewer.Body.String(), "Private Site Live") {
+		t.Errorf("expected authorized viewer to access private site, got %d", recPrivSiteViewer.Code)
+	}
+
+	// 4. Welcome fallback HTML when no index/README exists omits admin-only "Pages Settings" button for non-owners
+	emptyPub, err := database.CreateRepository(owner.ID, "site-empty-welcome", "Empty welcome repo", false)
+	if err != nil {
+		t.Fatalf("create emptyPub: %v", err)
+	}
+	emptyDir := filepath.Join(router.cfg.Repository.Root, owner.Username, emptyPub.Name+".git")
+	if err := git.InitBareRepository(emptyDir, "main"); err != nil {
+		t.Fatalf("init empty bare repo: %v", err)
+	}
+	if _, _, err := git.SaveFile(emptyDir, "main", "notes.txt", "hello", "pages_owner", "pages_owner@example.com", "Init non-index", ""); err != nil {
+		t.Fatalf("commit empty welcome repo: %v", err)
+	}
+	if rec := doJSON("POST", "/api/v1/repos/pages_owner/site-empty-welcome/pages", ownerTok, map[string]any{"enable_pages": true, "pages_branch": "main", "pages_folder": "/"}); rec.Code != http.StatusOK {
+		t.Fatalf("enable pages on emptyPub: %d: %s", rec.Code, rec.Body.String())
+	}
+
+	recAnonWelcome := doJSON("GET", "/pages/pages_owner/site-empty-welcome/", "", nil)
+	if recAnonWelcome.Code != http.StatusOK {
+		t.Fatalf("expected 200 welcome page, got %d", recAnonWelcome.Code)
+	}
+	if strings.Contains(recAnonWelcome.Body.String(), "Pages Settings") || strings.Contains(recAnonWelcome.Body.String(), "Create index.html") {
+		t.Errorf("anonymous welcome page must not render owner/writer action buttons")
+	}
+	recOwnerWelcome := doJSON("GET", "/pages/pages_owner/site-empty-welcome/", ownerTok, nil)
+	if recOwnerWelcome.Code != http.StatusOK || !strings.Contains(recOwnerWelcome.Body.String(), "Pages Settings") {
+		t.Errorf("owner welcome page should include Pages Settings button")
+	}
+}
+
+
 
 
 

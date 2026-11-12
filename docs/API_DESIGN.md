@@ -171,11 +171,9 @@ Headers dispatched on deliveries:
 - `PATCH /api/v1/repos/:owner/:repo/settings` - Toggle repository features including `enable_wiki: boolean`, `enable_pages: boolean`, and `allow_download_and_pulls: boolean` (disables ZIP/Clone/Raw/Fork for non-write users and disables Pull Requests/Compare repo-wide with `403 Forbidden`). Requires admin permissions.
 
 ### 2.14 ProGit Pages Hosting
-- `GET /api/v1/repos/:owner/:repo/pages` - Inspect ProGit Pages configuration.
-- `POST /api/v1/repos/:owner/:repo/pages` - Enable or configure ProGit Pages.
-  - Body: `{"branch": "main", "folder": "/docs"}`
-- `DELETE /api/v1/repos/:owner/:repo/pages` - Disable Pages hosting.
-- `GET /pages/:owner/:repo/` - Static site delivery with automatic Markdown rendering.
+- `GET /api/v1/repos/:owner/:repo/pages` - Inspect ProGit Pages configuration (`enable_pages`, `pages_branch`, `pages_folder`, `pages_url`, `branches`). Requires repository owner or administrator privileges (`401 Unauthorized` / `403 Forbidden` for non-owners; `404` if private and unauthorized).
+- `POST /api/v1/repos/:owner/:repo/pages` - Enable, disable, or configure ProGit Pages (`{"enable_pages": true, "pages_branch": "main", "pages_folder": "/docs"}`). Requires repository owner or administrator privileges.
+- `GET /pages/:owner/:repo/` - Static site delivery with automatic Markdown rendering. When enabled, public repositories are accessible to all visitors (`pages_url` is returned in `GET /api/v1/repos/:owner/:repo`); private repositories require repo read access.
 
 ### 2.15 System Telemetry & Administrative APIs
 

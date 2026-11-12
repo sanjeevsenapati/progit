@@ -19,7 +19,8 @@ import {
   AlertCircle,
   Loader2,
   Archive,
-  Eye
+  Eye,
+  ExternalLink
 } from 'lucide-react';
 
 interface RepoNavProps {
@@ -37,6 +38,9 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, permissions, isStarred, 
   const canAdmin = !!(user && (user.is_admin || user.username === repo.owner_name || perms?.admin));
   const canDownload = perms ? perms.download !== false : true;
   const isViewOnly = Boolean(perms?.view_only || !canDownload);
+  const pagesSiteURL = repo.enable_pages
+    ? ((repo as any).pages_url || api.getCachedRepo(repo.owner_name, repo.name)?.pages_url || `/pages/${repo.owner_name}/${repo.name}/`)
+    : '';
 
   const [showForkModal, setShowForkModal] = useState(false);
   const [orgs, setOrgs] = useState<Organization[]>([]);
@@ -270,20 +274,35 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, permissions, isStarred, 
             </a>
           )}
 
-          <a
-            href={`${basePath}/pages`}
-            className={`flex items-center space-x-2 py-3 px-3 border-b-2 font-medium transition-colors whitespace-nowrap ${
-              activeTab === 'pages'
-                ? 'border-emerald-600 text-gray-900 dark:text-white font-semibold'
-                : 'border-transparent text-gray-500 dark:text-dark-muted hover:text-gray-700 dark:hover:text-dark-text'
-            }`}
-          >
-            <Globe className="w-4 h-4" />
-            <span>Pages</span>
-            {repo.enable_pages && (
+          {canAdmin ? (
+            <a
+              href={`${basePath}/pages`}
+              className={`flex items-center space-x-2 py-3 px-3 border-b-2 font-medium transition-colors whitespace-nowrap ${
+                activeTab === 'pages'
+                  ? 'border-emerald-600 text-gray-900 dark:text-white font-semibold'
+                  : 'border-transparent text-gray-500 dark:text-dark-muted hover:text-gray-700 dark:hover:text-dark-text'
+              }`}
+            >
+              <Globe className="w-4 h-4" />
+              <span>Pages</span>
+              {repo.enable_pages && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              )}
+            </a>
+          ) : repo.enable_pages ? (
+            <a
+              href={pagesSiteURL}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open published ProGit Pages site"
+              className="flex items-center space-x-1.5 py-3 px-3 border-b-2 border-transparent text-gray-500 dark:text-dark-muted hover:text-emerald-600 dark:hover:text-emerald-400 font-medium transition-colors whitespace-nowrap"
+            >
+              <Globe className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Pages</span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            )}
-          </a>
+              <ExternalLink className="w-3 h-3 opacity-75" />
+            </a>
+          ) : null}
 
           {(canAdmin || activeTab === 'settings') && (
             <a

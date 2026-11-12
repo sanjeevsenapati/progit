@@ -249,15 +249,15 @@ Changes pushed over HTTPS or SSH are instantly indexed and reflected in the ProG
 
 ProGit Pages lets you host static websites, portfolios, or documentation directly from any Git branch.
 
-### 7.1 Enabling ProGit Pages
-1. Go to repository **Settings** (or the **Pages** tab).
+### 7.1 Enabling ProGit Pages (Owner / Repository Admin Only)
+1. Go to repository **Settings** (or the **Pages** tab — only visible for configuration to the repository owner and administrators).
 2. Check **Enable ProGit Pages**.
 3. Select the **Source Branch** (e.g. `gh-pages` or `main`).
 4. Select the **Source Folder** (`/` root or `/docs`).
 5. Click **Save Pages Configuration**.
 
 ### 7.2 Accessing Your Site
-Once enabled, your site is available at:
+Once enabled, the live ProGit Pages URL is displayed to all visitors on the repository **Code** page (and via the **Pages** navigation link) without exposing configuration controls:
 ```
 http://localhost:3000/pages/<owner>/<repo>/
 ```

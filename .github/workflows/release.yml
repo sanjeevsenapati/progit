@@ -66,7 +66,7 @@ jobs:
           VERSION: ${{ steps.get_version.outputs.version }}
         run: |
           mkdir -p dist/release
-          LDFLAGS="-s -w -X main.Version=${VERSION}"
+          LDFLAGS="-s -w -X main.Version=${VERSION} -X progit.io/progit/internal/api.Version=${VERSION}"
           TMP_DIR=$(mktemp -d)
 
           # Targets: OS:ARCH:FORMAT:BINARY

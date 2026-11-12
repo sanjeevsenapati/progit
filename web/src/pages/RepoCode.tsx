@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, Repository, RepoResponse, TreeEntry, Commit, RecentPush } from '../lib/api';
+import { useAuth } from '../lib/theme';
 import { RepoNav } from '../components/RepoNav';
 import { MarkdownViewer } from '../components/MarkdownViewer';
 import { showToast } from '../components/ModalDialog';
@@ -22,7 +23,9 @@ import {
   History,
   GitCommit,
   DownloadCloud,
-  Eye
+  Eye,
+  Globe,
+  ExternalLink
 } from 'lucide-react';
 
 interface RepoCodeProps {
@@ -51,6 +54,7 @@ function formatRelativeTime(dateInput: string | Date | number): string {
 }
 
 export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initialPath = '' }) => {
+  const { user } = useAuth();
   const cachedRepo = api.getCachedRepo(owner, repoName);
   const [repoData, setRepoData] = useState<Repository | null>(() => cachedRepo?.repository || null);
   const [isStarred, setIsStarred] = useState(() => cachedRepo?.is_starred || false);
@@ -69,6 +73,8 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
   const [repoPermissions, setRepoPermissions] = useState<RepoResponse['permissions'] | undefined>(cachedRepo?.permissions);
   const [canWrite, setCanWrite] = useState(() => Boolean(cachedRepo?.can_write || cachedRepo?.permissions?.write));
   const [canDownload, setCanDownload] = useState(() => cachedRepo?.permissions ? cachedRepo.permissions.download !== false : true);
+  const [pagesURL, setPagesURL] = useState(() => (cachedRepo?.repository?.enable_pages ? (cachedRepo?.pages_url || '') : ''));
+  const [copiedPages, setCopiedPages] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
@@ -78,6 +84,8 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
   const [copiedBlock1, setCopiedBlock1] = useState(false);
   const [copiedBlock2, setCopiedBlock2] = useState(false);
   const [recentPushes, setRecentPushes] = useState<RecentPush[]>([]);
+
+  const canAdmin = Boolean(user && (user.is_admin || user.username === owner || repoPermissions?.admin));
 
   const selectedCloneUrl = cloneTab === 'ssh' && cloneSSH ? cloneSSH : (cloneHTTP || `${window.location.origin}/${owner}/${repoName}.git`);
   const isEmptyRepo = !loading && !initialPath && entries.length === 0 && !latestCommit;
@@ -116,6 +124,11 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
         }
         setCloneHTTP(data.clone_url_http);
         setCloneSSH(data.clone_url_ssh);
+        setPagesURL(
+          data.repository.enable_pages
+            ? (data.pages_url || `${window.location.origin}/pages/${owner}/${repoName}/`)
+            : ''
+        );
 
         if (data.repository.allow_download_and_pulls !== false) {
           api.getRecentPushes(owner, repoName).then(res => {
@@ -531,6 +544,66 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
                 </a>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Published ProGit Pages URL Banner (visible to all when Pages is enabled) */}
+        {!initialPath && repoData.enable_pages && pagesURL && (
+          <div className="p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-800/70 bg-emerald-50/70 dark:bg-emerald-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs">
+            <div className="flex items-center space-x-2.5 min-w-0">
+              <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 shrink-0">
+                <Globe className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-bold text-gray-900 dark:text-white flex items-center space-x-1.5">
+                  <span>ProGit Pages</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300">
+                    Live
+                  </span>
+                </div>
+                <div className="flex items-center space-x-1.5 mt-0.5">
+                  <a
+                    href={pagesURL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono font-semibold text-emerald-700 dark:text-emerald-400 hover:underline truncate"
+                  >
+                    {pagesURL}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(pagesURL);
+                      setCopiedPages(true);
+                      setTimeout(() => setCopiedPages(false), 2000);
+                    }}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text shrink-0 cursor-pointer"
+                    title="Copy Pages URL"
+                  >
+                    {copiedPages ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2 shrink-0">
+              {canAdmin && (
+                <a
+                  href={`/${owner}/${repoName}/pages`}
+                  className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-hover text-gray-700 dark:text-dark-text font-semibold transition-colors"
+                >
+                  Configure
+                </a>
+              )}
+              <a
+                href={pagesURL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors shadow-xs"
+              >
+                <span>Visit Site</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
           </div>
         )}
 

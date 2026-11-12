@@ -13,9 +13,9 @@ Pre-built multi-architecture images and platform-specific artifacts are publicly
 | Registry Image / Tag | Architecture | Platform Description |
 | :--- | :--- | :--- |
 | `ghcr.io/sanjeevsenapati/progit:latest` | `linux/amd64` + `linux/arm64` | Multi-arch manifest (auto-selects native architecture) |
-| `ghcr.io/sanjeevsenapati/progit:1.3.0` | `linux/amd64` + `linux/arm64` | Release 1.3.0 multi-arch manifest |
-| `ghcr.io/sanjeevsenapati/progit:1.3.0-linux-amd64` | `linux/amd64` | Standard x86_64 production Linux servers |
-| `ghcr.io/sanjeevsenapati/progit:1.3.0-linux-arm64` | `linux/arm64` | ARM64 (Apple Silicon, AWS Graviton, Raspberry Pi) |
+| `ghcr.io/sanjeevsenapati/progit:1.4.0` | `linux/amd64` + `linux/arm64` | Release 1.4.0 multi-arch manifest |
+| `ghcr.io/sanjeevsenapati/progit:1.4.0-linux-amd64` | `linux/amd64` | Standard x86_64 production Linux servers |
+| `ghcr.io/sanjeevsenapati/progit:1.4.0-linux-arm64` | `linux/arm64` | ARM64 (Apple Silicon, AWS Graviton, Raspberry Pi) |
 | `ghcr.io/sanjeevsenapati/progit:linux-amd64` | `linux/amd64` | Latest rolling AMD64 build |
 | `ghcr.io/sanjeevsenapati/progit:linux-arm64` | `linux/arm64` | Latest rolling ARM64 build |
 
@@ -23,10 +23,10 @@ Pull the image directly:
 ```bash
 # Auto-detects architecture (AMD64 / ARM64)
 podman pull ghcr.io/sanjeevsenapati/progit:latest
-podman pull ghcr.io/sanjeevsenapati/progit:1.3.0
+podman pull ghcr.io/sanjeevsenapati/progit:1.4.0
 
 # Or pull explicitly by architecture
-podman pull ghcr.io/sanjeevsenapati/progit:1.3.0-linux-amd64
+podman pull ghcr.io/sanjeevsenapati/progit:1.4.0-linux-amd64
 ```
 
 ---
@@ -60,7 +60,7 @@ echo "127.0.0.1 progit.local" | sudo tee -a /etc/hosts
 ### 3.2 Automated Script Deployment
 Run the included deployment script:
 ```bash
-bash podman/deploy.sh ghcr.io/sanjeevsenapati/progit:1.3.0
+bash podman/deploy.sh ghcr.io/sanjeevsenapati/progit:1.4.0
 ```
 
 ### 3.3 Standalone Podman Run CLI
@@ -152,12 +152,12 @@ uname -m
 
 | Output of `uname -m` | Server Architecture | Correct Container Image Tag |
 | :--- | :--- | :--- |
-| `x86_64` | Intel / AMD 64-bit (Standard Enterprise Servers) | `ghcr.io/sanjeevsenapati/progit:1.3.0-linux-amd64` (or `:1.3.0`) |
-| `aarch64` | ARM 64-bit (AWS Graviton, Ampere Altra) | `ghcr.io/sanjeevsenapati/progit:1.3.0-linux-arm64` (or `:1.3.0`) |
+| `x86_64` | Intel / AMD 64-bit (Standard Enterprise Servers) | `ghcr.io/sanjeevsenapati/progit:1.4.0-linux-amd64` (or `:1.4.0`) |
+| `aarch64` | ARM 64-bit (AWS Graviton, Ampere Altra) | `ghcr.io/sanjeevsenapati/progit:1.4.0-linux-arm64` (or `:1.4.0`) |
 
 > [!WARNING]
 > **Architecture Mismatch Warning**:
-> Pulling an `arm64` image on an `x86_64` RHEL 9 server will result in an immediate `exec /progit: exec format error` crash (container exit code `126` or `139`). Always use the matching architecture tag or the multi-arch tag `:1.3.0`.
+> Pulling an `arm64` image on an `x86_64` RHEL 9 server will result in an immediate `exec /progit: exec format error` crash (container exit code `126` or `139`). Always use the matching architecture tag or the multi-arch tag `:1.4.0`.
 
 ---
 
@@ -210,10 +210,10 @@ podman volume ls
 1. Pull the appropriate image for your RHEL 9 server (example for standard `x86_64`):
 ```bash
 # For x86_64 servers:
-podman pull ghcr.io/sanjeevsenapati/progit:1.3.0-linux-amd64
+podman pull ghcr.io/sanjeevsenapati/progit:1.4.0-linux-amd64
 
 # (Or pull the multi-arch manifest tag which auto-selects x86_64 or aarch64):
-podman pull ghcr.io/sanjeevsenapati/progit:1.3.0
+podman pull ghcr.io/sanjeevsenapati/progit:1.4.0
 ```
 
 2. Run the container manually with background daemon mode (`-d`), persistent volumes with `:Z`, and automatic restart:
@@ -228,7 +228,7 @@ podman run -d \
   -v progit-repositories:/data/repositories:Z \
   -v progit-config:/data/config:Z \
   -v progit-logs:/data/logs:Z \
-  ghcr.io/sanjeevsenapati/progit:1.3.0-linux-amd64
+  ghcr.io/sanjeevsenapati/progit:1.4.0-linux-amd64
 ```
 
 ---
@@ -298,7 +298,7 @@ Access the web interface via browser:
 
 | Symptom / Error | Root Cause | Solution |
 | :--- | :--- | :--- |
-| `exec /progit: exec format error` | Pulled an `arm64` image on an `x86_64` CPU. | Remove image (`podman rmi ...`) and pull `ghcr.io/sanjeevsenapati/progit:1.3.0-linux-amd64`. |
+| `exec /progit: exec format error` | Pulled an `arm64` image on an `x86_64` CPU. | Remove image (`podman rmi ...`) and pull `ghcr.io/sanjeevsenapati/progit:1.4.0-linux-amd64`. |
 | `permission denied` writing to SQLite or `/data` | Missing `:Z` flag on SELinux in Enforcing mode. | Re-run `podman run` ensuring each volume has `:Z` suffix (e.g. `-v progit-data:/data/db:Z`). |
 | Connection refused or timed out from remote client | `firewalld` blocking ports `3443`, `3000`, or `2222`. | Run `sudo firewall-cmd --permanent --add-port=3443/tcp --add-port=3000/tcp --add-port=2222/tcp && sudo firewall-cmd --reload`. |
 | Container stops after user logs out | Rootless Podman user session terminated. | Enable lingering: `loginctl enable-linger $USER`. |

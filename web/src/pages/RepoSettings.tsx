@@ -46,7 +46,9 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
   const cachedRepo = api.getCachedRepo(owner, repoName);
   const [repoData, setRepoData] = useState<Repository | null>(() => cachedRepo?.repository || null);
   const [repoPermissions, setRepoPermissions] = useState<RepoResponse['permissions'] | undefined>(cachedRepo?.permissions);
-  const [canAdmin, setCanAdmin] = useState(true);
+  const [canAdmin, setCanAdmin] = useState(() =>
+    Boolean(user && (user.is_admin || user.username === owner || cachedRepo?.permissions?.admin))
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');

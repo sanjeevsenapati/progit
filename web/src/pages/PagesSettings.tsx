@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { api, Repository, PagesConfig } from '../lib/api';
+import { api, Repository, RepoResponse, PagesConfig } from '../lib/api';
+import { useAuth } from '../lib/theme';
 import { RepoNav } from '../components/RepoNav';
 import { showToast } from '../components/ModalDialog';
 import { 
@@ -10,6 +11,7 @@ import {
   GitBranch, 
   Folder, 
   ShieldCheck, 
+  ShieldAlert,
   FileCode, 
   Sparkles,
   AlertCircle
@@ -21,8 +23,15 @@ interface PagesSettingsProps {
 }
 
 export const PagesSettings: React.FC<PagesSettingsProps> = ({ owner, repo: repoName }) => {
-  const [repoData, setRepoData] = useState<Repository | null>(() => api.getCachedRepo(owner, repoName)?.repository || null);
+  const { user } = useAuth();
+  const cachedRepo = api.getCachedRepo(owner, repoName);
+  const [repoData, setRepoData] = useState<Repository | null>(() => cachedRepo?.repository || null);
+  const [repoPermissions, setRepoPermissions] = useState<RepoResponse['permissions'] | undefined>(cachedRepo?.permissions);
+  const [canAdmin, setCanAdmin] = useState(() =>
+    Boolean(user && (user.is_admin || user.username === owner || cachedRepo?.permissions?.admin))
+  );
   const [pagesConfig, setPagesConfig] = useState<PagesConfig | null>(null);
+  const [publicPagesURL, setPublicPagesURL] = useState<string>(() => cachedRepo?.pages_url || '');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -37,13 +46,26 @@ export const PagesSettings: React.FC<PagesSettingsProps> = ({ owner, repo: repoN
 
   useEffect(() => {
     loadData();
-  }, [owner, repoName]);
+  }, [owner, repoName, user]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       const repoRes = await api.getRepo(owner, repoName);
       setRepoData(repoRes.repository);
+      setRepoPermissions(repoRes.permissions);
+      const hasAdminAccess = !!(user && (user.is_admin || user.username === owner || repoRes.permissions?.admin));
+      setCanAdmin(hasAdminAccess);
+      setPublicPagesURL(
+        repoRes.repository.enable_pages
+          ? (repoRes.pages_url || `${window.location.origin}/pages/${owner}/${repoName}/`)
+          : ''
+      );
+
+      if (!hasAdminAccess) {
+        setPagesConfig(null);
+        return;
+      }
 
       const configRes = await api.getPagesConfig(owner, repoName);
       setPagesConfig(configRes);
@@ -68,6 +90,7 @@ export const PagesSettings: React.FC<PagesSettingsProps> = ({ owner, repo: repoN
       setPagesFolder(configRes.pages_folder || '/');
     } catch (err) {
       console.error('Failed to load pages config:', err);
+      setCanAdmin(false);
     } finally {
       setLoading(false);
     }
@@ -83,6 +106,7 @@ export const PagesSettings: React.FC<PagesSettingsProps> = ({ owner, repo: repoN
         pages_folder: pagesFolder,
       });
       setRepoData(res.repository);
+      setPublicPagesURL(enablePages ? res.pages_url : '');
       setPagesConfig({
         enable_pages: enablePages,
         pages_branch: pagesBranch,
@@ -100,9 +124,10 @@ export const PagesSettings: React.FC<PagesSettingsProps> = ({ owner, repo: repoN
     }
   };
 
-  const copyPagesURL = () => {
-    if (!pagesConfig?.pages_url) return;
-    navigator.clipboard.writeText(pagesConfig.pages_url);
+  const copyPagesURL = (urlToCopy?: string) => {
+    const target = urlToCopy || pagesConfig?.pages_url || publicPagesURL;
+    if (!target) return;
+    navigator.clipboard.writeText(target);
     setCopiedURL(true);
     setTimeout(() => setCopiedURL(false), 2000);
   };
@@ -120,9 +145,108 @@ export const PagesSettings: React.FC<PagesSettingsProps> = ({ owner, repo: repoN
     return <div className="py-20 text-center text-sm">Repository not found</div>;
   }
 
+  if (loading && !canAdmin) {
+    return (
+      <div>
+        <RepoNav repo={repoData} permissions={repoPermissions} activeTab="pages" />
+        <div className="py-20 text-center text-sm text-gray-400">
+          <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+          Loading ProGit Pages...
+        </div>
+      </div>
+    );
+  }
+
+  if (!canAdmin) {
+    if (repoData.enable_pages && publicPagesURL) {
+      return (
+        <div>
+          <RepoNav repo={repoData} permissions={repoPermissions} activeTab="pages" />
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center">
+                <Globe className="w-5 h-5 mr-2 text-emerald-600 dark:text-emerald-400" />
+                ProGit Pages
+              </h1>
+              <p className="text-xs text-gray-500 dark:text-dark-muted mt-1">
+                Published static website for <strong>{owner}/{repoName}</strong>.
+              </p>
+            </div>
+
+            <div className="p-5 rounded-xl border border-emerald-300 dark:border-emerald-800/80 bg-emerald-50/50 dark:bg-emerald-950/20 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start space-x-3">
+                <Sparkles className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">
+                    ProGit Pages site is live!
+                  </p>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <a
+                      href={publicPagesURL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-mono font-semibold text-emerald-700 dark:text-emerald-400 hover:underline break-all"
+                    >
+                      {publicPagesURL}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => copyPagesURL(publicPagesURL)}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text"
+                      title="Copy URL"
+                    >
+                      {copiedURL ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <a
+                href={publicPagesURL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-4 py-2 text-xs font-bold rounded-lg text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm transition-colors shrink-0"
+              >
+                <span>Visit Site</span>
+                <ExternalLink className="w-3.5 h-3.5 ml-1.5" />
+              </a>
+            </div>
+
+            <p className="text-xs text-gray-500 dark:text-dark-muted">
+              Only repository owners and administrators can configure ProGit Pages settings.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <RepoNav repo={repoData} permissions={repoPermissions} activeTab="pages" />
+        <div className="max-w-xl mx-auto my-16 p-8 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-center space-y-4 shadow-2xl">
+          <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto border border-red-200 dark:border-red-900/50">
+            <ShieldAlert className="w-6 h-6" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Access Restricted</h2>
+          <p className="text-xs text-gray-500 dark:text-dark-muted leading-relaxed">
+            Only repository owners and administrators can enable or configure ProGit Pages for <strong>{owner}/{repoName}</strong>.
+          </p>
+          <div className="pt-2">
+            <a
+              href={`/${owner}/${repoName}`}
+              className="inline-flex items-center px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm transition-colors"
+            >
+              Return to repository
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <RepoNav repo={repoData} activeTab="pages" />
+      <RepoNav repo={repoData} permissions={repoPermissions} activeTab="pages" />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         <div>
@@ -154,7 +278,8 @@ export const PagesSettings: React.FC<PagesSettingsProps> = ({ owner, repo: repoN
                     {pagesConfig.pages_url}
                   </a>
                   <button
-                    onClick={copyPagesURL}
+                    type="button"
+                    onClick={() => copyPagesURL()}
                     className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-text"
                     title="Copy URL"
                   >

@@ -6,7 +6,11 @@ set -euo pipefail
 # Targets: macOS (arm64, amd64), Linux (amd64, arm64), Windows (amd64, arm64)
 # ==============================================================================
 
-VERSION="${1:-1.3.0}"
+DEFAULT_VERSION="1.4.0"
+if [ -f "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/VERSION" ]; then
+    DEFAULT_VERSION="$(tr -d '[:space:]' < "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/VERSION")"
+fi
+VERSION="${1:-${DEFAULT_VERSION}}"
 VERSION="${VERSION#v}" # Strip leading 'v' if present
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${REPO_ROOT}/dist/release/v${VERSION}"
@@ -40,7 +44,7 @@ TARGETS=(
     "windows:arm64:zip:progit.exe"
 )
 
-LDFLAGS="-s -w -X main.Version=${VERSION}"
+LDFLAGS="-s -w -X main.Version=${VERSION} -X progit.io/progit/internal/api.Version=${VERSION}"
 
 TMP_BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "${TMP_BUILD_DIR}"' EXIT

@@ -28,7 +28,7 @@ import (
 
 var (
 	startTime = time.Now()
-	Version   = "1.3.0"
+	Version   = "1.4.0"
 )
 
 type ipRateLimiter struct {
@@ -1663,7 +1663,10 @@ func (r *Router) handleGetRepo(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 	}
-	pagesURL := fmt.Sprintf("%spages/%s/%s/", rootURL, owner, repoName)
+	pagesURL := ""
+	if repo.EnablePages {
+		pagesURL = fmt.Sprintf("%spages/%s/%s/", rootURL, owner, repoName)
+	}
 
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"repository": repo,
@@ -3562,6 +3565,14 @@ func (r *Router) handleGetPagesConfig(w http.ResponseWriter, req *http.Request) 
 		jsonError(w, http.StatusNotFound, "Repository not found")
 		return
 	}
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if !r.canAdminRepo(user, repo) {
+		jsonError(w, http.StatusForbidden, "Owner or administrator privileges required to view pages configuration")
+		return
+	}
 
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
 	branches, _ := git.GetBranches(repoDir)
@@ -3622,14 +3633,18 @@ func (r *Router) handleUpdatePagesConfig(w http.ResponseWriter, req *http.Reques
 	repoName := req.PathValue("repo")
 
 	user := auth.AuthenticateRequest(req)
-	if user == nil {
-		jsonError(w, http.StatusUnauthorized, "Unauthorized")
-		return
-	}
-
 	repo, err := database.GetRepositoryByName(owner, repoName)
 	if err != nil || repo == nil {
 		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	if !database.CanUserAccessRepo(user, repo, false) {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
@@ -3667,7 +3682,10 @@ func (r *Router) handleUpdatePagesConfig(w http.ResponseWriter, req *http.Reques
 
 	updatedRepo, _ := database.GetRepositoryByID(repo.ID)
 	rootURL := strings.TrimRight(r.cfg.Server.RootURL, "/") + "/"
-	pagesURL := fmt.Sprintf("%spages/%s/%s/", rootURL, owner, repoName)
+	pagesURL := ""
+	if body.EnablePages {
+		pagesURL = fmt.Sprintf("%spages/%s/%s/", rootURL, owner, repoName)
+	}
 
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"message":    "Pages configuration updated",
@@ -3783,17 +3801,15 @@ func (r *Router) handleServePages(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if !repo.EnablePages {
-		renderPagesMessage(w, http.StatusNotFound, "ProGit Pages Disabled", fmt.Sprintf("ProGit Pages is currently disabled for repository <strong>%s/%s</strong>.<br><br>The repository administrator can enable it under <strong>Settings &rarr; ProGit Pages</strong>.", htmlEscape(owner), htmlEscape(repoName)), repo)
+	user := auth.AuthenticateRequest(req)
+	if repo.IsPrivate && !database.CanUserAccessRepo(user, repo, false) {
+		renderPagesMessage(w, http.StatusForbidden, "Authentication Required", fmt.Sprintf("Repository <strong>%s/%s</strong> is private. Please sign in to an account with access to view this site.", htmlEscape(owner), htmlEscape(repoName)), repo)
 		return
 	}
 
-	if repo.IsPrivate {
-		user := auth.AuthenticateRequest(req)
-		if !database.CanUserAccessRepo(user, repo, false) {
-			renderPagesMessage(w, http.StatusForbidden, "Authentication Required", fmt.Sprintf("Repository <strong>%s/%s</strong> is private. Please sign in to an account with access to view this site.", htmlEscape(owner), htmlEscape(repoName)), repo)
-			return
-		}
+	if !repo.EnablePages {
+		renderPagesMessage(w, http.StatusNotFound, "ProGit Pages Disabled", fmt.Sprintf("ProGit Pages is currently disabled for repository <strong>%s/%s</strong>.<br><br>The repository administrator can enable it under <strong>Settings &rarr; ProGit Pages</strong>.", htmlEscape(owner), htmlEscape(repoName)), repo)
+		return
 	}
 
 	repoDir := filepath.Join(r.cfg.Repository.Root, owner, repoName+".git")
@@ -3903,7 +3919,9 @@ func (r *Router) handleServePages(w http.ResponseWriter, req *http.Request) {
 		}
 
 		if isIndexRequest {
-			renderPagesWelcome(w, repo, branch, folder)
+			canWrite := database.CanUserAccessRepo(user, repo, true)
+			canAdmin := r.canAdminRepo(user, repo)
+			renderPagesWelcome(w, repo, branch, folder, canWrite, canAdmin)
 			return
 		}
 
@@ -4055,13 +4073,22 @@ func servePagesContent(w http.ResponseWriter, filePath string, content []byte, r
 	}
 }
 
-func renderPagesWelcome(w http.ResponseWriter, repo *database.Repository, branch, folder string) {
+func renderPagesWelcome(w http.ResponseWriter, repo *database.Repository, branch, folder string, canWrite, canAdmin bool) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 
 	sourceDisplay := branch
 	if folder != "" && folder != "/" {
 		sourceDisplay += " (" + folder + ")"
+	}
+
+	var actionsHTML strings.Builder
+	if canWrite {
+		actionsHTML.WriteString(fmt.Sprintf(`<a class="btn btn-primary" href="/%s/%s/new/%s">Create index.html</a>`, htmlEscape(repo.OwnerName), htmlEscape(repo.Name), htmlEscape(branch)))
+	}
+	actionsHTML.WriteString(fmt.Sprintf(`<a class="btn btn-secondary" href="/%s/%s">Browse Repository</a>`, htmlEscape(repo.OwnerName), htmlEscape(repo.Name)))
+	if canAdmin {
+		actionsHTML.WriteString(fmt.Sprintf(`<a class="btn btn-secondary" href="/%s/%s/pages">Pages Settings</a>`, htmlEscape(repo.OwnerName), htmlEscape(repo.Name)))
 	}
 
 	html := fmt.Sprintf(`<!DOCTYPE html>
@@ -4170,13 +4197,11 @@ func renderPagesWelcome(w http.ResponseWriter, repo *database.Repository, branch
       <div style="margin-top: 4px;">Target Folder: <strong>%s</strong></div>
     </div>
     <div class="actions">
-      <a class="btn btn-primary" href="/%s/%s/new/%s">Create index.html</a>
-      <a class="btn btn-secondary" href="/%s/%s">Browse Repository</a>
-      <a class="btn btn-secondary" href="/%s/%s/pages">Pages Settings</a>
+      %s
     </div>
   </div>
 </body>
-</html>`, htmlEscape(repo.OwnerName), htmlEscape(repo.Name), htmlEscape(repo.OwnerName), htmlEscape(repo.Name), htmlEscape(sourceDisplay), htmlEscape(folder), htmlEscape(repo.OwnerName), htmlEscape(repo.Name), htmlEscape(branch), htmlEscape(repo.OwnerName), htmlEscape(repo.Name), htmlEscape(repo.OwnerName), htmlEscape(repo.Name))
+</html>`, htmlEscape(repo.OwnerName), htmlEscape(repo.Name), htmlEscape(repo.OwnerName), htmlEscape(repo.Name), htmlEscape(sourceDisplay), htmlEscape(folder), actionsHTML.String())
 	_, _ = w.Write([]byte(html))
 }
 
