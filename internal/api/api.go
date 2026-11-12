@@ -28,7 +28,7 @@ import (
 
 var (
 	startTime = time.Now()
-	Version   = "1.4.0"
+	Version   = "1.5.0"
 )
 
 type ipRateLimiter struct {
@@ -396,14 +396,20 @@ func (r *Router) handleHealth(w http.ResponseWriter, req *http.Request) {
 
 	uptime := time.Since(startTime).String()
 
+	defaultBranch := strings.TrimSpace(r.cfg.Repository.DefaultBranch)
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+
 	jsonResponse(w, http.StatusOK, map[string]any{
-		"status":       "ok",
-		"app":          r.cfg.Server.AppName,
-		"version":      Version,
-		"database":     dbStatus,
-		"repositories": repoStorageStatus,
-		"uptime":       uptime,
-		"ssh_enabled":  r.cfg.SSH.Enabled,
+		"status":         "ok",
+		"app":            r.cfg.Server.AppName,
+		"version":        Version,
+		"database":       dbStatus,
+		"repositories":   repoStorageStatus,
+		"uptime":         uptime,
+		"ssh_enabled":    r.cfg.SSH.Enabled,
+		"default_branch": defaultBranch,
 	})
 }
 
@@ -1309,11 +1315,12 @@ func (r *Router) handleCreateRepo(w http.ResponseWriter, req *http.Request) {
 	}
 
 	var body struct {
-		Name        string `json:"name"`
-		Owner       string `json:"owner"`
-		Description string `json:"description"`
-		Private     bool   `json:"private"`
-		AutoInit    bool   `json:"auto_init"`
+		Name          string `json:"name"`
+		Owner         string `json:"owner"`
+		Description   string `json:"description"`
+		Private       bool   `json:"private"`
+		AutoInit      bool   `json:"auto_init"`
+		DefaultBranch string `json:"default_branch"`
 	}
 	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 		jsonError(w, http.StatusBadRequest, "Invalid request body")
@@ -1323,6 +1330,18 @@ func (r *Router) handleCreateRepo(w http.ResponseWriter, req *http.Request) {
 	body.Name = strings.TrimSpace(body.Name)
 	if len(body.Name) < 1 {
 		jsonError(w, http.StatusBadRequest, "Repository name is required")
+		return
+	}
+
+	defaultBranch := strings.TrimSpace(body.DefaultBranch)
+	if defaultBranch == "" {
+		defaultBranch = strings.TrimSpace(r.cfg.Repository.DefaultBranch)
+	}
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+	if !git.IsValidBranchName(defaultBranch) {
+		jsonError(w, http.StatusBadRequest, "Invalid default branch name")
 		return
 	}
 
@@ -1377,7 +1396,7 @@ func (r *Router) handleCreateRepo(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	repo, err := database.CreateRepository(targetOwnerID, body.Name, body.Description, body.Private)
+	repo, err := database.CreateRepositoryWithDefaultBranch(targetOwnerID, body.Name, body.Description, body.Private, defaultBranch)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
 			jsonError(w, http.StatusConflict, "Repository already exists")
@@ -1389,9 +1408,9 @@ func (r *Router) handleCreateRepo(w http.ResponseWriter, req *http.Request) {
 
 	repoDir := filepath.Join(r.cfg.Repository.Root, targetOwnerName, repo.Name+".git")
 	if body.AutoInit {
-		err = git.InitRepositoryWithReadme(repoDir, repo.Name, repo.Description, "main", user.Username, user.Email)
+		err = git.InitRepositoryWithReadme(repoDir, repo.Name, repo.Description, defaultBranch, user.Username, user.Email)
 	} else {
-		err = git.InitBareRepository(repoDir, "main")
+		err = git.InitBareRepository(repoDir, defaultBranch)
 	}
 
 	if err != nil {
@@ -1895,7 +1914,11 @@ func (r *Router) handleDeleteBranch(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if branchName == repo.DefaultBranch || branchName == "main" || branchName == "master" {
+	defaultBranch := repo.DefaultBranch
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+	if branchName == defaultBranch {
 		jsonError(w, http.StatusBadRequest, "Cannot delete the default branch")
 		return
 	}
@@ -3717,6 +3740,7 @@ func (r *Router) handleUpdateRepoSettings(w http.ResponseWriter, req *http.Reque
 
 	var body struct {
 		Description           *string `json:"description"`
+		DefaultBranch         *string `json:"default_branch"`
 		IsPrivate             *bool   `json:"is_private"`
 		EnableWiki            *bool   `json:"enable_wiki"`
 		EnablePages           *bool   `json:"enable_pages"`
@@ -3727,6 +3751,19 @@ func (r *Router) handleUpdateRepoSettings(w http.ResponseWriter, req *http.Reque
 	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 		jsonError(w, http.StatusBadRequest, "Invalid request body")
 		return
+	}
+
+	var targetDefaultBranch string
+	shouldUpdateDefaultBranch := false
+	if body.DefaultBranch != nil {
+		targetDefaultBranch = strings.TrimSpace(*body.DefaultBranch)
+		if !git.IsValidBranchName(targetDefaultBranch) {
+			jsonError(w, http.StatusBadRequest, "Invalid default branch name")
+			return
+		}
+		if targetDefaultBranch != repo.DefaultBranch {
+			shouldUpdateDefaultBranch = true
+		}
 	}
 
 	desc := repo.Description
@@ -3767,9 +3804,27 @@ func (r *Router) handleUpdateRepoSettings(w http.ResponseWriter, req *http.Reque
 		pFolder = "/"
 	}
 
+	if shouldUpdateDefaultBranch {
+		repoDir := filepath.Join(r.cfg.Repository.Root, repo.OwnerName, repo.Name+".git")
+		if _, statErr := os.Stat(repoDir); statErr == nil {
+			if err := git.SetDefaultBranch(repoDir, targetDefaultBranch); err != nil {
+				jsonError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+		}
+	}
+
 	if err := database.UpdateRepositorySettings(repo.ID, desc, priv, wiki, pages, pBranch, pFolder, allowDownloadAndPulls); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	if shouldUpdateDefaultBranch {
+		if err := database.SetRepositoryDefaultBranch(repo.ID, targetDefaultBranch); err != nil {
+			jsonError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		database.CreateActivity(user.ID, user.Username, &repo.ID, repo.Name, "repo_settings", fmt.Sprintf("Changed default branch of %s/%s from '%s' to '%s'", repo.OwnerName, repo.Name, repo.DefaultBranch, targetDefaultBranch))
 	}
 
 	updatedRepo, _ := database.GetRepositoryByID(repo.ID)
@@ -4537,29 +4592,35 @@ func (r *Router) handleAdminStats(w http.ResponseWriter, req *http.Request) {
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
 
+	defaultBranch := strings.TrimSpace(r.cfg.Repository.DefaultBranch)
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+
 	jsonResponse(w, http.StatusOK, map[string]any{
-		"users_count":           userCount,
-		"repositories_count":    repoCount,
-		"uptime":                time.Since(startTime).String(),
-		"database_path":         r.cfg.Database.Path,
-		"repositories_path":     r.cfg.Repository.Root,
-		"ssh_enabled":           r.cfg.SSH.Enabled,
-		"ssh_port":              r.cfg.SSH.Port,
-		"domain":                r.cfg.Server.Domain,
-		"http_port":             r.cfg.Server.HTTPPort,
-		"https_port":            r.cfg.Server.HTTPSPort,
-		"protocol":              r.cfg.Server.Protocol,
-		"is_https":              r.cfg.Server.Protocol == "https",
-		"enable_acme":           r.cfg.Server.EnableACME,
-		"generate_local_cert":   r.cfg.Server.GenerateLocalCert,
-		"root_url":              r.cfg.Server.RootURL,
-		"app_name":              r.cfg.Server.AppName,
-		"go_version":            runtime.Version(),
-		"num_goroutines":        runtime.NumGoroutine(),
-		"memory_alloc_mb":       float64(mem.Alloc) / 1024 / 1024,
-		"memory_sys_mb":         float64(mem.Sys) / 1024 / 1024,
+		"users_count":                     userCount,
+		"repositories_count":              repoCount,
+		"uptime":                          time.Since(startTime).String(),
+		"database_path":                   r.cfg.Database.Path,
+		"repositories_path":               r.cfg.Repository.Root,
+		"ssh_enabled":                     r.cfg.SSH.Enabled,
+		"ssh_port":                        r.cfg.SSH.Port,
+		"domain":                          r.cfg.Server.Domain,
+		"http_port":                       r.cfg.Server.HTTPPort,
+		"https_port":                      r.cfg.Server.HTTPSPort,
+		"protocol":                        r.cfg.Server.Protocol,
+		"is_https":                        r.cfg.Server.Protocol == "https",
+		"enable_acme":                     r.cfg.Server.EnableACME,
+		"generate_local_cert":             r.cfg.Server.GenerateLocalCert,
+		"root_url":                        r.cfg.Server.RootURL,
+		"app_name":                        r.cfg.Server.AppName,
+		"go_version":                      runtime.Version(),
+		"num_goroutines":                  runtime.NumGoroutine(),
+		"memory_alloc_mb":                 float64(mem.Alloc) / 1024 / 1024,
+		"memory_sys_mb":                   float64(mem.Sys) / 1024 / 1024,
 		"active_sessions_count":           auth.CountActiveSessions(),
 		"install_locked":                  r.cfg.Security.InstallLock,
+		"default_branch":                  defaultBranch,
 		"default_repo_max_creation_limit": r.cfg.Repository.MaxCreationLimit,
 		"default_org_max_creation_limit":  r.cfg.Organization.MaxCreationLimit,
 	})
@@ -4862,19 +4923,32 @@ func (r *Router) handleAdminUpdateConfig(w http.ResponseWriter, req *http.Reques
 	}
 
 	var body struct {
-		AppName                     string `json:"app_name"`
-		Domain                      string `json:"domain"`
-		RootURL                     string `json:"root_url"`
-		SSHPort                     int    `json:"ssh_port"`
-		HTTPPort                    int    `json:"http_port"`
-		DefaultRepoMaxCreationLimit *int   `json:"default_repo_max_creation_limit"`
-		DefaultOrgMaxCreationLimit  *int   `json:"default_org_max_creation_limit"`
+		AppName                     string  `json:"app_name"`
+		Domain                      string  `json:"domain"`
+		RootURL                     string  `json:"root_url"`
+		SSHPort                     int     `json:"ssh_port"`
+		HTTPPort                    int     `json:"http_port"`
+		DefaultBranch               *string `json:"default_branch"`
+		DefaultRepoMaxCreationLimit *int    `json:"default_repo_max_creation_limit"`
+		DefaultOrgMaxCreationLimit  *int    `json:"default_org_max_creation_limit"`
 	}
 	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 		jsonError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
+	if body.DefaultBranch != nil {
+		db := strings.TrimSpace(*body.DefaultBranch)
+		if db == "" {
+			jsonError(w, http.StatusBadRequest, "Default branch name cannot be empty")
+			return
+		}
+		if !git.IsValidBranchName(db) {
+			jsonError(w, http.StatusBadRequest, "Invalid default branch name")
+			return
+		}
+		r.cfg.Repository.DefaultBranch = db
+	}
 	if body.AppName != "" {
 		r.cfg.Server.AppName = strings.TrimSpace(body.AppName)
 	}
@@ -4916,7 +4990,12 @@ func (r *Router) handleAdminUpdateConfig(w http.ResponseWriter, req *http.Reques
 	}
 	_ = config.Save(savePath, r.cfg)
 
-	database.CreateActivity(currentAdmin.ID, currentAdmin.Username, nil, "", "admin_config", fmt.Sprintf("Updated server configuration: RootURL=%s, Domain=%s", r.cfg.Server.RootURL, r.cfg.Server.Domain))
+	database.CreateActivity(currentAdmin.ID, currentAdmin.Username, nil, "", "admin_config", fmt.Sprintf("Updated server configuration: RootURL=%s, Domain=%s, DefaultBranch=%s", r.cfg.Server.RootURL, r.cfg.Server.Domain, r.cfg.Repository.DefaultBranch))
+
+	defaultBranch := strings.TrimSpace(r.cfg.Repository.DefaultBranch)
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
 
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"message":                         "Server configuration updated successfully",
@@ -4925,6 +5004,7 @@ func (r *Router) handleAdminUpdateConfig(w http.ResponseWriter, req *http.Reques
 		"root_url":                        r.cfg.Server.RootURL,
 		"ssh_port":                        r.cfg.SSH.Port,
 		"http_port":                       r.cfg.Server.HTTPPort,
+		"default_branch":                  defaultBranch,
 		"default_repo_max_creation_limit": r.cfg.Repository.MaxCreationLimit,
 		"default_org_max_creation_limit":  r.cfg.Organization.MaxCreationLimit,
 	})

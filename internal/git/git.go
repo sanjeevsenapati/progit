@@ -290,6 +290,29 @@ func ImportRepository(cloneURL, destRepoPath, username, password string) error {
 	return nil
 }
 
+// IsValidBranchName validates a Git branch name structurally and via git check-ref-format.
+func IsValidBranchName(branch string) bool {
+	if branch == "" || branch != strings.TrimSpace(branch) || len(branch) > 255 {
+		return false
+	}
+	if branch == "HEAD" || strings.HasPrefix(branch, "-") || strings.HasPrefix(branch, "/") || strings.HasSuffix(branch, "/") {
+		return false
+	}
+	if strings.Contains(branch, "//") || strings.Contains(branch, "..") || strings.Contains(branch, "@{") {
+		return false
+	}
+	if strings.ContainsAny(branch, " ~^:?*[\\") {
+		return false
+	}
+	for _, r := range branch {
+		if r < 32 || r == 127 {
+			return false
+		}
+	}
+	_, err := RunGit("", "check-ref-format", "refs/heads/"+branch)
+	return err == nil
+}
+
 // GetDefaultBranch returns the default branch for a bare repository.
 func GetDefaultBranch(repoPath string) string {
 	out, err := RunGit(repoPath, "symbolic-ref", "--short", "HEAD")
@@ -309,6 +332,34 @@ func GetDefaultBranch(repoPath string) string {
 		return branches[0]
 	}
 	return "main"
+}
+
+// SetDefaultBranch updates the bare repository's HEAD symbolic ref to the given branch.
+// If the repository already has branches, the target branch must exist.
+func SetDefaultBranch(repoPath, branch string) error {
+	branch = strings.TrimSpace(branch)
+	if !IsValidBranchName(branch) {
+		return fmt.Errorf("invalid branch name '%s'", branch)
+	}
+	branches, err := GetBranches(repoPath)
+	if err == nil && len(branches) > 0 {
+		found := false
+		for _, b := range branches {
+			if b == branch {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("branch '%s' does not exist in repository", branch)
+		}
+	}
+	_, err = RunGit(repoPath, "symbolic-ref", "HEAD", "refs/heads/"+branch)
+	if err != nil {
+		return fmt.Errorf("failed to set default branch: %w", err)
+	}
+	_, _ = RunGit(repoPath, "update-server-info")
+	return nil
 }
 
 // InitBareRepository initializes a bare Git repository with the given default branch.

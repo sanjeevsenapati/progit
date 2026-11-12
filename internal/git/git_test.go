@@ -459,4 +459,58 @@ func TestArchiveZipAndRefValidation(t *testing.T) {
 	}
 }
 
+func TestSetDefaultBranchAndValidation(t *testing.T) {
+	validNames := []string{"main", "master", "develop", "release/v1.5", "feat_default-branch"}
+	for _, b := range validNames {
+		if !IsValidBranchName(b) {
+			t.Errorf("expected valid branch name %q to pass IsValidBranchName", b)
+		}
+	}
+
+	invalidNames := []string{"", " ", "-bad", "HEAD", "bad branch", "bad..branch", "bad@{1}", "/leading", "trailing/", "a//b", "bad~1", "bad^2", "bad:ref", "bad*glob"}
+	for _, b := range invalidNames {
+		if IsValidBranchName(b) {
+			t.Errorf("expected invalid branch name %q to fail IsValidBranchName", b)
+		}
+	}
+
+	tempDir, err := os.MkdirTemp("", "progit-defbranch-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// 1. Empty bare repo allows switching HEAD to custom branch before first push
+	emptyRepo := filepath.Join(tempDir, "empty.git")
+	if err := InitBareRepository(emptyRepo, "main"); err != nil {
+		t.Fatalf("InitBareRepository failed: %v", err)
+	}
+	if got := GetDefaultBranch(emptyRepo); got != "main" {
+		t.Fatalf("expected initial HEAD 'main', got %q", got)
+	}
+	if err := SetDefaultBranch(emptyRepo, "trunk"); err != nil {
+		t.Fatalf("SetDefaultBranch on empty repo failed: %v", err)
+	}
+	if got := GetDefaultBranch(emptyRepo); got != "trunk" {
+		t.Errorf("expected HEAD updated to 'trunk', got %q", got)
+	}
+
+	// 2. Non-empty repo requires target branch to exist
+	populatedRepo := filepath.Join(tempDir, "populated.git")
+	if err := InitRepositoryWithReadme(populatedRepo, "pop", "Populated", "main", "Tester", "tester@example.com"); err != nil {
+		t.Fatalf("InitRepositoryWithReadme failed: %v", err)
+	}
+	if err := SetDefaultBranch(populatedRepo, "nonexistent"); err == nil {
+		t.Errorf("expected SetDefaultBranch to fail when target branch does not exist")
+	}
+	if err := CreateBranch(populatedRepo, "develop", "main"); err != nil {
+		t.Fatalf("CreateBranch develop failed: %v", err)
+	}
+	if err := SetDefaultBranch(populatedRepo, "develop"); err != nil {
+		t.Fatalf("SetDefaultBranch('develop') failed: %v", err)
+	}
+	if got := GetDefaultBranch(populatedRepo); got != "develop" {
+		t.Errorf("expected GetDefaultBranch 'develop', got %q", got)
+	}
+}
 

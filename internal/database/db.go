@@ -844,11 +844,19 @@ func DeleteSSHKey(userID, keyID int64) error {
 // Repository Methods
 
 func CreateRepository(ownerID int64, name, description string, isPrivate bool) (*Repository, error) {
+	return CreateRepositoryWithDefaultBranch(ownerID, name, description, isPrivate, "main")
+}
+
+func CreateRepositoryWithDefaultBranch(ownerID int64, name, description string, isPrivate bool, defaultBranch string) (*Repository, error) {
 	name = strings.TrimSpace(name)
+	defaultBranch = strings.TrimSpace(defaultBranch)
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
 	res, err := DB.Exec(`
 		INSERT INTO repositories (owner_id, name, description, is_private, default_branch, enable_wiki, enable_pages, pages_branch, pages_folder, allow_download_and_pulls)
-		VALUES (?, ?, ?, ?, 'main', 1, 0, 'main', '/', 1)
-	`, ownerID, name, description, isPrivate)
+		VALUES (?, ?, ?, ?, ?, 1, 0, ?, '/', 1)
+	`, ownerID, name, description, isPrivate, defaultBranch, defaultBranch)
 	if err != nil {
 		return nil, err
 	}
@@ -1167,7 +1175,7 @@ func SetRepositoryDefaultBranch(repoID int64, defaultBranch string) error {
 	}
 	_, err := DB.Exec(`
 		UPDATE repositories 
-		SET default_branch = ?, pages_branch = CASE WHEN pages_branch = 'main' OR pages_branch = 'master' THEN ? ELSE pages_branch END, updated_at = CURRENT_TIMESTAMP
+		SET default_branch = ?, pages_branch = CASE WHEN enable_pages = 0 AND (pages_branch = 'main' OR pages_branch = 'master') THEN ? ELSE pages_branch END, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`, defaultBranch, defaultBranch, repoID)
 	return err

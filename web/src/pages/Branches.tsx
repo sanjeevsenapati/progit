@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { api, Repository, RepoResponse, BranchDetail } from '../lib/api';
+import { useAuth } from '../lib/theme';
 import { RepoNav } from '../components/RepoNav';
+import { showToast } from '../components/ModalDialog';
 import { 
   GitBranch, 
   Plus, 
@@ -23,6 +25,7 @@ interface BranchesProps {
 }
 
 export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => {
+  const { user } = useAuth();
   const cachedRepo = api.getCachedRepo(owner, repoName);
   const [repoData, setRepoData] = useState<Repository | null>(() => cachedRepo?.repository || null);
   const [repoPermissions, setRepoPermissions] = useState<RepoResponse['permissions'] | undefined>(cachedRepo?.permissions);
@@ -31,6 +34,8 @@ export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => 
   const [activeTab, setActiveTab] = useState<'overview' | 'all'>('overview');
   const [loading, setLoading] = useState(true);
   const [canWrite, setCanWrite] = useState(() => Boolean(cachedRepo?.can_write || cachedRepo?.permissions?.write));
+  const [canAdmin, setCanAdmin] = useState(() => Boolean(user && (user.is_admin || user.username === owner || cachedRepo?.permissions?.admin)));
+  const [settingDefault, setSettingDefault] = useState<string | null>(null);
 
   // Create branch modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -51,6 +56,7 @@ export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => 
       setRepoData(r.repository);
       setRepoPermissions(r.permissions);
       setCanWrite(Boolean(r.can_write || r.permissions?.write));
+      setCanAdmin(Boolean(user && (user.is_admin || user.username === owner || r.permissions?.admin)));
       setBaseBranch(r.repository.default_branch || 'main');
 
       try {
@@ -127,6 +133,19 @@ export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => 
       setDeleteError(err.message || 'Failed to delete branch');
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleSetDefaultBranch = async (branchName: string) => {
+    try {
+      setSettingDefault(branchName);
+      await api.updateRepoSettings(owner, repoName, { default_branch: branchName });
+      showToast(`Default branch updated to '${branchName}'`);
+      await loadBranches();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update default branch', 'error');
+    } finally {
+      setSettingDefault(null);
     }
   };
 
@@ -355,6 +374,20 @@ export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => 
                       </div>
 
                       <div className="flex items-center space-x-2 shrink-0">
+                        {/* Set as default */}
+                        {canAdmin && (
+                          <button
+                            type="button"
+                            disabled={settingDefault === b.name}
+                            onClick={() => handleSetDefaultBranch(b.name)}
+                            className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold rounded-md border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-700 dark:hover:text-emerald-300 hover:border-emerald-300 dark:hover:border-emerald-800 text-gray-700 dark:text-dark-text shadow-sm transition-colors disabled:opacity-50"
+                            title={`Set ${b.name} as default branch`}
+                          >
+                            <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span>{settingDefault === b.name ? 'Updating...' : 'Set default'}</span>
+                          </button>
+                        )}
+
                         {/* Compare / New Pull Request */}
                         {pullsEnabled && (
                           <a
@@ -440,6 +473,19 @@ export const Branches: React.FC<BranchesProps> = ({ owner, repo: repoName }) => 
                   <div className="flex items-center space-x-2 shrink-0">
                     {!(b.is_default || b.name === defaultBranchName) && (
                       <>
+                        {canAdmin && (
+                          <button
+                            type="button"
+                            disabled={settingDefault === b.name}
+                            onClick={() => handleSetDefaultBranch(b.name)}
+                            className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold rounded-md border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-700 dark:hover:text-emerald-300 hover:border-emerald-300 dark:hover:border-emerald-800 text-gray-700 dark:text-dark-text shadow-sm transition-colors disabled:opacity-50"
+                            title={`Set ${b.name} as default branch`}
+                          >
+                            <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span>{settingDefault === b.name ? 'Updating...' : 'Set default'}</span>
+                          </button>
+                        )}
+
                         {pullsEnabled && (
                           <a
                             href={`/${owner}/${repoName}/compare?base=${defaultBranchName}&head=${b.name}`}

@@ -10,6 +10,8 @@ export const NewRepo: React.FC = () => {
   const [selectedOwner, setSelectedOwner] = useState('');
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [description, setDescription] = useState('');
+  const [defaultBranch, setDefaultBranch] = useState('main');
+  const [instanceDefaultBranch, setInstanceDefaultBranch] = useState('main');
   const [isPrivate, setIsPrivate] = useState(false);
   const [autoInit, setAutoInit] = useState(true);
   const [error, setError] = useState('');
@@ -24,6 +26,13 @@ export const NewRepo: React.FC = () => {
     if (initialOwner) {
       setSelectedOwner(initialOwner);
     }
+
+    api.getHealth().then((h) => {
+      if (h?.default_branch) {
+        setInstanceDefaultBranch(h.default_branch);
+        setDefaultBranch(prev => (prev === 'main' ? h.default_branch! : prev));
+      }
+    }).catch(() => {});
 
     api.listUserOrgs().then((list) => {
       setOrgs(list || []);
@@ -45,6 +54,7 @@ export const NewRepo: React.FC = () => {
         description,
         private: isPrivate,
         auto_init: autoInit,
+        default_branch: defaultBranch.trim() || undefined,
       });
       navigate(`/${repo.owner_name}/${repo.name}`);
     } catch (err: any) {
@@ -132,6 +142,22 @@ export const NewRepo: React.FC = () => {
             className="w-full px-3 py-2 rounded-lg bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             placeholder="Short description of this project"
           />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase tracking-wider">
+            Default Branch
+          </label>
+          <input
+            type="text"
+            value={defaultBranch}
+            onChange={e => setDefaultBranch(e.target.value)}
+            className="w-full sm:w-64 px-3 py-2 rounded-lg bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-mono"
+            placeholder={instanceDefaultBranch}
+          />
+          <p className="text-xs text-gray-500 dark:text-dark-muted mt-1">
+            Initial branch for this repository (instance default: <code className="font-mono">{instanceDefaultBranch}</code>).
+          </p>
         </div>
 
         {/* Visibility */}

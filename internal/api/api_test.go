@@ -3505,10 +3505,170 @@ func TestProGitPagesPermissionsAndPublicURL(t *testing.T) {
 	}
 }
 
+func TestDefaultBranchSettingsAndCreation(t *testing.T) {
+	router, cleanup := setupTestRouter(t)
+	defer cleanup()
 
+	doJSON := func(method, target, token string, payload any) *httptest.ResponseRecorder {
+		var body io.Reader
+		if payload != nil {
+			b, _ := json.Marshal(payload)
+			body = bytes.NewReader(b)
+		}
+		req := httptest.NewRequest(method, target, body)
+		if payload != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		return rec
+	}
 
+	adminUser, err := database.CreateUser("db_admin", "db_admin@example.com", "hash", "Admin", true)
+	if err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+	adminTok := "pgt_db_admin_tok"
+	_, _ = database.CreateAccessToken(adminUser.ID, "tok", adminTok, "repo,user,admin")
 
+	owner, err := database.CreateUser("db_owner", "db_owner@example.com", "hash", "Owner", false)
+	if err != nil {
+		t.Fatalf("create owner: %v", err)
+	}
+	ownerTok := "pgt_db_owner_tok"
+	_, _ = database.CreateAccessToken(owner.ID, "tok", ownerTok, "repo,user")
 
+	stranger, err := database.CreateUser("db_stranger", "db_stranger@example.com", "hash", "Stranger", false)
+	if err != nil {
+		t.Fatalf("create stranger: %v", err)
+	}
+	strangerTok := "pgt_db_stranger_tok"
+	_, _ = database.CreateAccessToken(stranger.ID, "tok", strangerTok, "repo,user")
 
+	// 1. Admin updates global default_branch via PUT /api/v1/admin/config
+	if rec := doJSON("PUT", "/api/v1/admin/config", adminTok, map[string]any{
+		"default_branch": "..invalid",
+	}); rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid global default_branch, got %d", rec.Code)
+	}
+	recCfg := doJSON("PUT", "/api/v1/admin/config", adminTok, map[string]any{
+		"default_branch": "trunk",
+	});
+	if recCfg.Code != http.StatusOK {
+		t.Fatalf("expected 200 updating global default_branch, got %d: %s", recCfg.Code, recCfg.Body.String())
+	}
+	var cfgResp map[string]any
+	_ = json.Unmarshal(recCfg.Body.Bytes(), &cfgResp)
+	if cfgResp["default_branch"] != "trunk" {
+		t.Errorf("expected config default_branch 'trunk', got %v", cfgResp["default_branch"])
+	}
+
+	// GET /api/health & GET /api/v1/admin/stats expose default_branch
+	recHealth := doJSON("GET", "/api/health", "", nil)
+	var healthResp map[string]any
+	_ = json.Unmarshal(recHealth.Body.Bytes(), &healthResp)
+	if healthResp["default_branch"] != "trunk" {
+		t.Errorf("expected /api/health default_branch 'trunk', got %v", healthResp["default_branch"])
+	}
+	recStats := doJSON("GET", "/api/v1/admin/stats", adminTok, nil)
+	var statsResp map[string]any
+	_ = json.Unmarshal(recStats.Body.Bytes(), &statsResp)
+	if statsResp["default_branch"] != "trunk" {
+		t.Errorf("expected /api/v1/admin/stats default_branch 'trunk', got %v", statsResp["default_branch"])
+	}
+
+	// 2. New repo created without explicit default_branch inherits global "trunk"
+	recGlobalRepo := doJSON("POST", "/api/v1/repos", ownerTok, map[string]any{
+		"name":      "inherits-global",
+		"auto_init": true,
+	})
+	if recGlobalRepo.Code != http.StatusCreated {
+		t.Fatalf("create repo inheriting global default: got %d: %s", recGlobalRepo.Code, recGlobalRepo.Body.String())
+	}
+	var globalRepo database.Repository
+	_ = json.Unmarshal(recGlobalRepo.Body.Bytes(), &globalRepo)
+	if globalRepo.DefaultBranch != "trunk" {
+		t.Errorf("expected repo default_branch 'trunk', got %q", globalRepo.DefaultBranch)
+	}
+	globalRepoDir := filepath.Join(router.cfg.Repository.Root, owner.Username, "inherits-global.git")
+	if gotGit := git.GetDefaultBranch(globalRepoDir); gotGit != "trunk" {
+		t.Errorf("expected git HEAD 'trunk', got %q", gotGit)
+	}
+
+	// 3. New repo with explicit default_branch overrides global setting
+	recCustomRepo := doJSON("POST", "/api/v1/repos", ownerTok, map[string]any{
+		"name":           "custom-initial",
+		"auto_init":      true,
+		"default_branch": "main",
+	})
+	if recCustomRepo.Code != http.StatusCreated {
+		t.Fatalf("create repo with custom default: got %d: %s", recCustomRepo.Code, recCustomRepo.Body.String())
+	}
+	var customRepo database.Repository
+	_ = json.Unmarshal(recCustomRepo.Body.Bytes(), &customRepo)
+	if customRepo.DefaultBranch != "main" {
+		t.Errorf("expected custom repo default_branch 'main', got %q", customRepo.DefaultBranch)
+	}
+
+	// 4. Create a second branch ("develop"), switch default_branch via PATCH settings
+	if rec := doJSON("POST", "/api/v1/repos/db_owner/custom-initial/branches", ownerTok, map[string]any{
+		"branch_name": "develop",
+		"base_ref":    "main",
+	}); rec.Code != http.StatusCreated {
+		t.Fatalf("create develop branch: got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Non-admin stranger cannot change default_branch
+	if rec := doJSON("PATCH", "/api/v1/repos/db_owner/custom-initial/settings", strangerTok, map[string]any{
+		"default_branch": "develop",
+	}); rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for non-admin changing default branch, got %d", rec.Code)
+	}
+
+	// Switching to nonexistent branch or invalid name must fail with 400
+	if rec := doJSON("PATCH", "/api/v1/repos/db_owner/custom-initial/settings", ownerTok, map[string]any{
+		"default_branch": "missing-branch",
+	}); rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for missing branch, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON("PATCH", "/api/v1/repos/db_owner/custom-initial/settings", ownerTok, map[string]any{
+		"default_branch": "-bad-ref",
+	}); rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid branch name, got %d", rec.Code)
+	}
+
+	// Cannot delete current default branch ("main")
+	if rec := doJSON("DELETE", "/api/v1/repos/db_owner/custom-initial/branches/main", ownerTok, nil); rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 deleting active default branch, got %d", rec.Code)
+	}
+
+	// Owner switches default_branch to "develop"
+	recSwitch := doJSON("PATCH", "/api/v1/repos/db_owner/custom-initial/settings", ownerTok, map[string]any{
+		"default_branch": "develop",
+	})
+	if recSwitch.Code != http.StatusOK {
+		t.Fatalf("expected 200 switching default_branch to develop, got %d: %s", recSwitch.Code, recSwitch.Body.String())
+	}
+	var updatedRepo database.Repository
+	_ = json.Unmarshal(recSwitch.Body.Bytes(), &updatedRepo)
+	if updatedRepo.DefaultBranch != "develop" {
+		t.Errorf("expected updated repo default_branch 'develop', got %q", updatedRepo.DefaultBranch)
+	}
+	customRepoDir := filepath.Join(router.cfg.Repository.Root, owner.Username, "custom-initial.git")
+	if gotGit := git.GetDefaultBranch(customRepoDir); gotGit != "develop" {
+		t.Errorf("expected bare repo git HEAD 'develop', got %q", gotGit)
+	}
+
+	// Cannot delete new default branch "develop", but CAN delete old "main"!
+	if rec := doJSON("DELETE", "/api/v1/repos/db_owner/custom-initial/branches/develop", ownerTok, nil); rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 deleting new default branch 'develop', got %d", rec.Code)
+	}
+	if rec := doJSON("DELETE", "/api/v1/repos/db_owner/custom-initial/branches/main", ownerTok, nil); rec.Code != http.StatusOK {
+		t.Errorf("expected 200 deleting former default branch 'main', got %d: %s", rec.Code, rec.Body.String())
+	}
+}
 
 

@@ -135,7 +135,7 @@ All admin endpoints require an active session or Personal Access Token from a us
 | `GET` | `/api/v1/install/status` | Check installation lock status and server configuration |
 | `POST` | `/api/v1/install` | Complete setup wizard and create Super Admin |
 | `GET` | `/api/v1/admin/stats` | System telemetry, runtime metrics, and storage paths |
-| `PUT` | `/api/v1/admin/config` | Update application name, domain, root URL, and ports |
+| `PUT` | `/api/v1/admin/config` | Update application name, domain, root URL, ports, global default branch, and creation limits |
 | `GET` | `/api/v1/admin/users` | List or search users (`?q=`) across the system |
 | `POST` | `/api/v1/admin/users` | Admin creates user account with optional `is_admin` / `can_download` flags |
 | `PATCH` | `/api/v1/admin/users/{id}` | Update user (`is_admin`, `is_active`, `can_download`, creation limits) |
@@ -467,10 +467,13 @@ curl -X PUT "https://git.company.com/api/v1/admin/config" \
     "root_url": "https://git.company.com/",
     "ssh_port": 2222,
     "http_port": 3000,
+    "default_branch": "main",
     "default_repo_max_creation_limit": 5,
     "default_org_max_creation_limit": 2
   }'
 ```
+
+You can also set the global initial branch in `conf/app.ini` (`[repository] DEFAULT_BRANCH = main`) or via the `PROGIT_DEFAULT_BRANCH` environment variable, or edit it in **Admin > Configuration > Edit Configuration**.
 
 #### 6. Enterprise Endpoints (Enterprise Edition)
 

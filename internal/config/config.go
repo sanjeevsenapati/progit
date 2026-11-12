@@ -72,6 +72,7 @@ type DatabaseConfig struct {
 
 type RepositoryConfig struct {
 	Root             string
+	DefaultBranch    string
 	MaxCreationLimit int // Global default repo creation limit per user (-1 for unlimited)
 }
 
@@ -137,6 +138,7 @@ func DefaultConfig() *Config {
 		},
 		Repository: RepositoryConfig{
 			Root:             "./data/repositories",
+			DefaultBranch:    "main",
 			MaxCreationLimit: -1,
 		},
 		Organization: OrganizationConfig{
@@ -336,6 +338,15 @@ func Load(configPath string) (*Config, error) {
 		cfg.Features.EnableMessaging = strings.ToLower(val) == "true" || val == "1"
 	}
 
+	if val := os.Getenv("PROGIT_DEFAULT_BRANCH"); val != "" {
+		cfg.Repository.DefaultBranch = strings.TrimSpace(val)
+	} else if val := os.Getenv("PROGIT_REPOSITORY_DEFAULT_BRANCH"); val != "" {
+		cfg.Repository.DefaultBranch = strings.TrimSpace(val)
+	}
+	if strings.TrimSpace(cfg.Repository.DefaultBranch) == "" {
+		cfg.Repository.DefaultBranch = "main"
+	}
+
 	if val := os.Getenv("PROGIT_REPO_MAX_CREATION_LIMIT"); val != "" {
 		if l, err := strconv.Atoi(val); err == nil {
 			cfg.Repository.MaxCreationLimit = l
@@ -460,6 +471,10 @@ func parseINIFile(path string, cfg *Config) error {
 			switch key {
 			case "ROOT":
 				cfg.Repository.Root = val
+			case "DEFAULT_BRANCH":
+				if val != "" {
+					cfg.Repository.DefaultBranch = val
+				}
 			case "MAX_CREATION_LIMIT", "REPO_CREATION_LIMIT":
 				if l, err := strconv.Atoi(val); err == nil {
 					cfg.Repository.MaxCreationLimit = l
@@ -474,6 +489,10 @@ func parseINIFile(path string, cfg *Config) error {
 			}
 		case "admin":
 			switch key {
+			case "DEFAULT_BRANCH":
+				if val != "" {
+					cfg.Repository.DefaultBranch = val
+				}
 			case "DEFAULT_REPO_MAX_CREATION_LIMIT", "REPO_MAX_CREATION_LIMIT":
 				if l, err := strconv.Atoi(val); err == nil {
 					cfg.Repository.MaxCreationLimit = l
@@ -584,6 +603,11 @@ func Save(configPath string, cfg *Config) error {
 
 	sb.WriteString("[repository]\n")
 	sb.WriteString(fmt.Sprintf("ROOT = %s\n", cfg.Repository.Root))
+	defaultBranch := strings.TrimSpace(cfg.Repository.DefaultBranch)
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+	sb.WriteString(fmt.Sprintf("DEFAULT_BRANCH = %s\n", defaultBranch))
 	sb.WriteString(fmt.Sprintf("MAX_CREATION_LIMIT = %d\n\n", cfg.Repository.MaxCreationLimit))
 
 	sb.WriteString("[organization]\n")

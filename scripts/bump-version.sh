@@ -91,7 +91,7 @@ sub_file("cmd/progit/main.go", r'^(var Version = ")[^"]*(")', rf'\g<1>{new_full}
 sub_file("internal/api/api.go", r'^(\s*Version\s*=\s*")[^"]*(")', rf'\g<1>{new_full}\g<2>')
 sub_file("Containerfile", r'-X main\.Version=[^ ]+ -X progit\.io/progit/internal/api\.Version=[^ "]+', f'-X main.Version={new_full} -X progit.io/progit/internal/api.Version={new_full}')
 sub_file("Dockerfile", r'-X main\.Version=[^ ]+ -X progit\.io/progit/internal/api\.Version=[^ "]+', f'-X main.Version={new_full} -X progit.io/progit/internal/api.Version={new_full}')
-sub_file("scripts/build-release.sh", r'DEFAULT_VERSION="[^"]+"', f'DEFAULT_VERSION="{new_full}"')
+sub_file("scripts/build-release.sh", r'^DEFAULT_VERSION="[^"]+"', f'DEFAULT_VERSION="{new_full}"')
 sub_file("scripts/build-release.sh", r'VERSION="\$\{1:-[^}]+\}"', f'VERSION="${{1:-{new_full}}}"')
 sub_file("web/package.json", r'^(\s*"version":\s*")[^"]*(")', rf'\g<1>{new_base}\g<2>')
 lock_p = root / "web/package-lock.json"

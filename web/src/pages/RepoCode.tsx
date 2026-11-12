@@ -32,6 +32,7 @@ interface RepoCodeProps {
   owner: string;
   repo: string;
   initialPath?: string;
+  initialBranch?: string;
 }
 
 function formatRelativeTime(dateInput: string | Date | number): string {
@@ -53,13 +54,15 @@ function formatRelativeTime(dateInput: string | Date | number): string {
   return `${Math.floor(diffInDays / 365)}y ago`;
 }
 
-export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initialPath = '' }) => {
+export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initialPath = '', initialBranch = '' }) => {
   const { user } = useAuth();
   const cachedRepo = api.getCachedRepo(owner, repoName);
   const [repoData, setRepoData] = useState<Repository | null>(() => cachedRepo?.repository || null);
   const [isStarred, setIsStarred] = useState(() => cachedRepo?.is_starred || false);
   const [branches, setBranches] = useState<string[]>(() => cachedRepo?.branches || ['main']);
-  const [currentBranch, setCurrentBranch] = useState(() => cachedRepo?.branches?.[0] || 'main');
+  const [currentBranch, setCurrentBranch] = useState(
+    () => initialBranch || cachedRepo?.repository?.default_branch || cachedRepo?.branches?.[0] || 'main'
+  );
   const [entries, setEntries] = useState<TreeEntry[]>([]);
   const [readme, setReadme] = useState<string | null>(null);
   const [latestCommit, setLatestCommit] = useState<Commit | null>(null);
@@ -90,9 +93,10 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
   const selectedCloneUrl = cloneTab === 'ssh' && cloneSSH ? cloneSSH : (cloneHTTP || `${window.location.origin}/${owner}/${repoName}.git`);
   const isEmptyRepo = !loading && !initialPath && entries.length === 0 && !latestCommit;
 
-  const block1Commands = `echo "# ${repoName}" >> README.md\ngit init\ngit add README.md\ngit commit -m "first commit"\ngit branch -M ${currentBranch || 'main'}\ngit remote add origin ${selectedCloneUrl}\ngit push -u origin ${currentBranch || 'main'}`;
+  const emptyDefaultBranch = repoData?.default_branch || currentBranch || 'main';
+  const block1Commands = `echo "# ${repoName}" >> README.md\ngit init\ngit add README.md\ngit commit -m "first commit"\ngit branch -M ${emptyDefaultBranch}\ngit remote add origin ${selectedCloneUrl}\ngit push -u origin ${emptyDefaultBranch}`;
 
-  const block2Commands = `git remote add origin ${selectedCloneUrl}\ngit branch -M ${currentBranch || 'main'}\ngit push -u origin ${currentBranch || 'main'}`;
+  const block2Commands = `git remote add origin ${selectedCloneUrl}\ngit branch -M ${emptyDefaultBranch}\ngit push -u origin ${emptyDefaultBranch}`;
 
   const handleCopyCode = (text: string, type: 'quick' | 'block1' | 'block2') => {
     navigator.clipboard.writeText(text);
@@ -117,11 +121,15 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
         setIsStarred(data.is_starred);
         setCanWrite(Boolean(data.can_write || data.permissions?.write));
         setCanDownload(data.permissions ? data.permissions.download !== false : true);
-        setBranches(data.branches || ['main']);
-        const branch = data.branches?.[0] || 'main';
-        if (data.branches?.length > 0) {
-          setCurrentBranch(branch);
-        }
+        const branchList = data.branches || [];
+        setBranches(branchList);
+        const repoDefault = data.repository.default_branch || 'main';
+        const branch =
+          (initialBranch && branchList.includes(initialBranch) ? initialBranch : '') ||
+          (branchList.includes(repoDefault) ? repoDefault : '') ||
+          branchList[0] ||
+          repoDefault;
+        setCurrentBranch(branch);
         setCloneHTTP(data.clone_url_http);
         setCloneSSH(data.clone_url_ssh);
         setPagesURL(
@@ -160,7 +168,7 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
       }
     }
     loadRepo();
-  }, [owner, repoName, initialPath]);
+  }, [owner, repoName, initialPath, initialBranch]);
 
   const handleBranchChange = async (newBranch: string) => {
     setCurrentBranch(newBranch);
@@ -325,7 +333,14 @@ export const RepoCode: React.FC<RepoCodeProps> = ({ owner, repo: repoName, initi
                               : 'text-gray-700 dark:text-dark-text'
                           }`}
                         >
-                          <span className="truncate">{b}</span>
+                          <span className="truncate flex items-center space-x-1.5">
+                            <span>{b}</span>
+                            {b === (repoData?.default_branch || 'main') && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-gray-100 dark:bg-dark-hover text-gray-500 dark:text-dark-muted border border-gray-200 dark:border-dark-border">
+                                default
+                              </span>
+                            )}
+                          </span>
                           {b === currentBranch && <Check className="w-3.5 h-3.5 text-emerald-600" />}
                         </button>
                       ))}

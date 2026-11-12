@@ -96,6 +96,8 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
   const [savingProt, setSavingProt] = useState(false);
 
   // Editable fields
+  const [branches, setBranches] = useState<string[]>(() => cachedRepo?.branches || []);
+  const [defaultBranch, setDefaultBranch] = useState(() => cachedRepo?.repository?.default_branch || 'main');
   const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [enableWiki, setEnableWiki] = useState(true);
@@ -113,12 +115,17 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
         const hasAdminAccess = !!(user && (user.is_admin || user.username === owner || r.permissions?.admin));
         setCanAdmin(hasAdminAccess);
 
+        const branchList = r.branches || [];
+        setBranches(branchList);
+        const repoDefBranch = r.repository.default_branch || 'main';
+        setDefaultBranch(repoDefBranch);
+        setProtBranch(repoDefBranch);
         setDescription(r.repository.description || '');
         setIsPrivate(r.repository.is_private);
         setEnableWiki(r.repository.enable_wiki !== false);
         setAllowDownloadAndPulls(r.repository.allow_download_and_pulls !== false);
         setEnablePages(r.repository.enable_pages === true);
-        setPagesBranch(r.repository.pages_branch || r.repository.default_branch || 'main');
+        setPagesBranch(r.repository.pages_branch || repoDefBranch);
         setPagesFolder(r.repository.pages_folder || '/');
 
         if (hasAdminAccess) {
@@ -384,6 +391,7 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
       setSaving(true);
       const updated = await api.updateRepoSettings(owner, repoName, {
         description,
+        default_branch: defaultBranch.trim() || undefined,
         is_private: isPrivate,
         enable_wiki: enableWiki,
         allow_download_and_pulls: allowDownloadAndPulls,
@@ -392,6 +400,7 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
         pages_folder: pagesFolder,
       });
       setRepoData(updated);
+      setDefaultBranch(updated.default_branch || 'main');
       setAllowDownloadAndPulls(updated.allow_download_and_pulls !== false);
       setSuccessMessage('Repository settings updated successfully');
       showToast('Repository settings updated successfully');
@@ -503,15 +512,36 @@ export const RepoSettings: React.FC<RepoSettingsProps> = ({ owner, repo: repoNam
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-500 dark:text-dark-muted mb-1">
+                <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1">
                   Default Branch
                 </label>
-                <input
-                  type="text"
-                  disabled
-                  value={repoData.default_branch || 'main'}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-hover text-gray-500 dark:text-dark-muted cursor-not-allowed text-xs font-mono"
-                />
+                {branches.length > 0 ? (
+                  <select
+                    value={defaultBranch}
+                    onChange={e => setDefaultBranch(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 text-xs font-mono"
+                  >
+                    {!branches.includes(defaultBranch) && defaultBranch && (
+                      <option value={defaultBranch}>{defaultBranch}</option>
+                    )}
+                    {branches.map(b => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={defaultBranch}
+                    onChange={e => setDefaultBranch(e.target.value)}
+                    placeholder="main"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 text-xs font-mono"
+                  />
+                )}
+                <p className="mt-1 text-[11px] text-gray-400 dark:text-dark-muted">
+                  Base branch for pull requests, code views, and fresh clones (`git clone`).
+                </p>
               </div>
             </div>
 

@@ -134,9 +134,9 @@ export const App: React.FC = () => {
       const subAction = segments[2];
 
       if (subAction === 'tree') {
-        const branch = segments[3] || 'main';
+        const branch = segments[3] || '';
         const initialPath = segments.slice(4).join('/');
-        return <RepoCode owner={owner} repo={repo} initialPath={initialPath} />;
+        return <RepoCode owner={owner} repo={repo} initialPath={initialPath} initialBranch={branch} />;
       }
 
       if (subAction === 'blob') {

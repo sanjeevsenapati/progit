@@ -67,6 +67,7 @@ export const AdminDashboard: React.FC = () => {
   const [cfgDomain, setCfgDomain] = useState('');
   const [cfgRootUrl, setCfgRootUrl] = useState('');
   const [cfgSshPort, setCfgSshPort] = useState(2222);
+  const [cfgDefaultBranch, setCfgDefaultBranch] = useState('main');
   const [cfgDefaultRepoLimit, setCfgDefaultRepoLimit] = useState(-1);
   const [cfgDefaultOrgLimit, setCfgDefaultOrgLimit] = useState(-1);
   const [cfgLoading, setCfgLoading] = useState(false);
@@ -263,6 +264,7 @@ export const AdminDashboard: React.FC = () => {
       setCfgDomain(stats.domain || 'progit.local');
       setCfgRootUrl(stats.root_url || 'https://progit.local/');
       setCfgSshPort(stats.ssh_port || 2222);
+      setCfgDefaultBranch(stats.default_branch || 'main');
       setCfgDefaultRepoLimit(stats.default_repo_max_creation_limit ?? -1);
       setCfgDefaultOrgLimit(stats.default_org_max_creation_limit ?? -1);
     }
@@ -278,6 +280,7 @@ export const AdminDashboard: React.FC = () => {
         domain: cfgDomain,
         root_url: cfgRootUrl,
         ssh_port: Number(cfgSshPort),
+        default_branch: cfgDefaultBranch.trim() || 'main',
         default_repo_max_creation_limit: Number(cfgDefaultRepoLimit),
         default_org_max_creation_limit: Number(cfgDefaultOrgLimit),
       });
@@ -780,6 +783,10 @@ export const AdminDashboard: React.FC = () => {
               <span className="font-bold text-gray-800 dark:text-white">{stats.repositories_path}</span>
             </div>
             <div className="p-3 rounded-lg bg-gray-50 dark:bg-dark-hover flex justify-between">
+              <span className="text-gray-500">Global Default Branch:</span>
+              <span className="font-bold text-gray-800 dark:text-white">{stats.default_branch || 'main'}</span>
+            </div>
+            <div className="p-3 rounded-lg bg-gray-50 dark:bg-dark-hover flex justify-between">
               <span className="text-gray-500">Global Default Repo Creation Limit:</span>
               <span className="font-bold text-gray-800 dark:text-white">
                 {stats.default_repo_max_creation_limit === -1 ? 'Unlimited (-1)' : `${stats.default_repo_max_creation_limit} repos/user`}
@@ -990,7 +997,7 @@ export const AdminDashboard: React.FC = () => {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
                     Application Name
@@ -1013,6 +1020,19 @@ export const AdminDashboard: React.FC = () => {
                     value={cfgSshPort}
                     onChange={e => setCfgSshPort(parseInt(e.target.value, 10) || 2222)}
                     className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                    Default Branch
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="main"
+                    value={cfgDefaultBranch}
+                    onChange={e => setCfgDefaultBranch(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-xs"
                   />
                 </div>
               </div>

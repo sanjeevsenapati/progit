@@ -50,7 +50,7 @@ Authentication endpoints (`/api/v1/auth/login`, `/api/v1/auth/register`) are rat
 - `GET /api/v1/repos/search?q={query}&limit=20&page=1` - Search repositories across name, description, and owner username with access control scoping (public repositories visible to all; private repositories visible strictly to owner, collaborators, and organization members).
 - `GET /api/v1/explore?q={query}` - Public and authorized repository exploration with keyword search.
 - `POST /api/v1/repos` - Create a new repository.
-  - Body: `{"name": "my-project", "description": "Demo project", "private": false, "auto_init": true, "readme": "Default"}`
+  - Body: `{"name": "my-project", "description": "Demo project", "private": false, "auto_init": true, "default_branch": "main"}`
 - `GET /api/v1/repos/:owner/:repo` - Retrieve repository metadata, permissions (`admin`, `write`, `read`, `download`, `view_only`), clone URLs (omitted when `download` is false), and stats.
 - `GET /api/v1/repos/:owner/:repo/archive?ref={branch_or_tag}&format=zip` - Download a ZIP archive of the specified branch, tag, or commit. Returns `403 Forbidden` when downloads are restricted for the caller or repository.
 - `POST /api/v1/repos/:owner/:repo/star` - Star or unstar a repository.
@@ -168,7 +168,7 @@ Headers dispatched on deliveries:
   - Body: `{"slug": "Home", "title": "Home", "content": "# Architecture Overview...", "message": "Initial docs"}`
 - `DELETE /api/v1/repos/:owner/:repo/wiki/pages/:slug` - Delete wiki page. Requires write permissions. Returns `403 Forbidden` if disabled.
 - `GET /api/v1/repos/:owner/:repo/wiki/pages/:slug/history` - Get revision history for a wiki page. Returns `403 Forbidden` if disabled.
-- `PATCH /api/v1/repos/:owner/:repo/settings` - Toggle repository features including `enable_wiki: boolean`, `enable_pages: boolean`, and `allow_download_and_pulls: boolean` (disables ZIP/Clone/Raw/Fork for non-write users and disables Pull Requests/Compare repo-wide with `403 Forbidden`). Requires admin permissions.
+- `PATCH /api/v1/repos/:owner/:repo/settings` - Update repository settings including `description`, `default_branch` (validates target branch on disk, updates bare repo `HEAD` symbolic ref & database), `is_private`, `enable_wiki: boolean`, `enable_pages: boolean`, `pages_branch`, `pages_folder`, and `allow_download_and_pulls: boolean` (disables ZIP/Clone/Raw/Fork for non-write users and disables Pull Requests/Compare repo-wide with `403 Forbidden`). Requires admin permissions.
 
 ### 2.14 ProGit Pages Hosting
 - `GET /api/v1/repos/:owner/:repo/pages` - Inspect ProGit Pages configuration (`enable_pages`, `pages_branch`, `pages_folder`, `pages_url`, `branches`). Requires repository owner or administrator privileges (`401 Unauthorized` / `403 Forbidden` for non-owners; `404` if private and unauthorized).
@@ -208,6 +208,7 @@ All administrative endpoints require **Super Administrator privileges** (`is_adm
       "memory_sys_mb": 42.15,
       "active_sessions_count": 6,
       "install_locked": true,
+      "default_branch": "main",
       "default_repo_max_creation_limit": -1,
       "default_org_max_creation_limit": -1
     }
@@ -297,6 +298,7 @@ All administrative endpoints require **Super Administrator privileges** (`is_adm
       "root_url": "https://git.company.com/",
       "ssh_port": 2222,
       "http_port": 3000,
+      "default_branch": "main",
       "default_repo_max_creation_limit": 10,
       "default_org_max_creation_limit": 3
     }
@@ -310,6 +312,7 @@ All administrative endpoints require **Super Administrator privileges** (`is_adm
       "root_url": "https://git.company.com/",
       "ssh_port": 2222,
       "http_port": 3000,
+      "default_branch": "main",
       "default_repo_max_creation_limit": 10,
       "default_org_max_creation_limit": 3
     }

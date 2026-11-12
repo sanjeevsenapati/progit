@@ -458,7 +458,7 @@ export const api = {
     return fetchJSON<Repository[]>(url);
   },
 
-  async createRepo(data: { name: string; owner?: string; description: string; private: boolean; auto_init: boolean }) {
+  async createRepo(data: { name: string; owner?: string; description: string; private: boolean; auto_init: boolean; default_branch?: string }) {
     return fetchJSON<Repository>('/api/v1/repos', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -876,6 +876,7 @@ export const api = {
 
   async updateRepoSettings(owner: string, repo: string, data: {
     description?: string;
+    default_branch?: string;
     is_private?: boolean;
     enable_wiki?: boolean;
     enable_pages?: boolean;
@@ -945,6 +946,7 @@ export const api = {
       memory_sys_mb: number;
       active_sessions_count: number;
       install_locked: boolean;
+      default_branch: string;
       default_repo_max_creation_limit: number;
       default_org_max_creation_limit: number;
     }>('/api/v1/admin/stats');
@@ -956,6 +958,7 @@ export const api = {
     root_url?: string;
     ssh_port?: number;
     http_port?: number;
+    default_branch?: string;
     default_repo_max_creation_limit?: number;
     default_org_max_creation_limit?: number;
   }) {
@@ -966,6 +969,7 @@ export const api = {
       root_url: string;
       ssh_port: number;
       http_port: number;
+      default_branch?: string;
       default_repo_max_creation_limit?: number;
       default_org_max_creation_limit?: number;
     }>('/api/v1/admin/config', {
@@ -1030,7 +1034,7 @@ export const api = {
   },
 
   async getHealth() {
-    return fetchJSON<{ status: string; uptime: string; database: string }>('/api/health');
+    return fetchJSON<{ status: string; uptime: string; database: string; default_branch?: string }>('/api/health');
   },
 
   // Collaborators
