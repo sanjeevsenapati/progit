@@ -51,7 +51,8 @@ Authentication endpoints (`/api/v1/auth/login`, `/api/v1/auth/register`) are rat
 - `GET /api/v1/explore?q={query}` - Public and authorized repository exploration with keyword search.
 - `POST /api/v1/repos` - Create a new repository.
   - Body: `{"name": "my-project", "description": "Demo project", "private": false, "auto_init": true, "readme": "Default"}`
-- `GET /api/v1/repos/:owner/:repo` - Retrieve repository metadata, permissions (`can_write`, `is_admin`), and stats.
+- `GET /api/v1/repos/:owner/:repo` - Retrieve repository metadata, permissions (`admin`, `write`, `read`, `download`, `view_only`), clone URLs (omitted when `download` is false), and stats.
+- `GET /api/v1/repos/:owner/:repo/archive?ref={branch_or_tag}&format=zip` - Download a ZIP archive of the specified branch, tag, or commit. Returns `403 Forbidden` when downloads are restricted for the caller or repository.
 - `POST /api/v1/repos/:owner/:repo/star` - Star or unstar a repository.
 
 ### 2.4 Code Browsing, Branches & Commits
@@ -64,7 +65,7 @@ Authentication endpoints (`/api/v1/auth/login`, `/api/v1/auth/register`) are rat
 - `GET /api/v1/repos/:owner/:repo/commits/:sha` - Get commit details and unified diffs.
 - `GET /api/v1/repos/:owner/:repo/tree?ref=main&path=src` - List files/subdirectories at a path.
 - `GET /api/v1/repos/:owner/:repo/blob?ref=main&path=README.md` - Get file content, size, and encoding.
-- `GET /api/v1/repos/:owner/:repo/raw?ref=main&path=image.png` - Stream raw file bytes with appropriate MIME type.
+- `GET /api/v1/repos/:owner/:repo/raw?ref=main&path=image.png` - Stream raw file bytes with appropriate MIME type (`403 Forbidden` when downloads are restricted).
 - `POST /api/v1/repos/:owner/:repo/contents/:path` - Create or edit a file online and commit to a branch.
   - Body: `{"content": "...", "message": "commit message", "branch": "main"}`
 - `DELETE /api/v1/repos/:owner/:repo/contents/:path` - Delete a file online.
@@ -74,7 +75,7 @@ Authentication endpoints (`/api/v1/auth/login`, `/api/v1/auth/register`) are rat
 ### 2.5 Collaborators & Permissions
 - `GET /api/v1/repos/:owner/:repo/collaborators` - List repository collaborators and permission levels.
 - `PUT /api/v1/repos/:owner/:repo/collaborators/:username` - Add or update collaborator.
-  - Body: `{"mode": "write"}` (`read`, `write`, `admin`)
+  - Body: `{"mode": "write"}` (`view_only`, `read`, `write`, `admin`). `view_only` grants Web UI browsing while blocking Download ZIP, Git clone/pull, raw file downloads, release asset downloads, and forking.
 - `DELETE /api/v1/repos/:owner/:repo/collaborators/:username` - Revoke collaborator access.
 
 ### 2.6 Issues & Assignees
@@ -167,17 +168,155 @@ Headers dispatched on deliveries:
   - Body: `{"slug": "Home", "title": "Home", "content": "# Architecture Overview...", "message": "Initial docs"}`
 - `DELETE /api/v1/repos/:owner/:repo/wiki/pages/:slug` - Delete wiki page. Requires write permissions. Returns `403 Forbidden` if disabled.
 - `GET /api/v1/repos/:owner/:repo/wiki/pages/:slug/history` - Get revision history for a wiki page. Returns `403 Forbidden` if disabled.
-- `PATCH /api/v1/repos/:owner/:repo/settings` - Toggle repository features including `enable_wiki: boolean`. Requires admin permissions.
+- `PATCH /api/v1/repos/:owner/:repo/settings` - Toggle repository features including `enable_wiki: boolean`, `enable_pages: boolean`, and `allow_download_and_pulls: boolean` (disables ZIP/Clone/Raw/Fork for non-write users and disables Pull Requests/Compare repo-wide with `403 Forbidden`). Requires admin permissions.
 
 ### 2.14 ProGit Pages Hosting
-- `GET /api/v1/repos/:owner/:repo/pages` - Inspect ProGit Pages configuration.
-- `POST /api/v1/repos/:owner/:repo/pages` - Enable or configure ProGit Pages.
-  - Body: `{"branch": "main", "folder": "/docs"}`
-- `DELETE /api/v1/repos/:owner/:repo/pages` - Disable Pages hosting.
-- `GET /pages/:owner/:repo/` - Static site delivery with automatic Markdown rendering.
+- `GET /api/v1/repos/:owner/:repo/pages` - Inspect ProGit Pages configuration (`enable_pages`, `pages_branch`, `pages_folder`, `pages_url`, `branches`). Requires repository owner or administrator privileges (`401 Unauthorized` / `403 Forbidden` for non-owners; `404` if private and unauthorized).
+- `POST /api/v1/repos/:owner/:repo/pages` - Enable, disable, or configure ProGit Pages (`{"enable_pages": true, "pages_branch": "main", "pages_folder": "/docs"}`). Requires repository owner or administrator privileges.
+- `GET /pages/:owner/:repo/` - Static site delivery with automatic Markdown rendering. When enabled, public repositories are accessible to all visitors (`pages_url` is returned in `GET /api/v1/repos/:owner/:repo`); private repositories require repo read access.
 
-### 2.15 System Telemetry & Administration
-- `GET /api/health` - Health check (verifies HTTP, SQLite WAL, and Repository storage).
+### 2.15 System Telemetry & Administrative APIs
+
+All administrative endpoints require **Super Administrator privileges** (`is_admin = true`). Requests must provide either an `Authorization: Bearer <admin_token>` header with `admin` scope or a valid Super Admin session cookie. Non-admin or unauthenticated requests are rejected with `401 Unauthorized` or `403 Forbidden`.
+
+#### 1. System Telemetry & Statistics
+- `GET /api/health` - Liveness & Health check (verifies HTTP, SQLite WAL, and Repository storage).
 - `GET /api/ready` - Readiness check (returns 200 OK when server is accepting traffic).
-- `GET /api/v1/admin/stats` - Super admin telemetry (user count, repo count, disk usage, Go runtime).
-- `POST /api/v1/admin/maintenance/checkpoint` - Execute SQLite WAL checkpoint (`PRAGMA wal_checkpoint(TRUNCATE)`).
+- `GET /api/v1/admin/stats` - Super admin telemetry and server statistics.
+  - **Response (200 OK)**:
+    ```json
+    {
+      "users_count": 42,
+      "repositories_count": 87,
+      "uptime": "14h22m10s",
+      "database_path": "./data/progit.db",
+      "repositories_path": "./data/repositories",
+      "ssh_enabled": true,
+      "ssh_port": 2222,
+      "domain": "git.company.com",
+      "http_port": 3000,
+      "https_port": 3443,
+      "protocol": "https",
+      "is_https": true,
+      "enable_acme": false,
+      "generate_local_cert": true,
+      "root_url": "https://git.company.com/",
+      "app_name": "ProGit Enterprise",
+      "go_version": "go1.24.0",
+      "num_goroutines": 38,
+      "memory_alloc_mb": 18.42,
+      "memory_sys_mb": 42.15,
+      "active_sessions_count": 6,
+      "install_locked": true,
+      "default_repo_max_creation_limit": -1,
+      "default_org_max_creation_limit": -1
+    }
+    ```
+
+#### 2. User Account Administration
+- `GET /api/v1/admin/users` - List or search registered user accounts with administrative status and creation limits.
+  - **Query Parameters**: `q` (optional search keyword matching `username`, `email`, or `full_name`), `limit` (default: 100, max: 500), `offset` (default: 0).
+  - **Response (200 OK)**: Array of User objects:
+    ```json
+    [
+      {
+        "id": 1,
+        "username": "admin",
+        "email": "admin@company.com",
+        "full_name": "Super Admin",
+        "is_admin": true,
+        "is_active": true,
+        "can_download": true,
+        "max_repo_creation": -1,
+        "max_org_creation": -1,
+        "num_repos": 12,
+        "num_orgs": 3,
+        "created_at": "2026-10-30T10:00:00Z"
+      }
+    ]
+    ```
+- `POST /api/v1/admin/users` - Create a new user account with initial role, `can_download` flag, and creation limits.
+  - **Request Body**:
+    ```json
+    {
+      "username": "developer1",
+      "email": "dev1@company.com",
+      "password": "TemporaryPassword123!",
+      "full_name": "Developer One",
+      "is_admin": false,
+      "can_download": true,
+      "max_repo_creation": 10,
+      "max_org_creation": 2
+    }
+    ```
+  - **Response (201 Created)**: Created User object.
+- `PATCH /api/v1/admin/users/:id` - Update user administrative permissions, active state, `can_download` restriction, or creation limits.
+  - **Request Body**:
+    ```json
+    {
+      "is_admin": true,
+      "is_active": true,
+      "can_download": true,
+      "max_repo_creation": 20,
+      "max_org_creation": 5
+    }
+    ```
+  - **Response (200 OK)**: Updated User object.
+  - *Safety Guard*: Super Admins cannot demote (`is_admin: false`), deactivate (`is_active: false`), or restrict downloads (`can_download: false`) on their own account.
+- `DELETE /api/v1/admin/users/:id` - Permanently delete a user account, revoke all tokens, and purge their repository directory on disk (`data/repositories/:username/`).
+  - **Response (200 OK)**: `{"message": "User deleted successfully"}`.
+  - *Safety Guard*: Super Admins cannot delete their own account.
+
+#### 3. Repository Administration
+- `GET /api/v1/admin/repos` - List all repositories across all users and organizations on the instance (including private repos).
+  - **Query Parameters**: `limit` (default: 100), `offset` (default: 0).
+  - **Response (200 OK)**: Array of Repository objects.
+- `DELETE /api/v1/admin/repos/:id` - Permanently delete any repository across the instance and remove its bare Git storage directory.
+  - **Response (200 OK)**: `{"message": "Repository deleted successfully"}`.
+
+#### 4. System Maintenance & Database Operations
+- `POST /api/v1/admin/maintenance` - Execute database and storage maintenance tasks.
+  - **Request Body**:
+    ```json
+    {
+      "operation": "checkpoint_wal"
+    }
+    ```
+  - **Supported Operations**:
+    - `"checkpoint_wal"`: Flushes and truncates SQLite Write-Ahead Log journal (`PRAGMA wal_checkpoint(TRUNCATE)`), synchronizing memory to disk.
+    - `"vacuum"`: Rebuilds database pages and reclaims fragmented disk storage (`VACUUM`).
+  - **Response (200 OK)**: `{"message": "SQLite WAL journal checkpointed and truncated successfully"}`.
+
+#### 5. Dynamic Server Runtime Configuration & Limits
+- `PUT /api/v1/admin/config` - Update core server runtime parameters and global creation limits without restarting. Changes are automatically persisted to `conf/app.ini`.
+  - **Request Body**:
+    ```json
+    {
+      "app_name": "ProGit Enterprise",
+      "domain": "git.company.com",
+      "root_url": "https://git.company.com/",
+      "ssh_port": 2222,
+      "http_port": 3000,
+      "default_repo_max_creation_limit": 10,
+      "default_org_max_creation_limit": 3
+    }
+    ```
+  - **Response (200 OK)**:
+    ```json
+    {
+      "message": "Server configuration updated successfully",
+      "app_name": "ProGit Enterprise",
+      "domain": "git.company.com",
+      "root_url": "https://git.company.com/",
+      "ssh_port": 2222,
+      "http_port": 3000,
+      "default_repo_max_creation_limit": 10,
+      "default_org_max_creation_limit": 3
+    }
+    ```
+
+#### 6. Enterprise High Availability, Licensing & Audit APIs *(Enterprise Edition)*
+- `GET /api/enterprise/cluster` - Inspect high-availability cluster topology, Raft consensus / Redis distributed locking state, and active nodes.
+- `GET /api/enterprise/license` - Inspect active enterprise license status, seat quota (`max_seats`, `active_seats`), edition, and expiry.
+- `POST /api/enterprise/license` - Upload and activate a cryptographically signed enterprise license payload.
+- `GET /api/enterprise/audit-logs?limit=100` - Stream and query SIEM compliance audit events with actor attribution and IP tracking.

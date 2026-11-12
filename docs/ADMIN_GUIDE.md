@@ -87,10 +87,16 @@ Administrators can update core server parameters live from the Admin Dashboard:
 - **Persistence**: Configuration is automatically saved to `/data/config/app.ini` so it survives container restarts.
 
 ### 2.2 User Management
+- **Search & Filter Users**:
+  - Use the live search box in the **Users** tab to filter accounts by `username`, `email`, or `full_name`, and narrow the list with status filters (`All`, `Admins`, `Standard`, `Suspended`, or `Download Restricted`).
 - **Add New User**:
   - Click **Create User** in the admin header.
   - Fill in Username, Email, Full Name, and Password.
-  - Check **Grant Administrator Privileges** if the user should also have admin rights.
+  - Check **Grant Administrator Privileges** if the user should also have admin rights, or uncheck **Allow code downloads, ZIP & Git clone/pull** to provision the account in download-restricted (view-only) mode.
+- **Restrict / Allow Code Downloads (`can_download`)**:
+  - Click **Restrict Download** (and confirm **Confirm Restrict**) on any non-administrator user row to globally revoke code downloads, ZIP archives, raw file downloads, release asset downloads, forking, and Git `clone`/`pull` (HTTP & SSH) across all repositories while keeping Web UI code browsing intact.
+  - Click **Allow Download** (and **Confirm Allow**) to restore download and clone access at any time.
+  - *Safety Guard*: Super Administrators (`is_admin = true`) cannot restrict their own account and remain exempt from global download restrictions.
 - **Promote / Demote Admins**:
   - Click **Make Admin** on any standard user to grant full administrative rights.
   - Click **Demote** to convert an administrator back to a standard user.
@@ -105,8 +111,9 @@ Administrators can update core server parameters live from the Admin Dashboard:
 - **Global Repository Oversight**:
   - Switch to the **Repositories** tab to see all public and private repositories across all users and organizations.
 - **Repository Feature Controls**:
-  - Each repository provides granular toggles under **Settings > Features** for **Wikis** (`enable_wiki`) and **ProGit Pages** (`enable_pages`).
-  - When disabled, backend endpoints enforce 403 Forbidden checks, and navigation items are dynamically hidden.
+  - Each repository provides granular toggles under **Settings > Features** for **Allow Downloads (ZIP / Clone) & Pull Requests** (`allow_download_and_pulls`), **Wikis** (`enable_wiki`), and **ProGit Pages** (`enable_pages`).
+  - When **Allow Downloads & Pull Requests** is disabled, `Read`, `View-Only`, and anonymous/public visitors cannot download ZIP archives, raw files, fork, or `git clone`/`git pull` (returning `403 Forbidden`), while `Write` collaborators, Repo Admins, Repo Owners, and Super Admins retain download/clone access; Pull Requests and Compare endpoints are disabled repository-wide (`403 Forbidden`), and related navigation/clone UI elements are hidden.
+  - When Wikis or Pages are disabled, backend endpoints enforce `403 Forbidden` checks and navigation items are dynamically hidden.
 - **Administrative Delete**:
   - Click **Delete Repo** to immediately remove any repository from SQLite and purge the bare repository tree from disk.
 
@@ -129,9 +136,9 @@ All admin endpoints require an active session or Personal Access Token from a us
 | `POST` | `/api/v1/install` | Complete setup wizard and create Super Admin |
 | `GET` | `/api/v1/admin/stats` | System telemetry, runtime metrics, and storage paths |
 | `PUT` | `/api/v1/admin/config` | Update application name, domain, root URL, and ports |
-| `GET` | `/api/v1/admin/users` | List all users across the system |
-| `POST` | `/api/v1/admin/users` | Admin creates user account with optional admin flag |
-| `PATCH` | `/api/v1/admin/users/{id}` | Update user (toggle `is_admin` or `is_active`) |
+| `GET` | `/api/v1/admin/users` | List or search users (`?q=`) across the system |
+| `POST` | `/api/v1/admin/users` | Admin creates user account with optional `is_admin` / `can_download` flags |
+| `PATCH` | `/api/v1/admin/users/{id}` | Update user (`is_admin`, `is_active`, `can_download`, creation limits) |
 | `DELETE` | `/api/v1/admin/users/{id}` | Delete user account and all repositories |
 | `GET` | `/api/v1/admin/repos` | List all repositories across the system |
 | `DELETE` | `/api/v1/admin/repos/{id}` | Admin deletes any repository from database and disk |
@@ -296,4 +303,188 @@ ProGit implements a granular, zero-trust permission model for pull requests on p
   1. Repository collaborators / members with write permissions, OR
   2. The author (requester) of the pull request.
 - **API Defense**: Direct HTTP POST requests to `/api/v1/repos/{owner}/{repo}/pulls/{index}/merge` require a valid session (`401 Unauthorized` for anonymous requests) and verify that the user is either a repo collaborator or the PR author (`403 Forbidden` for other logged-in users).
+
+---
+
+## 7. Administrative REST API Reference
+
+ProGit exposes a comprehensive set of administrative REST endpoints under `/api/v1/admin/*` and `/api/enterprise/*`.
+
+### 7.1 Authentication & Authorization
+All administrative endpoints require **Super Administrator privileges** (`is_admin = true`).
+Pass an admin-scoped Personal Access Token via header:
+```http
+Authorization: Bearer <admin_token>
+```
+Or authenticate via the browser session cookie (`progit_session`). Unauthenticated requests receive `401 Unauthorized`; non-admin users receive `403 Forbidden: Administrator privileges required`.
+
+---
+
+### 7.2 Administrative Endpoint Directory
+
+| Method | Endpoint | Description | Scope / Edition |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/admin/stats` | System telemetry, runtime metrics, and memory statistics | Open Source & Enterprise |
+| `GET` | `/api/v1/admin/users` | List or search users (`?q=`) across the system | Open Source & Enterprise |
+| `POST` | `/api/v1/admin/users` | Create a new user with role, `can_download`, and creation limits | Open Source & Enterprise |
+| `PATCH` | `/api/v1/admin/users/{id}` | Update admin status, active state, `can_download`, or creation limits | Open Source & Enterprise |
+| `DELETE` | `/api/v1/admin/users/{id}` | Permanently delete user and delete repository files | Open Source & Enterprise |
+| `GET` | `/api/v1/admin/repos` | List all repositories across the entire instance | Open Source & Enterprise |
+| `DELETE` | `/api/v1/admin/repos/{id}` | Permanently delete any repository and disk storage | Open Source & Enterprise |
+| `POST` | `/api/v1/admin/maintenance` | Execute database WAL checkpoint or VACUUM | Open Source & Enterprise |
+| `PUT` | `/api/v1/admin/config` | Update server configuration and global creation limits | Open Source & Enterprise |
+| `GET` | `/api/enterprise/cluster` | Inspect multi-node cluster topology and status | Enterprise Edition |
+| `GET` | `/api/enterprise/license` | Query active cryptographic license status & seats | Enterprise Edition |
+| `POST` | `/api/enterprise/license` | Activate / update enterprise license payload | Enterprise Edition |
+| `GET` | `/api/enterprise/audit-logs` | Query SIEM security compliance audit events | Enterprise Edition |
+
+---
+
+### 7.3 Detailed API Documentation & `curl` Examples
+
+#### 1. System Telemetry & Statistics
+```bash
+curl -X GET "https://git.company.com/api/v1/admin/stats" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+```
+**Response (200 OK):**
+```json
+{
+  "users_count": 25,
+  "repositories_count": 48,
+  "uptime": "2d14h30m",
+  "database_path": "./data/progit.db",
+  "repositories_path": "./data/repositories",
+  "ssh_enabled": true,
+  "ssh_port": 2222,
+  "domain": "git.company.com",
+  "http_port": 3000,
+  "https_port": 3443,
+  "protocol": "https",
+  "is_https": true,
+  "enable_acme": false,
+  "generate_local_cert": true,
+  "root_url": "https://git.company.com/",
+  "app_name": "ProGit",
+  "go_version": "go1.24.0",
+  "num_goroutines": 35,
+  "memory_alloc_mb": 14.8,
+  "memory_sys_mb": 38.2,
+  "active_sessions_count": 5,
+  "install_locked": true,
+  "default_repo_max_creation_limit": -1,
+  "default_org_max_creation_limit": -1
+}
+```
+
+#### 2. User Management APIs
+
+**List or Search Users:**
+```bash
+curl -X GET "https://git.company.com/api/v1/admin/users?q=alice&limit=50&offset=0" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+```
+
+**Create User:**
+```bash
+curl -X POST "https://git.company.com/api/v1/admin/users" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "developer1",
+    "email": "dev1@company.com",
+    "password": "SecurePassword123!",
+    "full_name": "Developer One",
+    "is_admin": false,
+    "can_download": true,
+    "max_repo_creation": 10,
+    "max_org_creation": 2
+  }'
+```
+
+**Update User Privileges, Download Permission & Limits:**
+```bash
+curl -X PATCH "https://git.company.com/api/v1/admin/users/4" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "is_admin": false,
+    "is_active": true,
+    "can_download": false,
+    "max_repo_creation": 25,
+    "max_org_creation": 5
+  }'
+```
+
+**Delete User:**
+```bash
+curl -X DELETE "https://git.company.com/api/v1/admin/users/4" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+```
+
+#### 3. Repository Administration APIs
+
+**List All Repositories:**
+```bash
+curl -X GET "https://git.company.com/api/v1/admin/repos?limit=100" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+```
+
+**Delete Repository:**
+```bash
+curl -X DELETE "https://git.company.com/api/v1/admin/repos/12" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+```
+
+#### 4. System Maintenance API
+
+**Execute SQLite WAL Checkpoint:**
+```bash
+curl -X POST "https://git.company.com/api/v1/admin/maintenance" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"operation": "checkpoint_wal"}'
+```
+
+**Execute Database VACUUM:**
+```bash
+curl -X POST "https://git.company.com/api/v1/admin/maintenance" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"operation": "vacuum"}'
+```
+
+#### 5. Dynamic Configuration & Global Creation Limits API
+
+**Update Server Config & Global Quotas:**
+```bash
+curl -X PUT "https://git.company.com/api/v1/admin/config" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "app_name": "ProGit Production",
+    "domain": "git.company.com",
+    "root_url": "https://git.company.com/",
+    "ssh_port": 2222,
+    "http_port": 3000,
+    "default_repo_max_creation_limit": 5,
+    "default_org_max_creation_limit": 2
+  }'
+```
+
+#### 6. Enterprise Endpoints (Enterprise Edition)
+
+**Activate Signed Enterprise License:**
+```bash
+curl -X POST "https://git.company.com/api/enterprise/license" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: text/plain" \
+  --data-binary @/path/to/enterprise.lic
+```
+
+**Export SIEM Audit Logs:**
+```bash
+curl -X GET "https://git.company.com/api/enterprise/audit-logs?limit=250" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+```
 

@@ -44,8 +44,12 @@ ProGit supports both standard local database authentication and enterprise Singl
 5. Optionally select **Initialize with README**.
 6. Click **Create Repository**.
 
-### 2.2 Cloning a Repository
-From the repository overview or the Git CLI Quick Reference card, copy the clone URL:
+### 2.2 Cloning & Downloading a Repository
+From the repository **Code** popover, the **Tags** page, or the Git CLI Quick Reference card, download an archive or copy the clone URL:
+
+- **Download ZIP Archive**:
+  - Open the green **Code** dropdown on the repository home page and click **Download ZIP (<branch>)**, or click **Download ZIP** next to any release tag on the **Tags** page.
+  - Note: Download ZIP, Raw file downloads, Fork, and Git `clone`/`pull` are hidden and blocked (`403 Forbidden`) if your user account is download-restricted by an administrator, if your repository/team role is `view_only`, or if the repository has **Allow Downloads (ZIP / Clone) & Pull Requests** disabled for non-write users.
 
 - **Smart HTTP / HTTPS**:
   ```bash
@@ -166,7 +170,11 @@ Protect important branches like `main` or release branches:
 4. Click **Save Protection Rule**.
 
 ### 5.2 Access Controls & Collaborators
-- Grant users write or admin permissions to allow them to push commits, edit files online, upload documents, and manage project boards.
+- **Combined Repository Feature Toggle (`Allow Downloads & Pull Requests`)**: Under **Settings > Features**, repository owners and admins can disable **Allow Downloads (ZIP / Clone) & Pull Requests** with a single switch. When disabled:
+  - `Write` collaborators, Repo Admins, Repo Owners, and Super Admins retain ZIP download, Git clone/pull, Raw file, and Fork access.
+  - `Read`, `View-Only`, and anonymous/public visitors can still browse code in the Web UI, while Download ZIP, Git clone/pull, Raw, `Copy`, and Fork are hidden/blocked (`403 Forbidden`).
+  - Pull Requests and branch comparison are disabled repository-wide (`Pull Requests` tab hidden; API returns `403 Forbidden`).
+- Grant users `view_only`, `read`, `write`, or `admin` permissions to match their workflow.
 
 ---
 
@@ -241,15 +249,15 @@ Changes pushed over HTTPS or SSH are instantly indexed and reflected in the ProG
 
 ProGit Pages lets you host static websites, portfolios, or documentation directly from any Git branch.
 
-### 7.1 Enabling ProGit Pages
-1. Go to repository **Settings** (or the **Pages** tab).
+### 7.1 Enabling ProGit Pages (Owner / Repository Admin Only)
+1. Go to repository **Settings** (or the **Pages** tab — only visible for configuration to the repository owner and administrators).
 2. Check **Enable ProGit Pages**.
 3. Select the **Source Branch** (e.g. `gh-pages` or `main`).
 4. Select the **Source Folder** (`/` root or `/docs`).
 5. Click **Save Pages Configuration**.
 
 ### 7.2 Accessing Your Site
-Once enabled, your site is available at:
+Once enabled, the live ProGit Pages URL is displayed to all visitors on the repository **Code** page (and via the **Pages** navigation link) without exposing configuration controls:
 ```
 http://localhost:3000/pages/<owner>/<repo>/
 ```
@@ -277,9 +285,10 @@ ProGit strictly enforces access control boundaries across all online write opera
 1. In your repository, click **Settings**.
 2. Scroll to the **Collaborators & Edit Permissions** section.
 3. Enter the collaborator's username and select their permission level:
-   - `write`: Can edit, create, delete, upload files, push code, and open/manage issues and PRs.
+   - `view_only`: Web UI browsing only — can view code, commits, and issues in browser, but cannot Download ZIP, `git clone`/`git pull`, view Raw, download release assets, or fork.
+   - `read`: Read-only access to browse code and clone/download repositories (when allowed by repository settings).
+   - `write`: Can edit, create, delete, upload files, push code, download/clone, and open/manage issues and PRs.
    - `admin`: Full administrative control over the repository including settings and collaborator management.
-   - `read`: Read-only access to browse code and clone private repositories.
 4. Click **Add Collaborator**.
 5. To revoke access, click the **Remove** button next to any collaborator in the list.
 
@@ -298,7 +307,7 @@ Like GitHub, ProGit allows users to create Organizations to manage shared reposi
 - Navigate to `/org/<orgname>` to view the organization profile.
 - **Repositories Tab**: View all repositories owned by the organization or create a new one directly.
 - **Members Tab**: Invite existing users by username and assign them roles (`owner`, `admin`, or `member`).
-- **Teams Tab**: Create developer teams (e.g. `Frontend Engineers`, `DevOps`) and assign team-wide default permissions (`read`, `write`, `admin`).
+- **Teams Tab**: Create developer teams (e.g. `Frontend Engineers`, `DevOps`, `External Auditors`) and assign team-wide default permissions (`view_only`, `read`, `write`, `admin`).
 - **Organization Repositories**: When creating a new repository (`/new`), choose the organization as the owner in the dropdown. Git clone/push URLs automatically reflect the organization namespace:
   ```bash
   git clone http://localhost:3000/acme-corp/service-backend.git
