@@ -114,10 +114,12 @@ Administrators can update core server parameters live from the Admin Dashboard:
   - Each repository provides granular toggles under **Settings > Features** for **Allow Downloads (ZIP / Clone) & Pull Requests** (`allow_download_and_pulls`), **Wikis** (`enable_wiki`), and **ProGit Pages** (`enable_pages`).
   - When **Allow Downloads & Pull Requests** is disabled, `Read`, `View-Only`, and anonymous/public visitors cannot download ZIP archives, raw files, fork, or `git clone`/`git pull` (returning `403 Forbidden`), while `Write` collaborators, Repo Admins, Repo Owners, and Super Admins retain download/clone access; Pull Requests and Compare endpoints are disabled repository-wide (`403 Forbidden`), and related navigation/clone UI elements are hidden.
   - When Wikis or Pages are disabled, backend endpoints enforce `403 Forbidden` checks and navigation items are dynamically hidden.
-- **Administrative Delete**:
-  - Click **Delete Repo** to immediately remove any repository from SQLite and purge the bare repository tree from disk.
+### 2.3 Repository Search & Moderation
+- **Global Search & Filtering**: Search repositories globally across owner usernames, repository names, descriptions, and default branches (`?q=`), and filter by `Public`, `Private`, `Archived`, or `Active` state without hitting a 100-repo list cap.
+- **Administrative Git GC & Delete**: Run per-repository `git gc --prune=now` directly from the repository row, or click **Delete Repo** to immediately remove any repository from SQLite and purge the bare repository tree from disk.
 
-### 2.4 System Diagnostics & Database Operations
+### 2.4 System Diagnostics, Git Management Dashboard & Database Operations
+- **Git Management Dashboard**: Displays Git CLI engine version, bare repository storage root accessibility, visibility & archive breakdown, total bare + wiki disk usage, top storage-consuming repositories, per-repository Git object-store inspection (`git count-objects -v`, branch/tag counts, loose vs packed objects), and administrative `git gc`, `git repack`, `git fsck`, `git prune`, `git update-server-info`, and global `gc_all` maintenance.
 - **System Metrics**: Go runtime version, active goroutines, memory allocation, active sessions, and SSH uptime.
 - **Checkpoint & Truncate WAL**: Flushes and truncates the SQLite write-ahead log (`PRAGMA wal_checkpoint(TRUNCATE)`), reclaiming storage.
 - **Database VACUUM**: Defragments the database file and reclaims freed storage space.
@@ -140,8 +142,11 @@ All admin endpoints require an active session or Personal Access Token from a us
 | `POST` | `/api/v1/admin/users` | Admin creates user account with optional `is_admin` / `can_download` flags |
 | `PATCH` | `/api/v1/admin/users/{id}` | Update user (`is_admin`, `is_active`, `can_download`, creation limits) |
 | `DELETE` | `/api/v1/admin/users/{id}` | Delete user account and all repositories |
-| `GET` | `/api/v1/admin/repos` | List all repositories across the system |
+| `GET` | `/api/v1/admin/repos` | Search or list repositories (`?q=`, `?visibility=`, `?limit=`) across the system |
 | `DELETE` | `/api/v1/admin/repos/{id}` | Admin deletes any repository from database and disk |
+| `GET` | `/api/v1/admin/git` | Git Management Dashboard summary, disk usage, and largest repositories |
+| `GET` | `/api/v1/admin/git/repos/{id}` | Inspect bare repository Git internals (refs, pack files, loose objects) |
+| `POST` | `/api/v1/admin/git/maintenance` | Execute Git maintenance (`gc`, `repack`, `prune`, `fsck`, `update_server_info`, `gc_all`) |
 | `POST` | `/api/v1/admin/maintenance` | Run maintenance: `checkpoint_wal` or `vacuum` |
 
 ---
@@ -304,6 +309,27 @@ ProGit implements a granular, zero-trust permission model for pull requests on p
   2. The author (requester) of the pull request.
 - **API Defense**: Direct HTTP POST requests to `/api/v1/repos/{owner}/{repo}/pulls/{index}/merge` require a valid session (`401 Unauthorized` for anonymous requests) and verify that the user is either a repo collaborator or the PR author (`403 Forbidden` for other logged-in users).
 
+### 6.3 Developer Toolbox & Server DNS Controls (`ENABLE_TOOLBOX`, `ENABLE_TOOLBOX_DNS`)
+Administrators can independently toggle the entire Developer Toolbox or disable server-side DNS resolution in air-gapped environments:
+
+**Configuration in `conf/app.ini`:**
+```ini
+[features]
+ENABLE_TOOLBOX = true       ; Set to false to disable /toolbox completely
+ENABLE_TOOLBOX_DNS = true   ; Set to false to disable GET /api/v1/toolbox/dns only
+```
+
+**Environment Variables:**
+```bash
+PROGIT_ENABLE_TOOLBOX="true"
+PROGIT_ENABLE_TOOLBOX_DNS="true"
+```
+
+**Isolation & Security Controls:**
+- **Browser-First Processing**: Password, UUID, Base64, Hash, JSON, XML, YAML, JWT, Cron, and Text Diff execute strictly in client memory.
+- **Bounded DNS Resolution**: `GET /api/v1/toolbox/dns` requires authentication, restricts queries to `A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`, `PTR`, or `ALL`, validates RFC hostnames/IPs, enforces a per-user/IP `30 req/min` rate limit, bounds concurrent server lookups with an `8`-slot semaphore, and cancels resolvers after `3s`.
+- **Reserved Route Namespace**: `toolbox` is reserved alongside system account names (`explore`, `admin`, `settings`, `messages`, etc.) to prevent owner/route collisions.
+
 ---
 
 ## 7. Administrative REST API Reference
@@ -329,8 +355,11 @@ Or authenticate via the browser session cookie (`progit_session`). Unauthenticat
 | `POST` | `/api/v1/admin/users` | Create a new user with role, `can_download`, and creation limits | Open Source & Enterprise |
 | `PATCH` | `/api/v1/admin/users/{id}` | Update admin status, active state, `can_download`, or creation limits | Open Source & Enterprise |
 | `DELETE` | `/api/v1/admin/users/{id}` | Permanently delete user and delete repository files | Open Source & Enterprise |
-| `GET` | `/api/v1/admin/repos` | List all repositories across the entire instance | Open Source & Enterprise |
+| `GET` | `/api/v1/admin/repos` | Search or list repositories (`?q=`, `?visibility=`) across the entire instance | Open Source & Enterprise |
 | `DELETE` | `/api/v1/admin/repos/{id}` | Permanently delete any repository and disk storage | Open Source & Enterprise |
+| `GET` | `/api/v1/admin/git` | Git engine telemetry, disk usage, and largest repositories | Open Source & Enterprise |
+| `GET` | `/api/v1/admin/git/repos/{id}` | Inspect bare repository Git object store & ref counts | Open Source & Enterprise |
+| `POST` | `/api/v1/admin/git/maintenance` | Run Git maintenance (`gc`, `repack`, `fsck`, `prune`, `gc_all`) | Open Source & Enterprise |
 | `POST` | `/api/v1/admin/maintenance` | Execute database WAL checkpoint or VACUUM | Open Source & Enterprise |
 | `PUT` | `/api/v1/admin/config` | Update server configuration and global creation limits | Open Source & Enterprise |
 | `GET` | `/api/enterprise/cluster` | Inspect multi-node cluster topology and status | Enterprise Edition |

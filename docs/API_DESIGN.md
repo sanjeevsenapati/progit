@@ -269,11 +269,14 @@ All administrative endpoints require **Super Administrator privileges** (`is_adm
   - *Safety Guard*: Super Admins cannot delete their own account.
 
 #### 3. Repository Administration
-- `GET /api/v1/admin/repos` - List all repositories across all users and organizations on the instance (including private repos).
-  - **Query Parameters**: `limit` (default: 100), `offset` (default: 0).
+- `GET /api/v1/admin/repos` - Search or list repositories across all users and organizations on the instance (including private and archived repos).
+  - **Query Parameters**: `q` (search owner, name, `owner/name`, description, or default branch), `visibility` (`all` | `public` | `private` | `archived` | `active`), `limit` (default: 100, max: 500), `offset` (default: 0).
   - **Response (200 OK)**: Array of Repository objects.
 - `DELETE /api/v1/admin/repos/:id` - Permanently delete any repository across the instance and remove its bare Git storage directory.
   - **Response (200 OK)**: `{"message": "Repository deleted successfully"}`.
+- `GET /api/v1/admin/git` - Return Git engine version, bare storage root health, visibility breakdown, total disk size, and top repositories by size.
+- `GET /api/v1/admin/git/repos/:id` - Inspect a single bare repository (`git count-objects -v`, branch/tag counts, HEAD ref, wiki presence).
+- `POST /api/v1/admin/git/maintenance` - Execute safe Git maintenance (`gc`, `repack`, `prune`, `fsck`, `update_server_info` with `repo_id`, or `gc_all` globally).
 
 #### 4. System Maintenance & Database Operations
 - `POST /api/v1/admin/maintenance` - Execute database and storage maintenance tasks.
@@ -323,3 +326,14 @@ All administrative endpoints require **Super Administrator privileges** (`is_adm
 - `GET /api/enterprise/license` - Inspect active enterprise license status, seat quota (`max_seats`, `active_seats`), edition, and expiry.
 - `POST /api/enterprise/license` - Upload and activate a cryptographically signed enterprise license payload.
 - `GET /api/enterprise/audit-logs?limit=100` - Stream and query SIEM compliance audit events with actor attribution and IP tracking.
+
+#### 7. Developer Toolbox & Feature Discovery APIs
+- `GET /api/v1/features` - Returns platform feature toggles:
+  ```json
+  {
+    "messaging_enabled": true,
+    "toolbox_enabled": true,
+    "toolbox_dns_enabled": true
+  }
+  ```
+- `GET /api/v1/toolbox/dns?name={host_or_ip}&type={record_type}` - Performs bounded server-side DNS resolution (`A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`, `PTR`, `ALL`). Requires authentication; enforces a `30 req/min` rate limit, `8`-slot concurrency cap, and `3s` lookup timeout. Returns `403 Forbidden` when `[features] ENABLE_TOOLBOX = false` or `ENABLE_TOOLBOX_DNS = false`.

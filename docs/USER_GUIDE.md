@@ -442,6 +442,24 @@ To safeguard project privacy and prevent unauthorized user targeting, issue assi
 - Only confirmed **repository owners and collaborators** appear in the issue assignee selector (`/api/v1/repos/{owner}/{repo}/assignees`).
 - Any attempt to assign an issue to an unauthorized external user is blocked with `HTTP 400 Bad Request`.
 
+---
+
+## 15. Developer Toolbox (`/toolbox`)
+
+ProGit includes a built-in **Developer Toolbox** accessible from the top navigation bar (**Toolbox** -> `/toolbox`) with searchable categories, Favorites, and Recently Used utilities (`⌘K` shortcut).
+
+### 15.1 Architecture & Zero Core Overhead
+- **Two-Level Lazy Loading**: The Toolbox route and each individual tool chunk load dynamically on demand, so repository, issue, pull request, and admin pages pay zero bundle overhead.
+- **Browser-First Execution**: 10 of 11 Phase-1 utilities run 100% locally in your browser (`crypto.getRandomValues`, Web Crypto `crypto.subtle`, `DOMParser`, and lazy parsers) with zero server CPU or database writes. Favorites and Recently Used tools persist in `localStorage`.
+
+### 15.2 Phase-1 Utilities
+- **Security**: Password Generator (`crypto.getRandomValues` + entropy bits), JWT Decoder & HMAC Verifier (`HS256`/`384`/`512`), Hash & Checksum Generator (`MD5`, `SHA-1`, `SHA-256`, `SHA-384`, `SHA-512`, `HMAC-SHA256`, local file checksums).
+- **Formatters**: JSON Formatter & Validator (2/4/tab, minify, sort keys), XML Formatter & Validator (`DOMParser`), YAML Formatter & YAML ↔ JSON Converter.
+- **Network**: DNS Lookup (`A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`, `PTR`, `ALL` — requires authenticated session, rate-limited at 30 req/min with 3s timeout).
+- **Cron & Time**: Cron Expression Parser (5-field Linux, `@macros`, and 6-field Quartz/Spring) with human-readable schedule summary and next 10 run timestamps in Local or UTC.
+- **Converters**: Base64 Encode/Decode (UTF-8 safe, URL-safe, File → Base64 Data URL).
+- **Text & Code**: Text Diff Viewer (Side-by-Side & Unified, ignore whitespace), UUID Generator (v4 random & RFC 9562 time-ordered v7, bulk export).
+
 
 
 
