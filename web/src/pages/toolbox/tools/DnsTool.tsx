@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Globe, Loader2, Search, Lock } from 'lucide-react';
 import { api, DNSLookupResponse } from '../../../lib/api';
 import { useAuth } from '../../../lib/theme';
-import { CopyButton, ToolError } from '../components/ToolUI';
+import { CopyButton, ThemedSelect, ToolError } from '../components/ToolUI';
 
 const RECORD_TYPES = ['ALL', 'A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'PTR'];
 
@@ -90,17 +90,17 @@ export const DnsTool: React.FC = () => {
           />
         </div>
 
-        <select
+        <ThemedSelect
+          ariaLabel="DNS record type"
           value={recordType}
-          onChange={e => setRecordType(e.target.value)}
-          className="px-3 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-xs font-bold text-gray-800 dark:text-white"
-        >
-          {RECORD_TYPES.map(t => (
-            <option key={t} value={t}>
-              {t === 'ALL' ? 'ALL Records' : t}
-            </option>
-          ))}
-        </select>
+          onChange={setRecordType}
+          buttonClassName="py-2.5 rounded-xl min-w-[8.5rem]"
+          menuWidthClass="w-44"
+          options={RECORD_TYPES.map(t => ({
+            value: t,
+            label: t === 'ALL' ? 'ALL Records' : t,
+          }))}
+        />
 
         <button
           type="submit"

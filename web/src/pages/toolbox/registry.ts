@@ -233,3 +233,4 @@ const TOOL_COMPONENT_MAP: Record<string, React.LazyExoticComponent<React.Compone
 export function getLazyToolComponent(toolId: string): React.LazyExoticComponent<React.ComponentType> | null {
   return TOOL_COMPONENT_MAP[toolId] || null;
 }
+

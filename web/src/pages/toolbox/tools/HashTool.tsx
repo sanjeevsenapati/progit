@@ -189,3 +189,4 @@ export const HashTool: React.FC = () => {
 };
 
 export default HashTool;
+

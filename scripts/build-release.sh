@@ -6,7 +6,7 @@ set -euo pipefail
 # Targets: macOS (arm64, amd64), Linux (amd64, arm64), Windows (amd64, arm64)
 # ==============================================================================
 
-DEFAULT_VERSION="1.6.0"
+DEFAULT_VERSION="1.6.1"
 if [ -f "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/VERSION" ]; then
     DEFAULT_VERSION="$(tr -d '[:space:]' < "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/VERSION")"
 fi

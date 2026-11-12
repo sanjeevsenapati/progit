@@ -145,3 +145,4 @@ export const UuidTool: React.FC = () => {
 };
 
 export default UuidTool;
+

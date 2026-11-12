@@ -32,6 +32,7 @@ import {
   recordRecentToolId,
   toggleFavoriteToolId,
 } from './toolbox/registry';
+import { ThemedSelect } from './toolbox/components/ToolUI';
 
 const CATEGORY_ICONS: Record<ToolboxCategoryId, React.ReactNode> = {
   security: <Shield className="w-5 h-5" />,
@@ -182,18 +183,18 @@ export const Toolbox: React.FC<ToolboxProps> = ({ toolId }) => {
           </div>
 
           <div className="flex items-center space-x-2">
-            <select
-              aria-label="Switch tool"
+            <ThemedSelect
+              ariaLabel="Switch tool"
+              align="right"
+              menuWidthClass="w-64"
               value={activeTool.id}
-              onChange={e => navigate(`/toolbox/${e.target.value}`)}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-xs font-semibold text-gray-800 dark:text-white focus:outline-none focus:border-emerald-500"
-            >
-              {TOOLBOX_TOOLS.map(t => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+              options={TOOLBOX_TOOLS.map(t => ({
+                value: t.id,
+                label: t.name,
+                hint: getCategoryById(t.category)?.name,
+              }))}
+              onChange={nextId => navigate(`/toolbox/${nextId}`)}
+            />
 
             <button
               type="button"
@@ -469,3 +470,4 @@ export const Toolbox: React.FC<ToolboxProps> = ({ toolId }) => {
 };
 
 export default Toolbox;
+

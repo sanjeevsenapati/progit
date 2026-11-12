@@ -201,3 +201,4 @@ export const Base64Tool: React.FC = () => {
 };
 
 export default Base64Tool;
+

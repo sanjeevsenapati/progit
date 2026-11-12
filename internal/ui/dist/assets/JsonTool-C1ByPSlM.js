@@ -1,4 +1,4 @@
-import{r as n,j as e,k,i as f,l as h}from"./index-CqBbnjdi.js";import{C as y,T as j}from"./ToolUI-BvxQAu0h.js";const m=`{
+import{r as n,j as e,p as k,o as f,q as h}from"./index-Bzx1FxN8.js";import{C as y,T as j}from"./Toolbox-CXX0cVmJ.js";const m=`{
   "service": "progit",
   "version": "1.6.0",
   "features": {

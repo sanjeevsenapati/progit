@@ -149,3 +149,4 @@ export function computeLineDiff(
 
   return { lines, added, removed, unchanged, truncated };
 }
+

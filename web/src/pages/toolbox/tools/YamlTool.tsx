@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Trash2, Sparkles, ArrowLeftRight } from 'lucide-react';
-import { CopyButton, ToolError } from '../components/ToolUI';
+import { CopyButton, ThemedSelect, ToolError } from '../components/ToolUI';
 
 const SAMPLE_YAML = `service: progit
 version: 1.6.0
@@ -93,14 +93,16 @@ export const YamlTool: React.FC = () => {
             ))}
           </div>
 
-          <select
-            value={indent}
-            onChange={e => setIndent(parseInt(e.target.value, 10))}
-            className="px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-700 dark:text-dark-text font-semibold"
-          >
-            <option value={2}>2 spaces</option>
-            <option value={4}>4 spaces</option>
-          </select>
+          <ThemedSelect
+            ariaLabel="YAML indentation"
+            value={String(indent)}
+            onChange={v => setIndent(parseInt(v, 10))}
+            menuWidthClass="w-36"
+            options={[
+              { value: '2', label: '2 spaces' },
+              { value: '4', label: '4 spaces' },
+            ]}
+          />
         </div>
 
         <div className="flex items-center space-x-2">
@@ -169,3 +171,4 @@ export const YamlTool: React.FC = () => {
 };
 
 export default YamlTool;
+
