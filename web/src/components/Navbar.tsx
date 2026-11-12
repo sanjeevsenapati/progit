@@ -20,7 +20,8 @@ import {
   Star,
   Loader2,
   X,
-  DownloadCloud
+  DownloadCloud,
+  Wrench
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -30,6 +31,7 @@ export const Navbar: React.FC = () => {
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [messagingEnabled, setMessagingEnabled] = useState(true);
+  const [toolboxEnabled, setToolboxEnabled] = useState(true);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -143,6 +145,9 @@ export const Navbar: React.FC = () => {
       if (res && res.messaging_enabled !== undefined) {
         setMessagingEnabled(res.messaging_enabled);
       }
+      if (res && res.toolbox_enabled !== undefined) {
+        setToolboxEnabled(res.toolbox_enabled);
+      }
     }).catch(() => {});
   }, []);
 
@@ -187,6 +192,12 @@ export const Navbar: React.FC = () => {
                 <Compass className="w-4 h-4 text-gray-500 dark:text-dark-muted" />
                 <span>Explore</span>
               </a>
+              {toolboxEnabled && (
+                <a href="/toolbox" className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-hover">
+                  <Wrench className="w-4 h-4 text-gray-500 dark:text-dark-muted" />
+                  <span>Toolbox</span>
+                </a>
+              )}
               {user?.is_admin && (
                 <a href="/admin" className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-emerald-600 dark:text-emerald-400 font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors">
                   <Shield className="w-4 h-4" />
@@ -333,6 +344,16 @@ export const Navbar: React.FC = () => {
 
           {/* Right: Actions & User */}
           <div className="flex items-center space-x-3">
+            {toolboxEnabled && (
+              <a
+                href="/toolbox"
+                aria-label="Developer Toolbox"
+                title="Developer Toolbox"
+                className="md:hidden p-2 rounded-lg text-gray-500 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-dark-hover transition-colors"
+              >
+                <Wrench className="w-4 h-4 text-gray-600 dark:text-dark-muted" />
+              </a>
+            )}
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}

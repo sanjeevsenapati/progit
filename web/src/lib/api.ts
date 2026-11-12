@@ -1280,7 +1280,12 @@ export const api = {
   },
 
   async getFeatures() {
-    return fetchJSON<{ messaging_enabled: boolean }>('/api/v1/features');
+    return fetchJSON<{ messaging_enabled: boolean; toolbox_enabled?: boolean; toolbox_dns_enabled?: boolean }>('/api/v1/features');
+  },
+
+  async lookupToolboxDNS(name: string, type: string = 'ALL') {
+    const params = new URLSearchParams({ name, type });
+    return fetchJSON<DNSLookupResponse>(`/api/v1/toolbox/dns?${params.toString()}`);
   },
 
   async getUnreadMessageCount() {
@@ -1437,5 +1442,20 @@ export interface Release {
   created_at: string;
   published_at?: string;
   assets: ReleaseAsset[];
+}
+
+export interface DNSRecord {
+  type: string;
+  name: string;
+  value: string;
+  priority?: number;
+}
+
+export interface DNSLookupResponse {
+  name: string;
+  record_type: string;
+  records: DNSRecord[];
+  duration_ms: number;
+  errors?: string[];
 }
 

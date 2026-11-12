@@ -92,7 +92,7 @@
           "priceCurrency": "USD"
         },
         "description": "A high-performance, single-binary self-hosted Git service and alternative to GitHub, Gogs, Gitea, and GitLab. Built with pure Go and embedded React 19 UI.",
-        "softwareVersion": "1.5.0",
+        "softwareVersion": "1.6.0",
         "license": "https://opensource.org/licenses/MIT",
         "url": "https://progit.co.in/"
       },
@@ -836,7 +836,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
         </div>
         <span class="brand-title">ProGit</span>
-        <span class="version-pill">v1.5.0</span>
+        <span class="version-pill">v1.6.0</span>
       </a>
     </div>
 
@@ -918,6 +918,7 @@
           <li><a href="#feature-orgs" data-target="feature-orgs" onclick="navigate('feature-orgs')">Organizations, Teams &amp; Access</a></li>
           <li><a href="#feature-webhooks" data-target="feature-webhooks" onclick="navigate('feature-webhooks')">Webhooks &amp; Event Delivery</a></li>
           <li><a href="#feature-messages" data-target="feature-messages" onclick="navigate('feature-messages')">Developer Direct Messaging</a></li>
+          <li><a href="#feature-toolbox" data-target="feature-toolbox" onclick="navigate('feature-toolbox')">Developer Toolbox</a></li>
           <li><a href="#feature-danger-zone" data-target="feature-danger-zone" onclick="navigate('feature-danger-zone')">Danger Zone &amp; Security Scoping</a></li>
           <li><a href="#feature-search" data-target="feature-search" onclick="navigate('feature-search')">Repository Search &amp; Discovery</a></li>
         </ul>
@@ -947,6 +948,7 @@
           <li><a href="#api-webhooks" data-target="api-webhooks" onclick="navigate('api-webhooks')">Webhooks &amp; Deliveries API</a></li>
           <li><a href="#api-danger-zone" data-target="api-danger-zone" onclick="navigate('api-danger-zone')">Danger Zone &amp; Governance API</a></li>
           <li><a href="#api-messages" data-target="api-messages" onclick="navigate('api-messages')">Developer Messaging API</a></li>
+          <li><a href="#api-toolbox" data-target="api-toolbox" onclick="navigate('api-toolbox')">Developer Toolbox API</a></li>
           <li><a href="#api-orgs" data-target="api-orgs" onclick="navigate('api-orgs')">Organizations &amp; Teams API</a></li>
           <li><a href="#api-projects" data-target="api-projects" onclick="navigate('api-projects')">Projects &amp; Cards API</a></li>
           <li><a href="#api-admin" data-target="api-admin" onclick="navigate('api-admin')">System Admin &amp; Maintenance API</a></li>
@@ -1420,11 +1422,11 @@ git push -u origin main</code><button class="copy-btn" onclick="copyCode(this)">
         <p>ProGit publishes official multi-architecture container images to GitHub Container Registry (<code>ghcr.io</code>), verified for <strong>Linux x86_64</strong> (AMD64) and <strong>ARM64</strong> (Apple Silicon &amp; AWS Graviton):</p>
         <pre><code># Pull the official multi-architecture image (auto-selects amd64 or arm64)
 podman pull ghcr.io/sanjeevsenapati/progit:latest
-podman pull ghcr.io/sanjeevsenapati/progit:1.5.0
+podman pull ghcr.io/sanjeevsenapati/progit:1.6.0
 
 # Or pull platform-specific tags
-podman pull ghcr.io/sanjeevsenapati/progit:1.5.0-linux-amd64
-podman pull ghcr.io/sanjeevsenapati/progit:1.5.0-linux-arm64
+podman pull ghcr.io/sanjeevsenapati/progit:1.6.0-linux-amd64
+podman pull ghcr.io/sanjeevsenapati/progit:1.6.0-linux-arm64
 
 # Run immediately with persistent storage and standard HTTPS / SSH ports
 podman run -d --name progit \
@@ -1470,12 +1472,12 @@ podman run -d --name progit \
         <p>Ensure you pull the container matching your server's CPU architecture:</p>
         <pre><code># Check host architecture
 uname -m
-# If output is 'x86_64': use ghcr.io/sanjeevsenapati/progit:1.5.0-linux-amd64
-# If output is 'aarch64': use ghcr.io/sanjeevsenapati/progit:1.5.0-linux-arm64</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+# If output is 'x86_64': use ghcr.io/sanjeevsenapati/progit:1.6.0-linux-amd64
+# If output is 'aarch64': use ghcr.io/sanjeevsenapati/progit:1.6.0-linux-arm64</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
         <div class="callout callout-warning">
           <div class="callout-title">Architecture Mismatch Warning</div>
-          <p>Running an ARM64 image on an x86_64 CPU produces an immediate <code>exec format error</code> crash. On x86_64 servers, pull <code>1.5.0-linux-amd64</code> or the multi-arch tag <code>1.5.0</code>.</p>
+          <p>Running an ARM64 image on an x86_64 CPU produces an immediate <code>exec format error</code> crash. On x86_64 servers, pull <code>1.6.0-linux-amd64</code> or the multi-arch tag <code>1.6.0</code>.</p>
         </div>
 
         <h3>2. Configure Firewalld Ports</h3>
@@ -1501,7 +1503,7 @@ podman run -d \
   -v progit-repositories:/data/repositories:Z \
   -v progit-config:/data/config:Z \
   -v progit-logs:/data/logs:Z \
-  ghcr.io/sanjeevsenapati/progit:1.5.0-linux-amd64</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+  ghcr.io/sanjeevsenapati/progit:1.6.0-linux-amd64</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
         <h3>4. Enable Systemd Auto-Start on Boot</h3>
         <pre><code># Enable lingering for rootless user
@@ -2597,6 +2599,50 @@ def verify_progit_signature(payload_bytes, secret_key, header_signature):
             <span class="dir">&larr; Previous</span>
             <span class="title">Webhooks &amp; Delivery</span>
           </a>
+          <a href="#feature-toolbox" class="nav-btn" onclick="navigate('feature-toolbox')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Developer Toolbox</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 25D. Features: Developer Toolbox -->
+      <article class="doc-page" id="page-feature-toolbox">
+        <div class="breadcrumbs">
+          <span>Features Guide</span>
+          <span>/</span>
+          <span class="current">Developer Toolbox</span>
+        </div>
+        <h1 class="page-title">Developer Toolbox</h1>
+        <p class="page-subtitle">Built-in, zero-overhead developer utilities at <code>/toolbox</code> with instant search, Favorites, and Recently Used history.</p>
+
+        <h2>Zero Core Overhead Architecture</h2>
+        <ul>
+          <li><strong>Two-Level Code Splitting</strong>: Both <code>/toolbox</code> and every individual tool chunk load lazily via dynamic imports. Users browsing code, issues, PRs, or Admin pages pay <strong>0 KB</strong> extra JS.</li>
+          <li><strong>Browser-First Compute (10/11 Tools)</strong>: Runs locally via <code>crypto.getRandomValues</code>, Web Crypto <code>crypto.subtle</code>, <code>DOMParser</code>, and lazy parsers. Favorites and Recently Used tools persist in <code>localStorage</code> with zero database writes.</li>
+          <li><strong>Bounded DNS Resolver</strong>: Live DNS lookup (<code>A</code>, <code>AAAA</code>, <code>CNAME</code>, <code>MX</code>, <code>TXT</code>, <code>NS</code>, <code>PTR</code>, <code>ALL</code>) requires authentication, caps concurrency at 8 slots, times out at 3 seconds, and rate-limits at 30 req/min.</li>
+        </ul>
+
+        <h2>Phase-1 Utilities (11 Tools)</h2>
+        <ul>
+          <li><strong>Security</strong>: Password Generator, JWT Decoder &amp; HMAC Verifier, Hash &amp; Checksum Generator (MD5, SHA-1/256/384/512, HMAC, File checksum).</li>
+          <li><strong>Formatters</strong>: JSON Formatter &amp; Validator, XML Formatter &amp; Validator, YAML Formatter &amp; YAML &harr; JSON Converter.</li>
+          <li><strong>Network</strong>: Server-assisted DNS Lookup.</li>
+          <li><strong>Cron &amp; Time</strong>: Cron Expression Parser (5-field Linux, macros, 6-field Quartz/Spring) + Next 10 Runs in Local/UTC.</li>
+          <li><strong>Converters</strong>: Base64 Encode/Decode (UTF-8, URL-safe, File to Data URL).</li>
+          <li><strong>Text &amp; Code</strong>: Text Diff Viewer (Side-by-Side &amp; Unified), UUID Generator (v4 &amp; RFC 9562 v7, bulk export).</li>
+        </ul>
+
+        <h2>Feature Toggles</h2>
+        <pre><code>[features]
+ENABLE_TOOLBOX = true
+ENABLE_TOOLBOX_DNS = true</code></pre>
+
+        <div class="page-nav-buttons">
+          <a href="#feature-messages" class="nav-btn" onclick="navigate('feature-messages')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Developer Messaging</span>
+          </a>
           <a href="#feature-danger-zone" class="nav-btn" onclick="navigate('feature-danger-zone')">
             <span class="dir">Next &rarr;</span>
             <span class="title">Danger Zone &amp; Security</span>
@@ -2921,7 +2967,7 @@ Content-Type: application/json
         <pre><code>{
   "app": "ProGit",
   "status": "ok",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "database": "healthy",
   "repositories": "accessible",
   "ssh_enabled": true,
@@ -3621,6 +3667,49 @@ Content-Type: application/json
             <span class="dir">&larr; Previous</span>
             <span class="title">Danger Zone API</span>
           </a>
+          <a href="#api-toolbox" class="nav-btn" onclick="navigate('api-toolbox')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Developer Toolbox API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 34D. REST API: Developer Toolbox -->
+      <article class="doc-page" id="page-api-toolbox">
+        <div class="breadcrumbs">
+          <span>REST API Reference (v1)</span>
+          <span>/</span>
+          <span class="current">Developer Toolbox API</span>
+        </div>
+        <h1 class="page-title">Developer Toolbox API</h1>
+        <p class="page-subtitle">Feature discovery and bounded server-side DNS resolution endpoints.</p>
+
+        <h2>Platform Feature Flags</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/features</span></div>
+        <pre><code>{
+  "messaging_enabled": true,
+  "toolbox_enabled": true,
+  "toolbox_dns_enabled": true
+}</code></pre>
+
+        <h2>Bounded DNS Lookup</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/toolbox/dns?name=example.com&amp;type=ALL</span></div>
+        <p>Requires valid Bearer token or session cookie. Supports <code>A</code>, <code>AAAA</code>, <code>CNAME</code>, <code>MX</code>, <code>TXT</code>, <code>NS</code>, <code>PTR</code>, and <code>ALL</code>. Enforces a 30 req/min limiter, 8-slot concurrency cap, and 3-second resolver timeout.</p>
+        <pre><code>{
+  "name": "example.com",
+  "record_type": "ALL",
+  "duration_ms": 14,
+  "records": [
+    { "type": "A", "name": "example.com", "value": "93.184.216.34" },
+    { "type": "MX", "name": "example.com", "value": "mail.example.com", "priority": 10 }
+  ]
+}</code></pre>
+
+        <div class="page-nav-buttons">
+          <a href="#api-messages" class="nav-btn" onclick="navigate('api-messages')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Developer Messaging API</span>
+          </a>
           <a href="#api-orgs" class="nav-btn" onclick="navigate('api-orgs')">
             <span class="dir">Next &rarr;</span>
             <span class="title">Organizations API</span>
@@ -4251,6 +4340,7 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
       { id: 'feature-orgs', title: 'Organizations, Teams & Access', section: 'Features', desc: 'Enterprise organization structures, team permissions, and collaborators.' },
       { id: 'feature-webhooks', title: 'Webhooks & Automated Delivery', section: 'Features', desc: 'Push, issue, and PR event triggers, HMAC-SHA256 signature verification, delivery logs.' },
       { id: 'feature-messages', title: 'Developer Direct Messaging', section: 'Features', desc: 'Internal developer messaging system with real-time unread badges and replies.' },
+      { id: 'feature-toolbox', title: 'Developer Toolbox', section: 'Features', desc: 'Lazy-loaded developer utilities: Password, UUID, Base64, Hash, JSON, XML, YAML, JWT, Cron, DNS, Diff.' },
       { id: 'feature-danger-zone', title: 'Danger Zone & Security Scoping', section: 'Features', desc: 'Visibility toggling, read-only archiving, ownership transfers, and collaborator assignee guards.' },
       { id: 'feature-search', title: 'Repository Search & Discovery', section: 'Features', desc: 'Real-time navbar autocomplete, keyboard shortcuts (/), Explore URL sync, and access control.' },
       { id: 'admin-setup', title: 'Super Admin Setup & CLI', section: 'Administration', desc: 'CLI user creation with progit admin create-user.' },
@@ -4268,6 +4358,7 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
       { id: 'api-webhooks', title: 'Webhooks & Deliveries API', section: 'REST API', desc: 'Endpoints for registering webhooks, HMAC-SHA256 signatures, and delivery logs.' },
       { id: 'api-danger-zone', title: 'Danger Zone & Governance API', section: 'REST API', desc: 'Endpoints for visibility toggles, read-only archiving, and ownership transfer.' },
       { id: 'api-messages', title: 'Developer Messaging API', section: 'REST API', desc: 'Endpoints for developer direct messaging, inbox, sent items, and unread counts.' },
+      { id: 'api-toolbox', title: 'Developer Toolbox API', section: 'REST API', desc: 'Feature flags and rate-limited server-side DNS lookup endpoint for Developer Toolbox.' },
       { id: 'api-orgs', title: 'Organizations & Teams API', section: 'REST API', desc: 'Endpoints for organization, team, and member administration.' },
       { id: 'api-projects', title: 'Projects & Cards API', section: 'REST API', desc: 'Endpoints for project boards, Kanban columns, and task cards.' },
       { id: 'api-admin', title: 'System Admin & Maintenance API', section: 'REST API', desc: 'Endpoints for system telemetry, user administration, and WAL checkpoints.' },

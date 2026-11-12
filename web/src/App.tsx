@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { useAuth } from './lib/theme';
 import { Navbar } from './components/Navbar';
 import { Landing } from './pages/Landing';
@@ -37,6 +37,8 @@ import { Messages } from './pages/Messages';
 import { ImportRepo } from './pages/ImportRepo';
 import { GlobalDialogProvider } from './components/ModalDialog';
 import { initLinkInterceptor, onNavigate, onProgress } from './lib/router';
+
+const Toolbox = lazy(() => import('./pages/Toolbox'));
 
 export const App: React.FC = () => {
   const { user, loading } = useAuth();
@@ -96,6 +98,21 @@ export const App: React.FC = () => {
     if (path === '/messages') return <Messages key={currentPath + currentSearch} />;
     if (path === '/admin') return <AdminDashboard />;
     if (path === '/install') return <Install />;
+    if (path === '/toolbox' || path.startsWith('/toolbox/')) {
+      const toolId = path.startsWith('/toolbox/') ? decodeURIComponent(path.slice('/toolbox/'.length).split('/')[0] || '') : undefined;
+      return (
+        <Suspense
+          fallback={
+            <div className="py-24 flex flex-col items-center justify-center text-gray-400 space-y-3">
+              <div className="w-7 h-7 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs font-semibold">Loading Developer Toolbox...</p>
+            </div>
+          }
+        >
+          <Toolbox toolId={toolId || undefined} />
+        </Suspense>
+      );
+    }
     if (path === '/org/new') return <NewOrg />;
 
     // Organization View: /org/:orgname or /orgs/:orgname

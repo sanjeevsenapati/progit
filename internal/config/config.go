@@ -23,7 +23,9 @@ type Config struct {
 
 // FeaturesConfig holds optional platform feature toggles.
 type FeaturesConfig struct {
-	EnableMessaging bool
+	EnableMessaging  bool
+	EnableToolbox    bool
+	EnableToolboxDNS bool
 }
 
 // OIDCConfig holds OpenID Connect and OAuth2 Single Sign-On parameters.
@@ -167,7 +169,9 @@ func DefaultConfig() *Config {
 			AutoProvision: true,
 		},
 		Features: FeaturesConfig{
-			EnableMessaging: true,
+			EnableMessaging:  true,
+			EnableToolbox:    true,
+			EnableToolboxDNS: true,
 		},
 	}
 }
@@ -336,6 +340,16 @@ func Load(configPath string) (*Config, error) {
 		cfg.Features.EnableMessaging = strings.ToLower(val) == "true" || val == "1"
 	} else if val := os.Getenv("PROGIT_FEATURES_ENABLE_MESSAGING"); val != "" {
 		cfg.Features.EnableMessaging = strings.ToLower(val) == "true" || val == "1"
+	}
+	if val := os.Getenv("PROGIT_ENABLE_TOOLBOX"); val != "" {
+		cfg.Features.EnableToolbox = strings.ToLower(val) == "true" || val == "1"
+	} else if val := os.Getenv("PROGIT_FEATURES_ENABLE_TOOLBOX"); val != "" {
+		cfg.Features.EnableToolbox = strings.ToLower(val) == "true" || val == "1"
+	}
+	if val := os.Getenv("PROGIT_ENABLE_TOOLBOX_DNS"); val != "" {
+		cfg.Features.EnableToolboxDNS = strings.ToLower(val) == "true" || val == "1"
+	} else if val := os.Getenv("PROGIT_FEATURES_ENABLE_TOOLBOX_DNS"); val != "" {
+		cfg.Features.EnableToolboxDNS = strings.ToLower(val) == "true" || val == "1"
 	}
 
 	if val := os.Getenv("PROGIT_DEFAULT_BRANCH"); val != "" {
@@ -562,6 +576,10 @@ func parseINIFile(path string, cfg *Config) error {
 			switch key {
 			case "ENABLE_MESSAGING", "MESSAGING_ENABLED":
 				cfg.Features.EnableMessaging = val == "true" || val == "1"
+			case "ENABLE_TOOLBOX", "TOOLBOX_ENABLED":
+				cfg.Features.EnableToolbox = val == "true" || val == "1"
+			case "ENABLE_TOOLBOX_DNS", "TOOLBOX_DNS_ENABLED":
+				cfg.Features.EnableToolboxDNS = val == "true" || val == "1"
 			}
 		}
 	}
@@ -645,7 +663,9 @@ func Save(configPath string, cfg *Config) error {
 	}
 
 	sb.WriteString("[features]\n")
-	sb.WriteString(fmt.Sprintf("ENABLE_MESSAGING = %v\n\n", cfg.Features.EnableMessaging))
+	sb.WriteString(fmt.Sprintf("ENABLE_MESSAGING = %v\n", cfg.Features.EnableMessaging))
+	sb.WriteString(fmt.Sprintf("ENABLE_TOOLBOX = %v\n", cfg.Features.EnableToolbox))
+	sb.WriteString(fmt.Sprintf("ENABLE_TOOLBOX_DNS = %v\n\n", cfg.Features.EnableToolboxDNS))
 
 	return os.WriteFile(configPath, []byte(sb.String()), 0644)
 }

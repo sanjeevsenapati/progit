@@ -28,7 +28,7 @@ import (
 
 var (
 	startTime = time.Now()
-	Version   = "1.5.0"
+	Version   = "1.6.0"
 )
 
 type ipRateLimiter struct {
@@ -89,6 +89,9 @@ type Router struct {
 	cfg         *config.Config
 	mux         *http.ServeMux
 	authLimiter *ipRateLimiter
+	dnsLimiter  *ipRateLimiter
+	dnsSem      chan struct{}
+	dnsResolver toolboxResolver
 }
 
 func NewRouter(cfg *config.Config) *Router {
@@ -96,6 +99,9 @@ func NewRouter(cfg *config.Config) *Router {
 		cfg:         cfg,
 		mux:         http.NewServeMux(),
 		authLimiter: newIPRateLimiter(120, 1*time.Minute),
+		dnsLimiter:  newIPRateLimiter(30, 1*time.Minute),
+		dnsSem:      make(chan struct{}, 8),
+		dnsResolver: net.DefaultResolver,
 	}
 	r.registerRoutes()
 	return r
@@ -348,6 +354,7 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("DELETE /api/v1/messages/{id}", r.handleDeleteMessage)
 	r.mux.HandleFunc("GET /api/v1/developers", r.handleListDevelopers)
 	r.mux.HandleFunc("GET /api/v1/features", r.handleGetFeatures)
+	r.mux.HandleFunc("GET /api/v1/toolbox/dns", r.handleToolboxDNS)
 
 	// Static Pages Web Hosting
 	r.mux.HandleFunc("GET /pages/{owner}/{repo}", r.handleServePagesRedirect)
@@ -446,6 +453,10 @@ func (r *Router) handleRegister(w http.ResponseWriter, req *http.Request) {
 	body.Email = strings.TrimSpace(body.Email)
 	if len(body.Username) < 2 {
 		jsonError(w, http.StatusBadRequest, "Username must be at least 2 characters")
+		return
+	}
+	if isReservedAccountName(body.Username) {
+		jsonError(w, http.StatusBadRequest, fmt.Sprintf("Username '%s' is reserved", body.Username))
 		return
 	}
 	if !strings.Contains(body.Email, "@") {
@@ -4682,6 +4693,10 @@ func (r *Router) handleAdminCreateUser(w http.ResponseWriter, req *http.Request)
 		jsonError(w, http.StatusBadRequest, "Username must be at least 2 characters")
 		return
 	}
+	if isReservedAccountName(body.Username) {
+		jsonError(w, http.StatusBadRequest, fmt.Sprintf("Username '%s' is reserved", body.Username))
+		return
+	}
 	if !strings.Contains(body.Email, "@") {
 		jsonError(w, http.StatusBadRequest, "Invalid email address")
 		return
@@ -5599,6 +5614,10 @@ func (r *Router) handleCreateOrg(w http.ResponseWriter, req *http.Request) {
 	body.Name = strings.TrimSpace(body.Name)
 	if body.Name == "" {
 		jsonError(w, http.StatusBadRequest, "Organization name is required")
+		return
+	}
+	if isReservedAccountName(body.Name) {
+		jsonError(w, http.StatusBadRequest, fmt.Sprintf("Organization name '%s' is reserved", body.Name))
 		return
 	}
 
@@ -6764,7 +6783,9 @@ func (r *Router) handleListDevelopers(w http.ResponseWriter, req *http.Request) 
 
 func (r *Router) handleGetFeatures(w http.ResponseWriter, req *http.Request) {
 	jsonResponse(w, http.StatusOK, map[string]any{
-		"messaging_enabled": r.cfg.Features.EnableMessaging,
+		"messaging_enabled":   r.cfg.Features.EnableMessaging,
+		"toolbox_enabled":     r.cfg.Features.EnableToolbox,
+		"toolbox_dns_enabled": r.cfg.Features.EnableToolbox && r.cfg.Features.EnableToolboxDNS,
 	})
 }
 

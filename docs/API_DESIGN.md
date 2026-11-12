@@ -323,3 +323,14 @@ All administrative endpoints require **Super Administrator privileges** (`is_adm
 - `GET /api/enterprise/license` - Inspect active enterprise license status, seat quota (`max_seats`, `active_seats`), edition, and expiry.
 - `POST /api/enterprise/license` - Upload and activate a cryptographically signed enterprise license payload.
 - `GET /api/enterprise/audit-logs?limit=100` - Stream and query SIEM compliance audit events with actor attribution and IP tracking.
+
+#### 7. Developer Toolbox & Feature Discovery APIs
+- `GET /api/v1/features` - Returns platform feature toggles:
+  ```json
+  {
+    "messaging_enabled": true,
+    "toolbox_enabled": true,
+    "toolbox_dns_enabled": true
+  }
+  ```
+- `GET /api/v1/toolbox/dns?name={host_or_ip}&type={record_type}` - Performs bounded server-side DNS resolution (`A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`, `PTR`, `ALL`). Requires authentication; enforces a `30 req/min` rate limit, `8`-slot concurrency cap, and `3s` lookup timeout. Returns `403 Forbidden` when `[features] ENABLE_TOOLBOX = false` or `ENABLE_TOOLBOX_DNS = false`.

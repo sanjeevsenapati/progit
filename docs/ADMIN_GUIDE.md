@@ -304,6 +304,27 @@ ProGit implements a granular, zero-trust permission model for pull requests on p
   2. The author (requester) of the pull request.
 - **API Defense**: Direct HTTP POST requests to `/api/v1/repos/{owner}/{repo}/pulls/{index}/merge` require a valid session (`401 Unauthorized` for anonymous requests) and verify that the user is either a repo collaborator or the PR author (`403 Forbidden` for other logged-in users).
 
+### 6.3 Developer Toolbox & Server DNS Controls (`ENABLE_TOOLBOX`, `ENABLE_TOOLBOX_DNS`)
+Administrators can independently toggle the entire Developer Toolbox or disable server-side DNS resolution in air-gapped environments:
+
+**Configuration in `conf/app.ini`:**
+```ini
+[features]
+ENABLE_TOOLBOX = true       ; Set to false to disable /toolbox completely
+ENABLE_TOOLBOX_DNS = true   ; Set to false to disable GET /api/v1/toolbox/dns only
+```
+
+**Environment Variables:**
+```bash
+PROGIT_ENABLE_TOOLBOX="true"
+PROGIT_ENABLE_TOOLBOX_DNS="true"
+```
+
+**Isolation & Security Controls:**
+- **Browser-First Processing**: Password, UUID, Base64, Hash, JSON, XML, YAML, JWT, Cron, and Text Diff execute strictly in client memory.
+- **Bounded DNS Resolution**: `GET /api/v1/toolbox/dns` requires authentication, restricts queries to `A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`, `PTR`, or `ALL`, validates RFC hostnames/IPs, enforces a per-user/IP `30 req/min` rate limit, bounds concurrent server lookups with an `8`-slot semaphore, and cancels resolvers after `3s`.
+- **Reserved Route Namespace**: `toolbox` is reserved alongside system account names (`explore`, `admin`, `settings`, `messages`, etc.) to prevent owner/route collisions.
+
 ---
 
 ## 7. Administrative REST API Reference
