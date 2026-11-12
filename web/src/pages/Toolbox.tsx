@@ -213,8 +213,8 @@ export const Toolbox: React.FC<ToolboxProps> = ({ toolId }) => {
         </div>
 
         {/* Workspace Card */}
-        <div className="rounded-2xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-200 dark:border-dark-border flex flex-wrap items-center justify-between gap-3 bg-gray-50/60 dark:bg-dark-bg/40">
+        <div className="rounded-2xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm">
+          <div className="px-5 py-4 rounded-t-2xl border-b border-gray-200 dark:border-dark-border flex flex-wrap items-center justify-between gap-3 bg-gray-50/60 dark:bg-dark-bg/40">
             <div>
               <h1 className="text-lg font-extrabold text-gray-900 dark:text-white">{activeTool.name}</h1>
               <p className="text-xs text-gray-500 dark:text-dark-muted mt-0.5">{activeTool.description}</p>
@@ -252,9 +252,9 @@ export const Toolbox: React.FC<ToolboxProps> = ({ toolId }) => {
   // Hub Landing Page (/toolbox)
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="rounded-2xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm">
         {/* Top Header */}
-        <div className="p-5 sm:p-6 border-b border-gray-100 dark:border-dark-border space-y-4">
+        <div className="p-5 sm:p-6 rounded-t-2xl border-b border-gray-100 dark:border-dark-border space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center space-x-3">
               <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-sm">
@@ -438,7 +438,7 @@ export const Toolbox: React.FC<ToolboxProps> = ({ toolId }) => {
         </div>
 
         {/* Bottom Recently Used Footer (Matching Mockup) */}
-        <div className="px-5 sm:px-6 py-4 border-t border-gray-100 dark:border-dark-border bg-gray-50/60 dark:bg-dark-bg/40 flex flex-wrap items-center justify-between gap-3">
+        <div className="px-5 sm:px-6 py-4 rounded-b-2xl border-t border-gray-100 dark:border-dark-border bg-gray-50/60 dark:bg-dark-bg/40 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold text-gray-700 dark:text-dark-text mr-1">Recently used</span>
             {(recentTools.length > 0 ? recentTools : TOOLBOX_TOOLS.slice(0, 3)).map(t => (

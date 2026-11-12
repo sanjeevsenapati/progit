@@ -125,7 +125,7 @@ export const ThemedSelect: React.FC<{
 
       {open && (
         <div
-          className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} mt-1.5 ${menuWidthClass} max-h-72 overflow-y-auto rounded-xl shadow-2xl p-1.5 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border z-50 space-y-0.5`}
+          className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} mt-1.5 ${menuWidthClass} max-h-72 overflow-y-auto rounded-xl shadow-xl ring-1 ring-black/5 dark:ring-white/5 p-1.5 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border z-50 space-y-0.5`}
         >
           {options.map(opt => {
             const isActive = opt.value === value;
