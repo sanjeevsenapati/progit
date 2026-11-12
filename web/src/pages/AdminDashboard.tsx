@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { api, User, Repository } from '../lib/api';
+import { api, User, Repository, AdminGitOverview, AdminGitInspectResponse } from '../lib/api';
 import { showModalConfirm } from '../components/ModalDialog';
+import { ThemedSelect } from '../components/ThemedSelect';
 import {
   Shield,
   Users,
   Database,
   Server,
   FolderGit2,
+  GitBranch,
   Clock,
   CheckCircle2,
   AlertCircle,
@@ -24,13 +26,36 @@ import {
   Search,
   Download,
   Ban,
+  Wrench,
+  Activity,
+  Archive,
+  Lock,
+  Globe,
   X
 } from 'lucide-react';
+
+const formatBytes = (bytes?: number): string => {
+  if (!bytes || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let val = bytes;
+  let idx = 0;
+  while (val >= 1024 && idx < units.length - 1) {
+    val /= 1024;
+    idx++;
+  }
+  return `${val < 10 && idx > 0 ? val.toFixed(1) : Math.round(val)} ${units[idx]}`;
+};
 
 export const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<any>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [repos, setRepos] = useState<Repository[]>([]);
+  const [gitOverview, setGitOverview] = useState<AdminGitOverview | null>(null);
+  const [gitLoading, setGitLoading] = useState(false);
+  const [inspectedRepo, setInspectedRepo] = useState<AdminGitInspectResponse | null>(null);
+  const [inspectLoadingId, setInspectLoadingId] = useState<number | null>(null);
+  const [gitBusyKey, setGitBusyKey] = useState<string | null>(null);
+
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'repos' | 'system'>('overview');
   const [loading, setLoading] = useState(true);
 
@@ -40,6 +65,15 @@ export const AdminDashboard: React.FC = () => {
   const [userSearching, setUserSearching] = useState(false);
   const userSearchRef = useRef('');
   const searchSeqRef = useRef(0);
+
+  // Repository search & filter
+  const [repoSearch, setRepoSearch] = useState('');
+  const [repoFilter, setRepoFilter] = useState<'all' | 'public' | 'private' | 'archived' | 'active'>('all');
+  const [repoSearching, setRepoSearching] = useState(false);
+  const repoSearchRef = useRef('');
+  const repoFilterRef = useRef<'all' | 'public' | 'private' | 'archived' | 'active'>('all');
+  const repoSearchSeqRef = useRef(0);
+
   const hasMountedRef = useRef(false);
 
   // User creation modal
@@ -94,16 +128,49 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const fetchAdminRepos = async (query: string, visibility: string) => {
+    const seq = ++repoSearchSeqRef.current;
+    setRepoSearching(true);
+    try {
+      const rList = await api.getAdminRepos(query, visibility, 200, 0);
+      if (seq === repoSearchSeqRef.current) {
+        setRepos(rList || []);
+      }
+    } catch (err: any) {
+      if (seq === repoSearchSeqRef.current) {
+        setStatusMsg({ type: 'error', text: err.message || 'Failed to search repositories.' });
+      }
+    } finally {
+      if (seq === repoSearchSeqRef.current) {
+        setRepoSearching(false);
+      }
+    }
+  };
+
+  const loadGitOverview = async () => {
+    setGitLoading(true);
+    try {
+      const g = await api.getAdminGitOverview();
+      setGitOverview(g);
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setGitLoading(false);
+    }
+  };
+
   const loadData = async () => {
     try {
-      const [s, uList, rList] = await Promise.all([
+      const [s, uList, rList, gData] = await Promise.all([
         api.getAdminStats(),
         api.getAdminUsers(userSearchRef.current),
-        api.getAdminRepos(),
+        api.getAdminRepos(repoSearchRef.current, repoFilterRef.current, 200, 0),
+        api.getAdminGitOverview().catch(() => null),
       ]);
       setStats(s);
       setUsers(uList || []);
       setRepos(rList || []);
+      if (gData) setGitOverview(gData);
     } catch (err: any) {
       console.error(err);
       setStatusMsg({ type: 'error', text: err.message || 'Failed to load administration data.' });
@@ -125,6 +192,16 @@ export const AdminDashboard: React.FC = () => {
     }, 200);
     return () => window.clearTimeout(timer);
   }, [userSearch]);
+
+  useEffect(() => {
+    repoSearchRef.current = repoSearch;
+    repoFilterRef.current = repoFilter;
+    if (!hasMountedRef.current) return;
+    const timer = window.setTimeout(() => {
+      fetchAdminRepos(repoSearch, repoFilter);
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [repoSearch, repoFilter]);
 
   const handleToggleAdmin = async (u: User) => {
     const action = u.is_admin ? 'revoke' : 'grant';
@@ -336,6 +413,62 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleInspectGitRepo = async (repoId: number) => {
+    if (inspectedRepo?.repo_id === repoId) {
+      setInspectedRepo(null);
+      return;
+    }
+    setInspectLoadingId(repoId);
+    try {
+      const res = await api.inspectAdminGitRepo(repoId);
+      setInspectedRepo(res);
+    } catch (err: any) {
+      setStatusMsg({ type: 'error', text: err.message || 'Failed to inspect Git repository.' });
+    } finally {
+      setInspectLoadingId(null);
+    }
+  };
+
+  const handleGitMaintenance = async (
+    op: 'gc' | 'repack' | 'prune' | 'fsck' | 'update_server_info' | 'gc_all',
+    repoId?: number,
+    repoName?: string
+  ) => {
+    if (op === 'gc_all') {
+      const confirmed = await showModalConfirm({
+        title: 'Run Global Git Garbage Collection',
+        message: 'Run `git gc --prune=now` sequentially across bare repositories on disk to reclaim unused Git pack space? Active clones and reads remain unaffected.',
+        confirmText: 'Run Global Git GC',
+        cancelText: 'Cancel',
+        isDanger: false,
+      });
+      if (!confirmed) return;
+    }
+
+    const key = `${op}:${repoId ?? 'all'}`;
+    setGitBusyKey(key);
+    try {
+      const res = await api.runAdminGitMaintenance(op, repoId);
+      const freedText = res.freed_bytes && res.freed_bytes > 0 ? ` Freed ${formatBytes(res.freed_bytes)}.` : '';
+      setStatusMsg({
+        type: 'success',
+        text: `${res.message}${freedText}${repoName && !res.message.includes(repoName) ? ` (${repoName})` : ''}`,
+      });
+      await loadGitOverview();
+      if (repoId && inspectedRepo?.repo_id === repoId) {
+        const refreshed = await api.inspectAdminGitRepo(repoId);
+        setInspectedRepo(refreshed);
+      }
+      if (activeTab === 'repos') {
+        await fetchAdminRepos(repoSearchRef.current, repoFilterRef.current);
+      }
+    } catch (err: any) {
+      setStatusMsg({ type: 'error', text: err.message || 'Git maintenance command failed.' });
+    } finally {
+      setGitBusyKey(null);
+    }
+  };
+
   const normalizedQuery = userSearch.trim().toLowerCase();
   const filteredUsers = users.filter(u => {
     if (normalizedQuery) {
@@ -434,7 +567,7 @@ export const AdminDashboard: React.FC = () => {
               : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
           }`}
         >
-          Repositories ({repos.length})
+          Repositories ({stats?.repositories_count ?? repos.length})
         </button>
         <button
           onClick={() => setActiveTab('system')}
@@ -470,6 +603,262 @@ export const AdminDashboard: React.FC = () => {
                 {stats.ssh_enabled ? `Active (Port ${stats.ssh_port || 2222})` : 'Disabled'}
               </p>
             </div>
+          </div>
+
+          {/* Git Management Dashboard */}
+          <div className="p-6 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-gray-100 dark:border-dark-border">
+              <div>
+                <h3 className="font-bold text-base text-gray-900 dark:text-white flex items-center space-x-2">
+                  <FolderGit2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Git Management Dashboard</span>
+                  {gitOverview?.git_version && (
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
+                      git {gitOverview.git_version}
+                    </span>
+                  )}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-dark-muted mt-1">
+                  Bare repository storage telemetry, object-store inspection, and live Git maintenance (`gc`, `repack`, `fsck`, `prune`).
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={loadGitOverview}
+                  disabled={gitLoading}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-hover hover:bg-gray-50 dark:hover:bg-dark-border text-gray-700 dark:text-dark-text text-xs font-semibold flex items-center space-x-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${gitLoading ? 'animate-spin' : ''}`} />
+                  <span>{gitLoading ? 'Scanning...' : 'Refresh Git Metrics'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleGitMaintenance('gc_all')}
+                  disabled={gitBusyKey === 'gc_all:all'}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  <Wrench className="w-3.5 h-3.5" />
+                  <span>{gitBusyKey === 'gc_all:all' ? 'Running GC...' : 'Run Global Git GC'}</span>
+                </button>
+              </div>
+            </div>
+
+            {gitOverview ? (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                  <div className="p-4 rounded-xl bg-gray-50 dark:bg-dark-hover border border-gray-100 dark:border-dark-border space-y-1">
+                    <span className="text-gray-400 font-semibold uppercase tracking-wide flex items-center justify-between">
+                      <span>Total Git Disk Usage</span>
+                      <HardDrive className="w-3.5 h-3.5 text-emerald-500" />
+                    </span>
+                    <p className="text-xl font-bold text-gray-900 dark:text-white font-mono">
+                      {formatBytes(gitOverview.summary.total_size_bytes)}
+                    </p>
+                    <p className="text-[11px] text-gray-500 dark:text-dark-muted">
+                      {gitOverview.summary.bare_repos_on_disk} bare repos • {gitOverview.summary.wiki_repos_on_disk} wiki stores
+                      {gitOverview.summary.missing_on_disk > 0 ? ` • ${gitOverview.summary.missing_on_disk} missing` : ''}
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-gray-50 dark:bg-dark-hover border border-gray-100 dark:border-dark-border space-y-1">
+                    <span className="text-gray-400 font-semibold uppercase tracking-wide flex items-center justify-between">
+                      <span>Visibility &amp; State</span>
+                      <Layers className="w-3.5 h-3.5 text-emerald-500" />
+                    </span>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                      {gitOverview.summary.public_repos} Public <span className="text-gray-400 font-normal">/</span> {gitOverview.summary.private_repos} Private
+                    </p>
+                    <p className="text-[11px] text-gray-500 dark:text-dark-muted">
+                      {gitOverview.summary.archived_repos} archived • {gitOverview.summary.fork_repos} forks
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-gray-50 dark:bg-dark-hover border border-gray-100 dark:border-dark-border space-y-1">
+                    <span className="text-gray-400 font-semibold uppercase tracking-wide flex items-center justify-between">
+                      <span>Default Branch &amp; Root</span>
+                      <GitBranch className="w-3.5 h-3.5 text-emerald-500" />
+                    </span>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white font-mono">
+                      {gitOverview.default_branch || 'main'}
+                    </p>
+                    <p className="text-[11px] text-gray-500 dark:text-dark-muted font-mono truncate" title={gitOverview.storage_root}>
+                      {gitOverview.storage_root}
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-gray-50 dark:bg-dark-hover border border-gray-100 dark:border-dark-border space-y-1">
+                    <span className="text-gray-400 font-semibold uppercase tracking-wide flex items-center justify-between">
+                      <span>Git Transport Health</span>
+                      <Activity className="w-3.5 h-3.5 text-emerald-500" />
+                    </span>
+                    <p className={`text-base font-bold ${gitOverview.storage_accessible ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {gitOverview.storage_accessible ? 'Storage Online' : 'Storage Inaccessible'}
+                    </p>
+                    <p className="text-[11px] text-gray-500 dark:text-dark-muted font-mono">
+                      HTTP ({gitOverview.http_protocol || 'http'}) • {gitOverview.ssh_enabled ? `SSH :${gitOverview.ssh_port}` : 'SSH Off'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Largest Repositories & Quick Object-Store Inspector */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-dark-muted">
+                      Top Bare Repositories by Storage ({gitOverview.largest_repos.length})
+                      {gitOverview.summary.scan_truncated ? ' • partial scan (time-bounded)' : ''}
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('repos')}
+                      className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                    >
+                      Search All Repositories →
+                    </button>
+                  </div>
+
+                  {gitOverview.largest_repos.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-gray-500 dark:text-dark-muted rounded-xl border border-dashed border-gray-200 dark:border-dark-border">
+                      No Git repositories initialized yet.
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-gray-200 dark:border-dark-border divide-y divide-gray-100 dark:divide-dark-border">
+                      {gitOverview.largest_repos.map(repo => {
+                        const isInspected = inspectedRepo?.repo_id === repo.id;
+                        const gcBusy = gitBusyKey === `gc:${repo.id}`;
+                        const fsckBusy = gitBusyKey === `fsck:${repo.id}`;
+                        return (
+                          <div key={repo.id} className="p-3.5 space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                              <div className="min-w-0 flex flex-wrap items-center gap-2">
+                                <a
+                                  href={`/${repo.full_name}`}
+                                  className="font-bold text-sm text-emerald-600 dark:text-emerald-400 hover:underline truncate"
+                                >
+                                  {repo.full_name}
+                                </a>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 dark:bg-dark-hover text-gray-600 dark:text-dark-muted inline-flex items-center space-x-1">
+                                  {repo.is_private ? <Lock className="w-2.5 h-2.5" /> : <Globe className="w-2.5 h-2.5" />}
+                                  <span>{repo.is_private ? 'Private' : 'Public'}</span>
+                                </span>
+                                {repo.is_archived && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 inline-flex items-center space-x-1">
+                                    <Archive className="w-2.5 h-2.5" />
+                                    <span>Archived</span>
+                                  </span>
+                                )}
+                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400">
+                                  {formatBytes(repo.size_bytes)}
+                                </span>
+                                <span className="text-[11px] font-mono text-gray-400">
+                                  HEAD: {repo.default_branch}
+                                </span>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleInspectGitRepo(repo.id)}
+                                  disabled={inspectLoadingId === repo.id}
+                                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                                    isInspected
+                                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
+                                      : 'border-gray-200 dark:border-dark-border text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-hover'
+                                  }`}
+                                >
+                                  {inspectLoadingId === repo.id ? 'Inspecting...' : isInspected ? 'Hide Internals' : 'Inspect Git'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleGitMaintenance('gc', repo.id, repo.full_name)}
+                                  disabled={gcBusy || !repo.exists_on_disk}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-gray-200 dark:border-dark-border text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-hover disabled:opacity-40 cursor-pointer"
+                                >
+                                  {gcBusy ? 'GC...' : 'git gc'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleGitMaintenance('fsck', repo.id, repo.full_name)}
+                                  disabled={fsckBusy || !repo.exists_on_disk}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-gray-200 dark:border-dark-border text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-hover disabled:opacity-40 cursor-pointer"
+                                >
+                                  {fsckBusy ? 'Checking...' : 'git fsck'}
+                                </button>
+                              </div>
+                            </div>
+
+                            {isInspected && inspectedRepo && (
+                              <div className="p-3.5 rounded-lg bg-gray-50 dark:bg-dark-hover border border-gray-200 dark:border-dark-border space-y-3">
+                                {inspectedRepo.exists_on_disk && inspectedRepo.telemetry ? (
+                                  <>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5 text-xs font-mono">
+                                      <div>
+                                        <span className="text-gray-400 block text-[10px]">HEAD Ref</span>
+                                        <span className="font-bold text-gray-900 dark:text-white">{inspectedRepo.telemetry.head_ref}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-gray-400 block text-[10px]">Branches / Tags</span>
+                                        <span className="font-bold text-gray-900 dark:text-white">
+                                          {inspectedRepo.telemetry.branches_count} / {inspectedRepo.telemetry.tags_count}
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <span className="text-gray-400 block text-[10px]">Packed Objects</span>
+                                        <span className="font-bold text-gray-900 dark:text-white">
+                                          {inspectedRepo.telemetry.in_pack_objects} ({inspectedRepo.telemetry.pack_files} packs)
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <span className="text-gray-400 block text-[10px]">Loose Objects</span>
+                                        <span className="font-bold text-gray-900 dark:text-white">
+                                          {inspectedRepo.telemetry.loose_objects} ({inspectedRepo.telemetry.loose_size_kb} KB)
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <span className="text-gray-400 block text-[10px]">Disk / Wiki</span>
+                                        <span className="font-bold text-gray-900 dark:text-white">
+                                          {formatBytes(inspectedRepo.telemetry.disk_size_bytes)}
+                                          {inspectedRepo.telemetry.has_wiki ? ` + ${formatBytes(inspectedRepo.telemetry.wiki_size_bytes)}` : ''}
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <span className="text-gray-400 block text-[10px]">Prunable / Garbage</span>
+                                        <span className="font-bold text-gray-900 dark:text-white">
+                                          {inspectedRepo.telemetry.prune_packable} / {inspectedRepo.telemetry.garbage_files}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-200 dark:border-dark-border">
+                                      {(['repack', 'prune', 'update_server_info'] as const).map(cmd => (
+                                        <button
+                                          key={cmd}
+                                          type="button"
+                                          onClick={() => handleGitMaintenance(cmd, repo.id, repo.full_name)}
+                                          disabled={gitBusyKey === `${cmd}:${repo.id}`}
+                                          className="px-2.5 py-1 rounded-md bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border text-[11px] font-mono font-semibold text-gray-700 dark:text-dark-text hover:border-emerald-500 transition-colors cursor-pointer disabled:opacity-40"
+                                        >
+                                          {gitBusyKey === `${cmd}:${repo.id}` ? `Running ${cmd}...` : `git ${cmd.replace(/_/g, '-')}`}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </>
+                                ) : (
+                                  <p className="text-xs text-red-600 dark:text-red-400 font-mono">
+                                    {inspectedRepo.error || 'Bare repository directory missing on disk.'}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="text-xs text-gray-400 py-4">Loading Git subsystem telemetry...</div>
+            )}
           </div>
 
           {/* Runtime Metrics */}
@@ -557,18 +946,19 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-2">
-              <select
+              <ThemedSelect
                 value={userFilter}
-                onChange={e => setUserFilter(e.target.value as 'all' | 'admin' | 'standard' | 'suspended' | 'restricted')}
-                aria-label="Filter users by role or status"
-                className="px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="all">All Users</option>
-                <option value="admin">Super Admins</option>
-                <option value="standard">Standard Users</option>
-                <option value="restricted">Download Restricted</option>
-                <option value="suspended">Suspended</option>
-              </select>
+                onChange={v => setUserFilter(v as 'all' | 'admin' | 'standard' | 'suspended' | 'restricted')}
+                ariaLabel="Filter users by role or status"
+                align="right"
+                options={[
+                  { value: 'all', label: 'All Users' },
+                  { value: 'admin', label: 'Super Admins' },
+                  { value: 'standard', label: 'Standard Users' },
+                  { value: 'restricted', label: 'Download Restricted' },
+                  { value: 'suspended', label: 'Suspended' },
+                ]}
+              />
 
               <span className="text-xs text-gray-500 dark:text-dark-muted whitespace-nowrap px-2">
                 {userSearching ? 'Searching...' : `${filteredUsers.length} user${filteredUsers.length === 1 ? '' : 's'}`}
@@ -711,36 +1101,134 @@ export const AdminDashboard: React.FC = () => {
 
       {/* Repositories Tab */}
       {activeTab === 'repos' && (
-        <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-sm divide-y divide-gray-100 dark:divide-dark-border overflow-hidden">
-          <div className="p-4 bg-gray-50 dark:bg-dark-hover flex justify-between items-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-            <span>Repository</span>
-            <span>Administrative Controls</span>
-          </div>
-          {repos.map(r => (
-            <div key={r.id} className="p-4 flex items-center justify-between">
-              <div>
-                <a href={`/${r.owner_name}/${r.name}`} className="font-bold text-sm text-emerald-600 dark:text-emerald-400 hover:underline">
-                  {r.owner_name} / {r.name}
-                </a>
-                <p className="text-xs text-gray-500 dark:text-dark-muted mt-0.5">{r.description || 'No description'}</p>
-                <div className="flex items-center space-x-3 text-xs text-gray-400 mt-1">
-                  <span>{r.is_private ? 'Private' : 'Public'}</span>
-                  <span>•</span>
-                  <span>{r.num_stars} stars</span>
-                  <span>•</span>
-                  <span>Branch: {r.default_branch}</span>
-                </div>
-              </div>
-              <button
-                onClick={() => handleDeleteRepo(r)}
-                title="Permanently delete repository from disk"
-                className="px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/60 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 text-xs font-semibold flex items-center space-x-1.5 transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete Repo</span>
-              </button>
+        <div className="space-y-4">
+          {/* Repository Search & Filter Toolbar */}
+          <div className="p-4 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={repoSearch}
+                onChange={e => setRepoSearch(e.target.value)}
+                placeholder="Search repositories by owner/name, description, or default branch..."
+                aria-label="Search repositories"
+                className="w-full pl-9 pr-8 py-2 text-xs rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              {repoSearch && (
+                <button
+                  type="button"
+                  onClick={() => setRepoSearch('')}
+                  title="Clear search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5 rounded"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
-          ))}
+
+            <div className="flex items-center space-x-2">
+              <ThemedSelect
+                value={repoFilter}
+                onChange={v => setRepoFilter(v as 'all' | 'public' | 'private' | 'archived' | 'active')}
+                ariaLabel="Filter repositories by visibility or archive state"
+                align="right"
+                options={[
+                  { value: 'all', label: 'All Repositories' },
+                  { value: 'public', label: 'Public Only' },
+                  { value: 'private', label: 'Private Only' },
+                  { value: 'archived', label: 'Archived' },
+                  { value: 'active', label: 'Active (Non-Archived)' },
+                ]}
+              />
+
+              <span className="text-xs text-gray-500 dark:text-dark-muted whitespace-nowrap px-2">
+                {repoSearching ? 'Searching...' : `${repos.length} repo${repos.length === 1 ? '' : 's'}`}
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-dark-surface rounded-xl border border-gray-200 dark:border-dark-border shadow-sm divide-y divide-gray-100 dark:divide-dark-border overflow-hidden">
+            <div className="p-4 bg-gray-50 dark:bg-dark-hover flex justify-between items-center text-xs font-bold text-gray-500 uppercase tracking-wider">
+              <span>Repository</span>
+              <span>Administrative Controls</span>
+            </div>
+            {repos.length === 0 ? (
+              <div className="p-8 text-center space-y-2">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  No repositories found{repoSearch.trim() ? ` matching "${repoSearch.trim()}"` : ''}.
+                </p>
+                {(repoSearch || repoFilter !== 'all') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRepoSearch('');
+                      setRepoFilter('all');
+                    }}
+                    className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                  >
+                    Clear search and filters
+                  </button>
+                )}
+              </div>
+            ) : (
+              repos.map(r => (
+                <div key={r.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <a href={`/${r.owner_name}/${r.name}`} className="font-bold text-sm text-emerald-600 dark:text-emerald-400 hover:underline">
+                        {r.owner_name} / {r.name}
+                      </a>
+                      {r.is_private ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 dark:bg-dark-hover text-gray-600 dark:text-dark-muted">
+                          Private
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400">
+                          Public
+                        </span>
+                      )}
+                      {r.is_archived && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300">
+                          Archived
+                        </span>
+                      )}
+                      {r.size_bytes > 0 && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-gray-100 dark:bg-dark-hover text-gray-600 dark:text-dark-muted">
+                          {formatBytes(r.size_bytes)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-dark-muted mt-0.5">{r.description || 'No description'}</p>
+                    <div className="flex items-center space-x-3 text-xs text-gray-400 mt-1">
+                      <span>{r.num_stars} stars</span>
+                      <span>•</span>
+                      <span>Branch: {r.default_branch}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleGitMaintenance('gc', r.id, `${r.owner_name}/${r.name}`)}
+                      disabled={gitBusyKey === `gc:${r.id}`}
+                      title="Run git gc --prune=now on bare repository"
+                      className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-hover text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer disabled:opacity-40"
+                    >
+                      <Wrench className="w-3.5 h-3.5" />
+                      <span>{gitBusyKey === `gc:${r.id}` ? 'Running GC...' : 'Git GC'}</span>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteRepo(r)}
+                      title="Permanently delete repository from disk"
+                      className="px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/60 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Repo</span>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
 

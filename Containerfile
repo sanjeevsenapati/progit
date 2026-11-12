@@ -32,7 +32,7 @@ COPY --from=frontend-builder /build/web/dist ./internal/ui/dist
 
 # Build static pure-Go binary with embedded UI for target architecture
 ENV CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH}
-RUN go build -trimpath -ldflags="-s -w -X main.Version=1.6.2 -X progit.io/progit/internal/api.Version=1.6.2" -o /progit ./cmd/progit
+RUN go build -trimpath -ldflags="-s -w -X main.Version=1.7.0 -X progit.io/progit/internal/api.Version=1.7.0" -o /progit ./cmd/progit
 
 # Stage 3: Minimal Production Runtime (Target Platform)
 FROM docker.io/library/alpine:3.21

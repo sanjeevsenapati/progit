@@ -13,9 +13,9 @@ Pre-built multi-architecture container images are publicly hosted on GitHub Cont
 | Registry Image / Tag | Architecture | Platform Description |
 | :--- | :--- | :--- |
 | `ghcr.io/sanjeevsenapati/progit:latest` | `linux/amd64` + `linux/arm64` | Multi-arch manifest (auto-selects native host architecture) |
-| `ghcr.io/sanjeevsenapati/progit:1.6.2` | `linux/amd64` + `linux/arm64` | Release 1.6.2 multi-arch manifest |
-| `ghcr.io/sanjeevsenapati/progit:1.6.2-linux-amd64` | `linux/amd64` | Standard x86_64 production Linux servers (Intel / AMD) |
-| `ghcr.io/sanjeevsenapati/progit:1.6.2-linux-arm64` | `linux/arm64` | ARM64 (Apple Silicon, AWS Graviton, Ampere, Raspberry Pi) |
+| `ghcr.io/sanjeevsenapati/progit:1.7.0` | `linux/amd64` + `linux/arm64` | Release 1.7.0 multi-arch manifest |
+| `ghcr.io/sanjeevsenapati/progit:1.7.0-linux-amd64` | `linux/amd64` | Standard x86_64 production Linux servers (Intel / AMD) |
+| `ghcr.io/sanjeevsenapati/progit:1.7.0-linux-arm64` | `linux/arm64` | ARM64 (Apple Silicon, AWS Graviton, Ampere, Raspberry Pi) |
 | `ghcr.io/sanjeevsenapati/progit:linux-amd64` | `linux/amd64` | Rolling AMD64 continuous build |
 | `ghcr.io/sanjeevsenapati/progit:linux-arm64` | `linux/arm64` | Rolling ARM64 continuous build |
 
@@ -23,10 +23,10 @@ Pull the image directly with Docker:
 ```bash
 # Auto-detects native CPU architecture (AMD64 or ARM64)
 docker pull ghcr.io/sanjeevsenapati/progit:latest
-docker pull ghcr.io/sanjeevsenapati/progit:1.6.2
+docker pull ghcr.io/sanjeevsenapati/progit:1.7.0
 
 # Or pull explicitly by architecture
-docker pull ghcr.io/sanjeevsenapati/progit:1.6.2-linux-amd64
+docker pull ghcr.io/sanjeevsenapati/progit:1.7.0-linux-amd64
 ```
 
 ---
@@ -373,7 +373,7 @@ Expected health JSON response:
   "repositories": "accessible",
   "ssh_enabled": true,
   "status": "ok",
-  "version": "1.6.2"
+  "version": "1.7.0"
 }
 ```
 
@@ -498,7 +498,7 @@ podman run --rm -v progit-data:/to:Z -v $(pwd):/backup:ro alpine tar -xzf /backu
 
 | Symptom / Error | Root Cause | Solution |
 | :--- | :--- | :--- |
-| `exec /progit: exec format error` | Pulled ARM64 image on an x86_64 host or vice versa. | Run `docker pull ghcr.io/sanjeevsenapati/progit:1.6.2-linux-amd64` (for Intel/AMD) or `:1.6.2-linux-arm64` (for ARM). |
+| `exec /progit: exec format error` | Pulled ARM64 image on an x86_64 host or vice versa. | Run `docker pull ghcr.io/sanjeevsenapati/progit:1.7.0-linux-amd64` (for Intel/AMD) or `:1.7.0-linux-arm64` (for ARM). |
 | `bind: address already in use` | Another service is using port `3443`, `3000`, or `2222`. | Check `sudo lsof -i :3443` or remap host ports in `docker-compose.yml` (e.g. `"8443:3443"`). |
 | `permission denied` on `/data/db/progit.db` | Host directory permissions mismatch or SELinux blocking. | Ensure named volumes are used (`progit-data`), or append `:z` on RHEL/CentOS systems. |
 | Browser shows `NET::ERR_CERT_AUTHORITY_INVALID` | ProGit uses an auto-generated ECDSA self-signed certificate for local HTTPS. | Download the certificate from `https://localhost:3443/api/v1/server/cert` and import it into your OS trust store, or use Caddy/Nginx for Let's Encrypt. |

@@ -1016,13 +1016,46 @@ export const api = {
     });
   },
 
-  async getAdminRepos() {
-    return fetchJSON<Repository[]>('/api/v1/admin/repos');
+  async getAdminRepos(q?: string, visibility?: string, limit?: number, offset?: number) {
+    const params = new URLSearchParams();
+    if (q && q.trim()) params.set('q', q.trim());
+    if (visibility && visibility !== 'all') params.set('visibility', visibility);
+    if (limit !== undefined) params.set('limit', String(limit));
+    if (offset !== undefined) params.set('offset', String(offset));
+    const qs = params.toString();
+    return fetchJSON<Repository[]>(`/api/v1/admin/repos${qs ? `?${qs}` : ''}`);
   },
 
   async adminDeleteRepo(id: number) {
     return fetchJSON<{ message: string }>(`/api/v1/admin/repos/${id}`, {
       method: 'DELETE',
+    });
+  },
+
+  async getAdminGitOverview() {
+    return fetchJSON<AdminGitOverview>('/api/v1/admin/git');
+  },
+
+  async inspectAdminGitRepo(id: number) {
+    return fetchJSON<AdminGitInspectResponse>(`/api/v1/admin/git/repos/${id}`);
+  },
+
+  async runAdminGitMaintenance(
+    operation: 'gc' | 'repack' | 'prune' | 'fsck' | 'update_server_info' | 'gc_all',
+    repoId?: number
+  ) {
+    return fetchJSON<{
+      message: string;
+      operation: string;
+      target?: string;
+      size_bytes?: number;
+      output?: string;
+      processed?: number;
+      failed?: number;
+      freed_bytes?: number;
+    }>('/api/v1/admin/git/maintenance', {
+      method: 'POST',
+      body: JSON.stringify({ operation, ...(repoId ? { repo_id: repoId } : {}) }),
     });
   },
 
@@ -1457,5 +1490,67 @@ export interface DNSLookupResponse {
   records: DNSRecord[];
   duration_ms: number;
   errors?: string[];
+}
+
+export interface AdminGitRepoEntry {
+  id: number;
+  owner_name: string;
+  name: string;
+  full_name: string;
+  default_branch: string;
+  is_private: boolean;
+  is_archived: boolean;
+  is_fork: boolean;
+  size_bytes: number;
+  has_wiki: boolean;
+  exists_on_disk: boolean;
+}
+
+export interface AdminGitOverview {
+  git_version: string;
+  storage_root: string;
+  storage_accessible: boolean;
+  default_branch: string;
+  ssh_enabled: boolean;
+  ssh_port: number;
+  http_protocol: string;
+  summary: {
+    total_repos: number;
+    public_repos: number;
+    private_repos: number;
+    archived_repos: number;
+    fork_repos: number;
+    wiki_repos: number;
+    total_size_bytes: number;
+    bare_repos_on_disk: number;
+    missing_on_disk: number;
+    wiki_repos_on_disk: number;
+    scanned_repos: number;
+    scan_truncated: boolean;
+  };
+  largest_repos: AdminGitRepoEntry[];
+}
+
+export interface AdminGitInspectResponse {
+  repo_id: number;
+  full_name: string;
+  default_branch: string;
+  exists_on_disk: boolean;
+  error?: string;
+  telemetry?: {
+    disk_size_bytes: number;
+    branches_count: number;
+    tags_count: number;
+    head_ref: string;
+    loose_objects: number;
+    loose_size_kb: number;
+    in_pack_objects: number;
+    pack_files: number;
+    size_pack_kb: number;
+    prune_packable: number;
+    garbage_files: number;
+    has_wiki: boolean;
+    wiki_size_bytes: number;
+  };
 }
 

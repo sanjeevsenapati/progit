@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,7 +29,7 @@ import (
 
 var (
 	startTime = time.Now()
-	Version   = "1.6.2"
+	Version   = "1.7.0"
 )
 
 type ipRateLimiter struct {
@@ -372,6 +373,9 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("DELETE /api/v1/admin/users/{id}", r.handleAdminDeleteUser)
 	r.mux.HandleFunc("GET /api/v1/admin/repos", r.handleAdminRepos)
 	r.mux.HandleFunc("DELETE /api/v1/admin/repos/{id}", r.handleAdminDeleteRepo)
+	r.mux.HandleFunc("GET /api/v1/admin/git", r.handleAdminGitOverview)
+	r.mux.HandleFunc("GET /api/v1/admin/git/repos/{id}", r.handleAdminGitInspectRepo)
+	r.mux.HandleFunc("POST /api/v1/admin/git/maintenance", r.handleAdminGitMaintenance)
 	r.mux.HandleFunc("POST /api/v1/admin/maintenance", r.handleAdminMaintenance)
 	r.mux.HandleFunc("PUT /api/v1/admin/config", r.handleAdminUpdateConfig)
 }
@@ -4861,12 +4865,340 @@ func (r *Router) handleAdminRepos(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	repos, err := database.ListRepositories(100, 0, false)
+	limit := 100
+	if l, err := strconv.Atoi(req.URL.Query().Get("limit")); err == nil && l > 0 && l <= 500 {
+		limit = l
+	}
+	offset := 0
+	if o, err := strconv.Atoi(req.URL.Query().Get("offset")); err == nil && o >= 0 {
+		offset = o
+	}
+	query := strings.TrimSpace(req.URL.Query().Get("q"))
+	visibility := strings.TrimSpace(req.URL.Query().Get("visibility"))
+
+	repos, err := database.SearchReposAdmin(query, visibility, limit, offset)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if repos == nil {
+		repos = []*database.Repository{}
+	}
 	jsonResponse(w, http.StatusOK, repos)
+}
+
+func (r *Router) resolveRepoDiskPath(ownerName, repoName string) (string, error) {
+	rootAbs, err := filepath.Abs(r.cfg.Repository.Root)
+	if err != nil {
+		return "", err
+	}
+	targetAbs, err := filepath.Abs(filepath.Join(rootAbs, ownerName, repoName+".git"))
+	if err != nil {
+		return "", err
+	}
+	rel, err := filepath.Rel(rootAbs, targetAbs)
+	if err != nil || strings.HasPrefix(rel, "..") || rel == "." {
+		return "", fmt.Errorf("invalid repository storage path")
+	}
+	return targetAbs, nil
+}
+
+type adminGitRepoDiskEntry struct {
+	ID            int64  `json:"id"`
+	OwnerName     string `json:"owner_name"`
+	Name          string `json:"name"`
+	FullName      string `json:"full_name"`
+	DefaultBranch string `json:"default_branch"`
+	IsPrivate     bool   `json:"is_private"`
+	IsArchived    bool   `json:"is_archived"`
+	IsFork        bool   `json:"is_fork"`
+	SizeBytes     int64  `json:"size_bytes"`
+	HasWiki       bool   `json:"has_wiki"`
+	ExistsOnDisk  bool   `json:"exists_on_disk"`
+}
+
+func (r *Router) handleAdminGitOverview(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil || !user.IsAdmin {
+		jsonError(w, http.StatusForbidden, "Administrator privileges required")
+		return
+	}
+
+	summary, err := database.GetAdminRepoSummary()
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	storageAccessible := false
+	if _, err := os.Stat(r.cfg.Repository.Root); err == nil {
+		storageAccessible = true
+	}
+
+	defaultBranch := strings.TrimSpace(r.cfg.Repository.DefaultBranch)
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+
+	repos, err := database.ListReposForGitScan(2000)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	scanDeadline := time.Now().Add(3 * time.Second)
+	var totalSizeBytes int64
+	var bareOnDisk int
+	var missingOnDisk int
+	var wikiOnDisk int
+	var scannedCount int
+	scanTruncated := false
+
+	diskEntries := make([]adminGitRepoDiskEntry, 0, len(repos))
+
+	for i, repo := range repos {
+		repoSize := repo.SizeBytes
+		existsOnDisk := false
+		hasWiki := false
+
+		if time.Now().After(scanDeadline) {
+			scanTruncated = i < len(repos)
+		} else {
+			scannedCount++
+			if repoDir, err := r.resolveRepoDiskPath(repo.OwnerName, repo.Name); err == nil {
+				if sz, err := git.DirSizeBytes(repoDir); err == nil {
+					existsOnDisk = true
+					bareOnDisk++
+					repoSize = sz
+					if sz != repo.SizeBytes {
+						_ = database.UpdateRepoSizeBytes(repo.ID, sz)
+					}
+				} else {
+					missingOnDisk++
+				}
+				wikiDir := git.GetWikiRepoPath(repoDir)
+				if wSz, err := git.DirSizeBytes(wikiDir); err == nil {
+					hasWiki = true
+					wikiOnDisk++
+					totalSizeBytes += wSz
+				}
+			}
+		}
+
+		totalSizeBytes += repoSize
+		diskEntries = append(diskEntries, adminGitRepoDiskEntry{
+			ID:            repo.ID,
+			OwnerName:     repo.OwnerName,
+			Name:          repo.Name,
+			FullName:      repo.OwnerName + "/" + repo.Name,
+			DefaultBranch: repo.DefaultBranch,
+			IsPrivate:     repo.IsPrivate,
+			IsArchived:    repo.IsArchived,
+			IsFork:        repo.IsFork,
+			SizeBytes:     repoSize,
+			HasWiki:       hasWiki,
+			ExistsOnDisk:  existsOnDisk,
+		})
+	}
+
+	sort.Slice(diskEntries, func(i, j int) bool {
+		if diskEntries[i].SizeBytes != diskEntries[j].SizeBytes {
+			return diskEntries[i].SizeBytes > diskEntries[j].SizeBytes
+		}
+		return diskEntries[i].ID < diskEntries[j].ID
+	})
+
+	topLimit := 10
+	if len(diskEntries) < topLimit {
+		topLimit = len(diskEntries)
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"git_version":        git.GetGitVersion(),
+		"storage_root":       r.cfg.Repository.Root,
+		"storage_accessible": storageAccessible,
+		"default_branch":     defaultBranch,
+		"ssh_enabled":        r.cfg.SSH.Enabled,
+		"ssh_port":           r.cfg.SSH.Port,
+		"http_protocol":      r.cfg.Server.Protocol,
+		"summary": map[string]any{
+			"total_repos":        summary.TotalRepos,
+			"public_repos":       summary.PublicRepos,
+			"private_repos":      summary.PrivateRepos,
+			"archived_repos":     summary.ArchivedRepos,
+			"fork_repos":         summary.ForkRepos,
+			"wiki_repos":         summary.WikiRepos,
+			"total_size_bytes":   totalSizeBytes,
+			"bare_repos_on_disk": bareOnDisk,
+			"missing_on_disk":    missingOnDisk,
+			"wiki_repos_on_disk": wikiOnDisk,
+			"scanned_repos":      scannedCount,
+			"scan_truncated":     scanTruncated,
+		},
+		"largest_repos": diskEntries[:topLimit],
+	})
+}
+
+func (r *Router) handleAdminGitInspectRepo(w http.ResponseWriter, req *http.Request) {
+	user := auth.AuthenticateRequest(req)
+	if user == nil || !user.IsAdmin {
+		jsonError(w, http.StatusForbidden, "Administrator privileges required")
+		return
+	}
+
+	repoID, err := strconv.ParseInt(req.PathValue("id"), 10, 64)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid repository ID")
+		return
+	}
+
+	repo, err := database.GetRepositoryByID(repoID)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	repoDir, err := r.resolveRepoDiskPath(repo.OwnerName, repo.Name)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	telemetry, err := git.InspectRepositoryGit(repoDir)
+	if err != nil {
+		jsonResponse(w, http.StatusOK, map[string]any{
+			"repo_id":        repo.ID,
+			"full_name":      repo.OwnerName + "/" + repo.Name,
+			"default_branch": repo.DefaultBranch,
+			"exists_on_disk": false,
+			"error":          err.Error(),
+		})
+		return
+	}
+
+	if telemetry.DiskSizeBytes != repo.SizeBytes {
+		_ = database.UpdateRepoSizeBytes(repo.ID, telemetry.DiskSizeBytes)
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"repo_id":        repo.ID,
+		"full_name":      repo.OwnerName + "/" + repo.Name,
+		"default_branch": repo.DefaultBranch,
+		"exists_on_disk": true,
+		"telemetry":      telemetry,
+	})
+}
+
+func (r *Router) handleAdminGitMaintenance(w http.ResponseWriter, req *http.Request) {
+	currentAdmin := auth.AuthenticateRequest(req)
+	if currentAdmin == nil || !currentAdmin.IsAdmin {
+		jsonError(w, http.StatusForbidden, "Administrator privileges required")
+		return
+	}
+
+	var body struct {
+		Operation string `json:"operation"`
+		RepoID    int64  `json:"repo_id"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	op := strings.ToLower(strings.TrimSpace(body.Operation))
+	if op == "gc_all" {
+		repos, err := database.ListReposForGitScan(2000)
+		if err != nil {
+			jsonError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		deadline := time.Now().Add(90 * time.Second)
+		processed := 0
+		failed := 0
+		var beforeBytes, afterBytes int64
+
+		for _, repo := range repos {
+			if time.Now().After(deadline) {
+				break
+			}
+			repoDir, err := r.resolveRepoDiskPath(repo.OwnerName, repo.Name)
+			if err != nil {
+				continue
+			}
+			preSz, err := git.DirSizeBytes(repoDir)
+			if err != nil {
+				continue
+			}
+			beforeBytes += preSz
+			if _, err := git.RunGitMaintenance(repoDir, "gc"); err != nil {
+				failed++
+				afterBytes += preSz
+				continue
+			}
+			processed++
+			postSz, err := git.DirSizeBytes(repoDir)
+			if err == nil {
+				afterBytes += postSz
+				_ = database.UpdateRepoSizeBytes(repo.ID, postSz)
+			}
+		}
+
+		freed := beforeBytes - afterBytes
+		if freed < 0 {
+			freed = 0
+		}
+		database.CreateActivity(currentAdmin.ID, currentAdmin.Username, nil, "", "admin_git_maintenance", fmt.Sprintf("Ran Git GC across %d repositories (%d failed)", processed, failed))
+		jsonResponse(w, http.StatusOK, map[string]any{
+			"message":     fmt.Sprintf("Completed Git garbage collection on %d repositories (%d skipped/failed).", processed, failed),
+			"operation":   "gc_all",
+			"processed":   processed,
+			"failed":      failed,
+			"freed_bytes": freed,
+		})
+		return
+	}
+
+	if body.RepoID <= 0 {
+		jsonError(w, http.StatusBadRequest, "repo_id is required for single-repository Git maintenance")
+		return
+	}
+
+	repo, err := database.GetRepositoryByID(body.RepoID)
+	if err != nil || repo == nil {
+		jsonError(w, http.StatusNotFound, "Repository not found")
+		return
+	}
+
+	repoDir, err := r.resolveRepoDiskPath(repo.OwnerName, repo.Name)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	output, err := git.RunGitMaintenance(repoDir, op)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if strings.Contains(err.Error(), "unsupported git maintenance operation") {
+			status = http.StatusBadRequest
+		}
+		jsonError(w, status, err.Error())
+		return
+	}
+
+	newSize, _ := git.DirSizeBytes(repoDir)
+	_ = database.UpdateRepoSizeBytes(repo.ID, newSize)
+
+	fullName := repo.OwnerName + "/" + repo.Name
+	database.CreateActivity(currentAdmin.ID, currentAdmin.Username, &repo.ID, fullName, "admin_git_maintenance", fmt.Sprintf("Admin ran git %s on %s", op, fullName))
+
+	msg := fmt.Sprintf("Git %s completed cleanly for %s.", strings.ToUpper(strings.ReplaceAll(op, "_", " ")), fullName)
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"message":    msg,
+		"operation":  op,
+		"target":     fullName,
+		"size_bytes": newSize,
+		"output":     output,
+	})
 }
 
 func (r *Router) handleAdminDeleteRepo(w http.ResponseWriter, req *http.Request) {

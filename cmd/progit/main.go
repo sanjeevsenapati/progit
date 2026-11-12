@@ -30,7 +30,7 @@ import (
 	"progit.io/progit/internal/ui"
 )
 
-var Version = "1.6.2"
+var Version = "1.7.0"
 
 func main() {
 	maybeReapPID1()

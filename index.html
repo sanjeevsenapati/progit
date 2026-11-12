@@ -92,7 +92,7 @@
           "priceCurrency": "USD"
         },
         "description": "A high-performance, single-binary self-hosted Git service and alternative to GitHub, Gogs, Gitea, and GitLab. Built with pure Go and embedded React 19 UI.",
-        "softwareVersion": "1.6.2",
+        "softwareVersion": "1.7.0",
         "license": "https://opensource.org/licenses/MIT",
         "url": "https://progit.co.in/"
       },
@@ -836,7 +836,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
         </div>
         <span class="brand-title">ProGit</span>
-        <span class="version-pill">v1.6.2</span>
+        <span class="version-pill">v1.7.0</span>
       </a>
     </div>
 
@@ -1422,11 +1422,11 @@ git push -u origin main</code><button class="copy-btn" onclick="copyCode(this)">
         <p>ProGit publishes official multi-architecture container images to GitHub Container Registry (<code>ghcr.io</code>), verified for <strong>Linux x86_64</strong> (AMD64) and <strong>ARM64</strong> (Apple Silicon &amp; AWS Graviton):</p>
         <pre><code># Pull the official multi-architecture image (auto-selects amd64 or arm64)
 podman pull ghcr.io/sanjeevsenapati/progit:latest
-podman pull ghcr.io/sanjeevsenapati/progit:1.6.2
+podman pull ghcr.io/sanjeevsenapati/progit:1.7.0
 
 # Or pull platform-specific tags
-podman pull ghcr.io/sanjeevsenapati/progit:1.6.2-linux-amd64
-podman pull ghcr.io/sanjeevsenapati/progit:1.6.2-linux-arm64
+podman pull ghcr.io/sanjeevsenapati/progit:1.7.0-linux-amd64
+podman pull ghcr.io/sanjeevsenapati/progit:1.7.0-linux-arm64
 
 # Run immediately with persistent storage and standard HTTPS / SSH ports
 podman run -d --name progit \
@@ -1472,12 +1472,12 @@ podman run -d --name progit \
         <p>Ensure you pull the container matching your server's CPU architecture:</p>
         <pre><code># Check host architecture
 uname -m
-# If output is 'x86_64': use ghcr.io/sanjeevsenapati/progit:1.6.2-linux-amd64
-# If output is 'aarch64': use ghcr.io/sanjeevsenapati/progit:1.6.2-linux-arm64</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+# If output is 'x86_64': use ghcr.io/sanjeevsenapati/progit:1.7.0-linux-amd64
+# If output is 'aarch64': use ghcr.io/sanjeevsenapati/progit:1.7.0-linux-arm64</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
         <div class="callout callout-warning">
           <div class="callout-title">Architecture Mismatch Warning</div>
-          <p>Running an ARM64 image on an x86_64 CPU produces an immediate <code>exec format error</code> crash. On x86_64 servers, pull <code>1.6.2-linux-amd64</code> or the multi-arch tag <code>1.6.2</code>.</p>
+          <p>Running an ARM64 image on an x86_64 CPU produces an immediate <code>exec format error</code> crash. On x86_64 servers, pull <code>1.7.0-linux-amd64</code> or the multi-arch tag <code>1.7.0</code>.</p>
         </div>
 
         <h3>2. Configure Firewalld Ports</h3>
@@ -1503,7 +1503,7 @@ podman run -d \
   -v progit-repositories:/data/repositories:Z \
   -v progit-config:/data/config:Z \
   -v progit-logs:/data/logs:Z \
-  ghcr.io/sanjeevsenapati/progit:1.6.2-linux-amd64</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+  ghcr.io/sanjeevsenapati/progit:1.7.0-linux-amd64</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
         <h3>4. Enable Systemd Auto-Start on Boot</h3>
         <pre><code># Enable lingering for rootless user
@@ -2967,7 +2967,7 @@ Content-Type: application/json
         <pre><code>{
   "app": "ProGit",
   "status": "ok",
-  "version": "1.6.2",
+  "version": "1.7.0",
   "database": "healthy",
   "repositories": "accessible",
   "ssh_enabled": true,

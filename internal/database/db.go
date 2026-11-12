@@ -1187,6 +1187,159 @@ func CountRepositories() (int, error) {
 	return count, err
 }
 
+// SearchReposAdmin searches repositories globally for administrators with optional visibility/archive filtering.
+func SearchReposAdmin(query, visibility string, limit, offset int) ([]*Repository, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	query = strings.TrimSpace(query)
+	visibility = strings.ToLower(strings.TrimSpace(visibility))
+
+	baseQuery := `
+		SELECT r.id, r.owner_id, u.username, r.name, r.description, r.is_private, r.is_fork, r.fork_parent_id,
+		       r.default_branch, r.num_stars, r.num_forks, r.num_watches, r.num_issues, r.num_pulls, r.size_bytes, r.is_archived,
+		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.allow_download_and_pulls, r.created_at, r.updated_at
+		FROM repositories r
+		JOIN users u ON u.id = r.owner_id
+	`
+
+	var whereClauses []string
+	var args []any
+
+	switch visibility {
+	case "public":
+		whereClauses = append(whereClauses, "r.is_private = ?")
+		args = append(args, false)
+	case "private":
+		whereClauses = append(whereClauses, "r.is_private = ?")
+		args = append(args, true)
+	case "archived":
+		whereClauses = append(whereClauses, "r.is_archived = ?")
+		args = append(args, true)
+	case "active":
+		whereClauses = append(whereClauses, "r.is_archived = ?")
+		args = append(args, false)
+	}
+
+	var orderBy string
+	if query != "" && query != "/" {
+		escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(query)
+		containsPattern := "%" + escaped + "%"
+		prefixPattern := escaped + "%"
+		whereClauses = append(whereClauses, `(
+			LOWER(r.name) LIKE LOWER(?) ESCAPE '\'
+			OR LOWER(r.description) LIKE LOWER(?) ESCAPE '\'
+			OR LOWER(u.username) LIKE LOWER(?) ESCAPE '\'
+			OR LOWER(u.username || '/' || r.name) LIKE LOWER(?) ESCAPE '\'
+			OR LOWER(r.default_branch) LIKE LOWER(?) ESCAPE '\'
+		)`)
+		args = append(args, containsPattern, containsPattern, containsPattern, containsPattern, containsPattern)
+		orderBy = ` ORDER BY CASE
+			WHEN LOWER(u.username || '/' || r.name) = LOWER(?) THEN 0
+			WHEN LOWER(r.name) = LOWER(?) THEN 1
+			WHEN LOWER(r.name) LIKE LOWER(?) ESCAPE '\' THEN 2
+			ELSE 3
+		END, r.updated_at DESC, r.id DESC`
+		args = append(args, query, query, prefixPattern)
+	} else {
+		orderBy = " ORDER BY r.updated_at DESC, r.id DESC"
+	}
+
+	fullQuery := baseQuery
+	if len(whereClauses) > 0 {
+		fullQuery += " WHERE " + strings.Join(whereClauses, " AND ")
+	}
+	fullQuery += orderBy + " LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+
+	rows, err := DB.Query(fullQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	list := make([]*Repository, 0)
+	for rows.Next() {
+		r := &Repository{}
+		if err := rows.Scan(&r.ID, &r.OwnerID, &r.OwnerName, &r.Name, &r.Description, &r.IsPrivate, &r.IsFork, &r.ForkParentID,
+			&r.DefaultBranch, &r.NumStars, &r.NumForks, &r.NumWatches, &r.NumIssues, &r.NumPulls, &r.SizeBytes, &r.IsArchived,
+			&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.AllowDownloadAndPulls, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, r)
+	}
+	return list, rows.Err()
+}
+
+// AdminRepoSummary holds aggregated database breakdowns for the Git Management Dashboard.
+type AdminRepoSummary struct {
+	TotalRepos    int `json:"total_repos"`
+	PublicRepos   int `json:"public_repos"`
+	PrivateRepos  int `json:"private_repos"`
+	ArchivedRepos int `json:"archived_repos"`
+	ForkRepos     int `json:"fork_repos"`
+	WikiRepos     int `json:"wiki_repos"`
+}
+
+// GetAdminRepoSummary returns repository breakdowns across visibility, archive, fork, and wiki flags.
+func GetAdminRepoSummary() (*AdminRepoSummary, error) {
+	s := &AdminRepoSummary{}
+	if err := DB.QueryRow(`SELECT COUNT(*) FROM repositories`).Scan(&s.TotalRepos); err != nil {
+		return nil, err
+	}
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM repositories WHERE is_private = ?`, false).Scan(&s.PublicRepos)
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM repositories WHERE is_private = ?`, true).Scan(&s.PrivateRepos)
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM repositories WHERE is_archived = ?`, true).Scan(&s.ArchivedRepos)
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM repositories WHERE is_fork = ?`, true).Scan(&s.ForkRepos)
+	_ = DB.QueryRow(`SELECT COUNT(*) FROM repositories WHERE enable_wiki = ?`, true).Scan(&s.WikiRepos)
+	return s, nil
+}
+
+// ListReposForGitScan returns lightweight repository metadata ordered by most recently updated for admin disk telemetry.
+func ListReposForGitScan(limit int) ([]*Repository, error) {
+	if limit <= 0 {
+		limit = 2000
+	}
+	rows, err := DB.Query(`
+		SELECT r.id, r.owner_id, u.username, r.name, r.description, r.is_private, r.is_fork, r.fork_parent_id,
+		       r.default_branch, r.num_stars, r.num_forks, r.num_watches, r.num_issues, r.num_pulls, r.size_bytes, r.is_archived,
+		       r.enable_wiki, r.enable_pages, r.pages_branch, r.pages_folder, r.allow_download_and_pulls, r.created_at, r.updated_at
+		FROM repositories r
+		JOIN users u ON u.id = r.owner_id
+		ORDER BY r.updated_at DESC, r.id DESC
+		LIMIT ?
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	list := make([]*Repository, 0)
+	for rows.Next() {
+		r := &Repository{}
+		if err := rows.Scan(&r.ID, &r.OwnerID, &r.OwnerName, &r.Name, &r.Description, &r.IsPrivate, &r.IsFork, &r.ForkParentID,
+			&r.DefaultBranch, &r.NumStars, &r.NumForks, &r.NumWatches, &r.NumIssues, &r.NumPulls, &r.SizeBytes, &r.IsArchived,
+			&r.EnableWiki, &r.EnablePages, &r.PagesBranch, &r.PagesFolder, &r.AllowDownloadAndPulls, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, r)
+	}
+	return list, rows.Err()
+}
+
+// UpdateRepoSizeBytes persists the calculated bare repository disk size (without bumping updated_at).
+func UpdateRepoSizeBytes(repoID int64, sizeBytes int64) error {
+	_, err := DB.Exec(`UPDATE repositories SET size_bytes = ? WHERE id = ?`, sizeBytes, repoID)
+	return err
+}
+
 func DeleteRepository(repoID int64) error {
 	_, err := DB.Exec(`DELETE FROM repositories WHERE id = ?`, repoID)
 	return err

@@ -269,11 +269,14 @@ All administrative endpoints require **Super Administrator privileges** (`is_adm
   - *Safety Guard*: Super Admins cannot delete their own account.
 
 #### 3. Repository Administration
-- `GET /api/v1/admin/repos` - List all repositories across all users and organizations on the instance (including private repos).
-  - **Query Parameters**: `limit` (default: 100), `offset` (default: 0).
+- `GET /api/v1/admin/repos` - Search or list repositories across all users and organizations on the instance (including private and archived repos).
+  - **Query Parameters**: `q` (search owner, name, `owner/name`, description, or default branch), `visibility` (`all` | `public` | `private` | `archived` | `active`), `limit` (default: 100, max: 500), `offset` (default: 0).
   - **Response (200 OK)**: Array of Repository objects.
 - `DELETE /api/v1/admin/repos/:id` - Permanently delete any repository across the instance and remove its bare Git storage directory.
   - **Response (200 OK)**: `{"message": "Repository deleted successfully"}`.
+- `GET /api/v1/admin/git` - Return Git engine version, bare storage root health, visibility breakdown, total disk size, and top repositories by size.
+- `GET /api/v1/admin/git/repos/:id` - Inspect a single bare repository (`git count-objects -v`, branch/tag counts, HEAD ref, wiki presence).
+- `POST /api/v1/admin/git/maintenance` - Execute safe Git maintenance (`gc`, `repack`, `prune`, `fsck`, `update_server_info` with `repo_id`, or `gc_all` globally).
 
 #### 4. System Maintenance & Database Operations
 - `POST /api/v1/admin/maintenance` - Execute database and storage maintenance tasks.
