@@ -2381,17 +2381,17 @@ AUTO_PROVISION = true</code><button class="copy-btn" onclick="copyCode(this)">Co
         <h1 class="page-title">ProGit Pages (Static Site Hosting)</h1>
         <p class="page-subtitle">Host static sites, documentation, and HTML portfolios directly from your Git repositories.</p>
 
-        <h2>Enabling ProGit Pages</h2>
+        <h2>Enabling ProGit Pages (Owner / Repository Admin Only)</h2>
         <ol>
-          <li>Navigate to your repository and click the <strong>Pages</strong> tab.</li>
+          <li>Navigate to your repository <strong>Settings</strong> (or the <strong>Pages</strong> tab &mdash; configuration is restricted to the repository owner and repository administrators).</li>
           <li>Toggle <strong>Enable ProGit Pages</strong> on.</li>
           <li>Choose your source branch (e.g. <code>main</code> or <code>docs</code>) and source directory (<code>/</code> or <code>/docs</code>).</li>
           <li>Click <strong>Save Pages Settings</strong>.</li>
         </ol>
 
         <h2>Public Website URL</h2>
-        <p>Your site is immediately published at:</p>
-        <pre><code>http://localhost:3000/pages/&lt;owner&gt;/&lt;repo&gt;/</code></pre>
+        <p>Once enabled, the published live ProGit Pages URL is visible to all authorized repository viewers on the repository <strong>Code</strong> page without exposing configuration controls:</p>
+        <pre><code>https://localhost:3443/pages/&lt;owner&gt;/&lt;repo&gt;/</code></pre>
 
         <div class="callout callout-tip">
           <div class="callout-title">Automatic Markdown Rendering</div>
@@ -2482,12 +2482,13 @@ AUTO_PROVISION = true</code><button class="copy-btn" onclick="copyCode(this)">Co
           <li><strong>Organization Owner</strong>: Complete control over the organization, all its teams, members, and repositories.</li>
           <li><strong>Team Permissions</strong>:
             <ul>
-              <li><code>read</code>: Can clone and view code, issues, and wiki.</li>
+              <li><code>view_only</code>: Web UI inspection only &mdash; view files, commits, and issues in browser while blocking Download ZIP, raw downloads, forks, and Git <code>clone</code>/<code>pull</code>.</li>
+              <li><code>read</code>: Can clone, download ZIPs, and view code, issues, and wiki.</li>
               <li><code>write</code>: Can push commits, create branches, edit online, and manage project boards.</li>
               <li><code>admin</code>: Full settings and collaborator management on team repositories.</li>
             </ul>
           </li>
-          <li><strong>External Collaborators</strong>: Invite individual users to private repositories with granular <code>read</code>, <code>write</code>, or <code>admin</code> permissions without adding them to an organization.</li>
+          <li><strong>External Collaborators</strong>: Invite individual users to private repositories with granular <code>view_only</code>, <code>read</code>, <code>write</code>, or <code>admin</code> permissions without adding them to an organization.</li>
         </ul>
 
         <div class="page-nav-buttons">
@@ -2795,8 +2796,10 @@ podman exec -it progit /usr/local/bin/progit admin create-user \
 
         <h2>Administrative Powers</h2>
         <ul>
+          <li><strong>Search &amp; Filter Users</strong>: Filter accounts live by <code>username</code>, <code>email</code>, or <code>full_name</code>, and narrow results with status filters (<code>All</code>, <code>Admins</code>, <code>Standard</code>, <code>Suspended</code>, and <code>Download Restricted</code>).</li>
+          <li><strong>Restrict / Allow Code Downloads (<code>can_download</code>)</strong>: Globally disable or restore Download ZIP, raw file downloads, release asset downloads, forking, and HTTP/SSH Git <code>clone</code>/<code>pull</code> per non-admin user while preserving Web UI browsing.</li>
           <li><strong>Activate / Suspend</strong>: Temporarily lock user accounts without deleting repository data.</li>
-          <li><strong>Promote / Demote</strong>: Grant or revoke system administrator rights. (Self-demotion is blocked to prevent accidental administrative lockouts).</li>
+          <li><strong>Promote / Demote</strong>: Grant or revoke system administrator rights. (Self-demotion and self-download restriction are blocked to prevent accidental lockouts).</li>
           <li><strong>Delete User</strong>: Purge account and associated user repositories from the server.</li>
         </ul>
 
@@ -2822,8 +2825,8 @@ podman exec -it progit /usr/local/bin/progit admin create-user \
         <h1 class="page-title">Repository Oversight &amp; Danger Zone</h1>
         <p class="page-subtitle">Global repository management and disk usage telemetry.</p>
 
-        <h2>Global Repository List</h2>
-        <p>In <code>/admin &gt; Repositories</code>, administrators can inspect all repositories hosted across all user accounts and organizations, including visibility status and disk usage.</p>
+        <h2>Global Repository List &amp; Feature Controls</h2>
+        <p>In <code>/admin &gt; Repositories</code>, administrators can inspect all repositories hosted across all user accounts and organizations, including visibility status and disk usage. Repository owners and administrators can also configure per-repository feature toggles in <strong>Settings &rarr; Features</strong> for <strong>Allow Downloads (ZIP / Clone) &amp; Pull Requests</strong> (<code>allow_download_and_pulls</code>), <strong>Wikis</strong> (<code>enable_wiki</code>), and <strong>ProGit Pages</strong> (<code>enable_pages</code>).</p>
 
         <h2>Administrative Deletion</h2>
         <p>Administrators can delete any repository directly from the admin panel. ProGit purges the metadata from SQLite and permanently removes the <code>.git</code> directory from disk.</p>
@@ -2918,7 +2921,7 @@ Content-Type: application/json
         <pre><code>{
   "app": "ProGit",
   "status": "ok",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "database": "healthy",
   "repositories": "accessible",
   "ssh_enabled": true,
@@ -3149,7 +3152,7 @@ Content-Type: application/json
         <pre><code>{
   "mode": "write"
 }</code></pre>
-        <p>Allowed modes: <code>read</code> (clone and inspect), <code>write</code> (commit and push code), <code>admin</code> (full repository settings).</p>
+        <p>Allowed modes: <code>view_only</code> (Web UI code &amp; issues only; blocks ZIP/Clone/Raw/Fork), <code>read</code> (clone and inspect), <code>write</code> (commit and push code), <code>admin</code> (full repository settings).</p>
 
         <h2>Revoke Collaborator</h2>
         <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/repos/{owner}/{repo}/collaborators/{collaborator}</span></div>
@@ -3458,14 +3461,15 @@ Content-Type: application/json
         <h2>Get Wiki Page Revision History</h2>
         <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/wiki/pages/{slug}/history</span></div>
 
-        <h2>ProGit Pages Configuration</h2>
+        <h2>ProGit Pages Configuration (Owner / Repo Admin Only)</h2>
         <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/repos/{owner}/{repo}/pages</span></div>
         <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/repos/{owner}/{repo}/pages</span></div>
         <pre><code>{
-  "branch": "main",
-  "folder": "/docs"
+  "enable_pages": true,
+  "pages_branch": "main",
+  "pages_folder": "/docs"
 }</code></pre>
-        <p>Configures static hosting. Rendered pages are served at <code>/pages/{owner}/{repo}/</code>.</p>
+        <p>Requires repository owner or administrator privileges (returns <code>401</code>/<code>403</code> for non-owners). When enabled, the live <code>pages_url</code> is exposed to all authorized repository viewers in <code>GET /api/v1/repos/{owner}/{repo}</code>, and static content is served at <code>/pages/{owner}/{repo}/</code>.</p>
 
         <div class="page-nav-buttons">
           <a href="#api-forks" class="nav-btn" onclick="navigate('api-forks')">
@@ -3770,18 +3774,20 @@ Content-Type: application/json
 }</code></pre>
 
         <h2>Manage Platform Users</h2>
-        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/admin/users</span></div>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/admin/users?q={query}&amp;limit=50&amp;offset=0</span></div>
         <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/admin/users</span></div>
         <pre><code>{
   "username": "qa_operator",
   "email": "qa@progit.local",
   "password": "SecurePassword123!",
-  "is_admin": true
+  "is_admin": true,
+  "can_download": true
 }</code></pre>
         <div class="api-endpoint"><span class="badge badge-patch">PATCH</span><span>/api/v1/admin/users/{id}</span></div>
         <pre><code>{
   "is_admin": false,
-  "is_active": true
+  "is_active": true,
+  "can_download": false
 }</code></pre>
         <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/admin/users/{id}</span></div>
 
