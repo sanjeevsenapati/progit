@@ -3880,9 +3880,21 @@ Content-Type: application/json
 }</code></pre>
         <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/admin/users/{id}</span></div>
 
-        <h2>Global Repository Registry</h2>
-        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/admin/repos</span></div>
+        <h2>Global Repository Search &amp; Management</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/admin/repos?q={query}&amp;visibility={all|public|private|archived|active}&amp;limit=100&amp;offset=0</span></div>
         <div class="api-endpoint"><span class="badge badge-delete">DELETE</span><span>/api/v1/admin/repos/{id}</span></div>
+
+        <h2>Git Management Dashboard &amp; Maintenance</h2>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/admin/git</span></div>
+        <p>Returns Git engine version, storage root accessibility, visibility &amp; archive breakdowns, bare/wiki disk usage, and top repositories by storage size.</p>
+        <div class="api-endpoint"><span class="badge badge-get">GET</span><span>/api/v1/admin/git/repos/{id}</span></div>
+        <p>Inspects bare repository internals (<code>git count-objects -v</code>, branch/tag counts, loose vs. packed objects, pack files, wiki store size).</p>
+        <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/admin/git/maintenance</span></div>
+        <pre><code>{
+  "operation": "gc",
+  "repo_id": 12
+}</code></pre>
+        <p>Operations: <code>gc</code>, <code>repack</code>, <code>prune</code>, <code>fsck</code>, <code>update_server_info</code> (single repository), or <code>gc_all</code> (global garbage collection).</p>
 
         <h2>Database Maintenance (WAL Checkpoint &amp; Vacuum)</h2>
         <div class="api-endpoint"><span class="badge badge-post">POST</span><span>/api/v1/admin/maintenance</span></div>
