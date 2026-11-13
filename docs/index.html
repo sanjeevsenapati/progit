@@ -850,6 +850,7 @@
       <nav class="header-links">
         <a href="#overview" onclick="navigate('overview')">Docs</a>
         <a href="tutorial.html" style="color: var(--accent); font-weight: 600;">Tutorial</a>
+        <a href="slides.html" style="color: var(--accent); font-weight: 600;">Slides</a>
         <a href="#quickstart" onclick="navigate('quickstart')">Quickstart</a>
         <a href="#config-cheatsheet" onclick="navigate('config-cheatsheet')">Cheat Sheet</a>
         <a href="#api-overview" onclick="navigate('api-overview')">REST API</a>
@@ -967,6 +968,7 @@
       <div class="sidebar-group">
         <div class="sidebar-heading">Presentations &amp; Strategy</div>
         <ul class="sidebar-nav">
+          <li><a href="slides.html" target="_blank" style="color: var(--accent); font-weight: 600; display: flex; align-items: center; justify-content: space-between;"><span>Educational Slides &nearr;</span><span style="font-size: 10px; background: rgba(16,185,129,0.15); color: var(--accent); padding: 1px 6px; border-radius: 999px; font-weight: 600;">NEW</span></a></li>
           <li><a href="sme-presentation.html" target="_blank" style="color: var(--accent); font-weight: 600;">SME &amp; Agency Deck &nearr;</a></li>
           <li><a href="presentation.html" target="_blank">Enterprise HA Roadmap Deck &nearr;</a></li>
           <li><a href="#enterprise-ha" data-target="enterprise-ha" onclick="navigate('enterprise-ha')">Multi-Node HA Architecture</a></li>
@@ -4308,6 +4310,7 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
     <p>
       <a href="https://progit.co.in">Documentation</a> &bull;
       <a href="tutorial.html" style="font-weight: 600; color: var(--accent);">Git &amp; CI/CD Tutorial</a> &bull;
+      <a href="slides.html" style="font-weight: 600; color: var(--accent);">Educational Slides</a> &bull;
       <a href="https://github.com/sanjeevsenapati/progit" target="_blank" rel="noopener noreferrer">GitHub Repository</a> &bull;
       <a href="#quickstart" onclick="navigate('quickstart')">Quickstart</a> &bull;
       <a href="#config-cheatsheet" onclick="navigate('config-cheatsheet')">Configuration</a> &bull;
@@ -4319,6 +4322,7 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
   <script>
     // Search Index
     const searchIndex = [
+      { id: 'slides', title: 'ProGit Masterclass Educational Slides', section: 'Presentations', desc: 'Interactive educational slide deck covering Git internals, installation, super administration, operations, developer toolbox, 18k+ RPS benchmarks, and 3-year TCO.', url: 'slides.html' },
       { id: 'tutorial', title: 'Git, ProGit & CI/CD GitHub Actions Tutorial', section: 'Tutorial', desc: 'Exhaustive step-by-step masterclass covering Git fundamentals, staging, branching, conflict resolution, ProGit platform, and production GitHub Actions pipelines.', url: 'tutorial.html' },
       { id: 'git-comparison', title: 'Git Services Comparison (ProGit vs GitHub, Gogs, Gitea, GitLab)', section: 'Getting Started', desc: 'Technical comparison of self-hosted Git services, memory footprints (< 40MB vs 4GB), zero CGO, and features.' },
       { id: 'migration', title: 'Migrating from GitHub, Gogs, Gitea & GitLab to ProGit', section: 'Getting Started', desc: 'Step-by-step repository mirroring, batch migration, and switching git remotes seamlessly.' },
@@ -4384,6 +4388,11 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
     function navigate(pageId) {
       if (!pageId) pageId = "overview";
       pageId = pageId.replace(/^#/, "").trim();
+
+      if (pageId === "slides") {
+        window.location.href = "slides.html";
+        return;
+      }
 
       if (pageId === "presentation") {
         window.location.href = "presentation.html";
