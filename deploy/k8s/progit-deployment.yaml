@@ -1,0 +1,172 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: progit-data-pvc
+  labels:
+    app.kubernetes.io/name: progit
+    app.kubernetes.io/component: server
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: progit-config
+  labels:
+    app.kubernetes.io/name: progit
+    app.kubernetes.io/component: server
+data:
+  PROGIT_APP_NAME: "ProGit"
+  PROGIT_DOMAIN: "progit.local"
+  PROGIT_PROTOCOL: "https"
+  PROGIT_HTTP_PORT: "3000"
+  PROGIT_HTTPS_PORT: "3443"
+  PROGIT_SSH_PORT: "2222"
+  PROGIT_ROOT_URL: "https://progit.local:3443/"
+  PROGIT_REDIRECT_OTHER_PORT: "true"
+  PROGIT_GENERATE_LOCAL_CERT: "true"
+  PROGIT_DEFAULT_BRANCH: "main"
+  PROGIT_DB_PATH: "/data/db/progit.db"
+  PROGIT_REPO_ROOT: "/data/repositories"
+  PROGIT_CERT_FILE: "/data/config/https/cert.pem"
+  PROGIT_KEY_FILE: "/data/config/https/key.pem"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: progit-secrets
+  labels:
+    app.kubernetes.io/name: progit
+    app.kubernetes.io/component: server
+type: Opaque
+stringData:
+  PROGIT_SECRET_KEY: "progit-k8s-production-secret-key-change-me"
+  PROGIT_ADMIN_USER: "admin"
+  PROGIT_ADMIN_PASSWORD: "AdminPassword123!"
+  PROGIT_ADMIN_EMAIL: "admin@progit.local"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: progit
+  labels:
+    app.kubernetes.io/name: progit
+    app.kubernetes.io/component: server
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: progit
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: progit
+        app.kubernetes.io/component: server
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: progit
+          image: localhost/progit:1.8.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+              hostPort: 3000
+            - name: https
+              containerPort: 3443
+              hostPort: 3443
+            - name: ssh
+              containerPort: 2222
+              hostPort: 2222
+          envFrom:
+            - configMapRef:
+                name: progit-config
+            - secretRef:
+                name: progit-secrets
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/ready
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 2000m
+              memory: 512Mi
+          volumeMounts:
+            - name: progit-data
+              mountPath: /data
+      volumes:
+        - name: progit-data
+          persistentVolumeClaim:
+            claimName: progit-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: progit-service
+  labels:
+    app.kubernetes.io/name: progit
+    app.kubernetes.io/component: server
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: progit
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+    - name: https
+      port: 3443
+      targetPort: 3443
+    - name: ssh
+      port: 2222
+      targetPort: 2222
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: progit-ingress
+  labels:
+    app.kubernetes.io/name: progit
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: "1024m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
+spec:
+  rules:
+    - host: progit.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: progit-service
+                port:
+                  number: 3000
+

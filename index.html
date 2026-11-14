@@ -885,6 +885,7 @@
         <div class="sidebar-heading">Installation &amp; Setup</div>
         <ul class="sidebar-nav">
           <li><a href="#install-podman" data-target="install-podman" onclick="navigate('install-podman')">Podman &amp; Docker (Recommended)</a></li>
+          <li><a href="#install-kubernetes" data-target="install-kubernetes" onclick="navigate('install-kubernetes')">Kubernetes &amp; Podman Kube</a></li>
           <li><a href="#install-binary" data-target="install-binary" onclick="navigate('install-binary')">Standalone Binary Release</a></li>
           <li><a href="#install-source" data-target="install-source" onclick="navigate('install-source')">Compile From Source</a></li>
           <li><a href="#install-wizard" data-target="install-wizard" onclick="navigate('install-wizard')">Web Installation Wizard</a></li>
@@ -1547,6 +1548,91 @@ volumes:
           <a href="#credits" class="nav-btn" onclick="navigate('credits')">
             <span class="dir">&larr; Previous</span>
             <span class="title">Credits &amp; Attributions</span>
+          </a>
+          <a href="#install-kubernetes" class="nav-btn" onclick="navigate('install-kubernetes')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Kubernetes &amp; Podman Kube</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 5b. Installation: Kubernetes -->
+      <article class="doc-page" id="page-install-kubernetes">
+        <div class="breadcrumbs">
+          <span>Installation</span>
+          <span>/</span>
+          <span class="current">Kubernetes &amp; Podman Kube</span>
+        </div>
+        <h1 class="page-title">Kubernetes &amp; Podman Kube Deployment</h1>
+        <p class="page-subtitle">Deploying ProGit v1.8.0 on production Kubernetes clusters and testing locally with native Podman kube play.</p>
+
+        <h2>Kubernetes Architecture Overview</h2>
+        <p>ProGit runs as a sovereign, rootless pod (UID:GID 1000:1000) backed by a <code>PersistentVolumeClaim</code> (ReadWriteOnce) for bare Git repositories and high-speed SQLite WAL database. Due to single-writer database integrity, the deployment uses <code>strategy.type: Recreate</code>.</p>
+
+        <div class="callout callout-info">
+          <div class="callout-title">Production Design Highlights</div>
+          <p>
+            &bull; <strong>Deployment Strategy (Recreate)</strong>: Guarantees old pods unmount storage before the replacement pod mounts it, eliminating WAL locking conflicts.<br/>
+            &bull; <strong>Dual Health Probes</strong>: Liveness probe against <code>/api/health</code> checks database and repository health; readiness probe against <code>/api/ready</code> checks traffic readiness.<br/>
+            &bull; <strong>Git Push Buffer Support</strong>: Ingress annotations include <code>proxy-body-size: "1024m"</code> and 1800s timeout for large commits and multi-gigabyte packfiles.
+          </p>
+        </div>
+
+        <h2>Manifest Files Structure</h2>
+        <p>Kubernetes deployment manifests are provided in the repository under <code>deploy/k8s/</code>:</p>
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Manifest File</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>deploy/k8s/progit-deployment.yaml</code></td><td>All-in-one manifest: PVC, ConfigMap, Secret, Deployment, Service, and Ingress</td></tr>
+              <tr><td><code>deploy/k8s/kustomization.yaml</code></td><td>Kustomize manifest for overlays, secret management, and namespace scoping</td></tr>
+              <tr><td><code>deploy/k8s/test-podman-kube.sh</code></td><td>Automated Podman integration test script (100% pass verification)</td></tr>
+              <tr><td><code>docs/KUBERNETES_DEPLOYMENT.md</code></td><td>Detailed production runbook, TLS ingress, and disaster recovery procedures</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2>Local Testing with Podman (podman kube play)</h2>
+        <p>Validate the Kubernetes deployment locally without running a heavyweight cluster:</p>
+        <pre><code># 1. Run the end-to-end automated test suite
+./deploy/k8s/test-podman-kube.sh
+
+# 2. Or manually deploy with Podman Kube Play
+podman kube play deploy/k8s/progit-deployment.yaml
+
+# 3. Verify running pod and health endpoints
+curl -k https://localhost:3443/api/health
+curl -k https://localhost:3443/metrics | head -n 15
+
+# 4. Execute in-container ProGit Doctor
+podman exec -it progit-pod-progit /usr/local/bin/progit doctor
+
+# 5. Teardown
+podman kube down deploy/k8s/progit-deployment.yaml</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h2>Production Kubernetes Deployment</h2>
+        <p>Deploy to any certified Kubernetes cluster (EKS, GKE, AKS, k3s, OpenShift):</p>
+        <pre><code># 1. Create sovereign production secrets
+kubectl create secret generic progit-secrets \
+  --from-literal=PROGIT_SECRET_KEY="$(openssl rand -hex 32)" \
+  --from-literal=PROGIT_ADMIN_USER="admin" \
+  --from-literal=PROGIT_ADMIN_PASSWORD="StrongProductionPassword123!" \
+  --from-literal=PROGIT_ADMIN_EMAIL="admin@yourdomain.com" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# 2. Apply deployment manifests via Kustomize or kubectl
+kubectl apply -k deploy/k8s/
+# OR
+kubectl apply -f deploy/k8s/progit-deployment.yaml
+
+# 3. Monitor rollout status
+kubectl rollout status deployment/progit
+kubectl get pods -l app.kubernetes.io/name=progit</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <div class="page-nav-buttons">
+          <a href="#install-podman" class="nav-btn" onclick="navigate('install-podman')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Podman &amp; Docker</span>
           </a>
           <a href="#install-binary" class="nav-btn" onclick="navigate('install-binary')">
             <span class="dir">Next &rarr;</span>
@@ -4293,6 +4379,7 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
             <li><strong>ProGit Doctor CLI</strong>: Built-in <code>progit doctor</code> verifying 15 critical system, DB, permissions, Git, port, and security diagnostics.</li>
             <li><strong>Atomic Hot Backup</strong>: <code>progit backup</code> with non-locking SQLite <code>VACUUM INTO</code> and automated SHA-256 <code>manifest.json</code>.</li>
             <li><strong>Deterministic SHA ETag Caching</strong>: HTTP 304 Not Modified caching on <code>/blob</code> and <code>/raw</code> endpoints.</li>
+            <li><strong>Kubernetes &amp; Podman Kube Manifests</strong>: Production-ready K8s manifests (PVC, ConfigMap, Secrets, Recreate Deployment, Ingress with 1024MB Git buffer) and automated local test script with <code>podman kube play</code>.</li>
           </ul>
         </div>
 
@@ -4428,6 +4515,7 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
       { id: 'architecture', title: 'Architecture & Zero CGO', section: 'Getting Started', desc: 'Pure Go engine, modernc.org/sqlite, Write-Ahead Logging (WAL).' },
       { id: 'credits', title: 'Credits & Attributions', section: 'Getting Started', desc: 'Supported by PDIH, created by ProGit Team and Sanjeev, built on Gogs.' },
       { id: 'install-podman', title: 'Podman & Docker Deployment', section: 'Installation', desc: 'Lightweight ~37 MB container setup with persistent volume mapping.' },
+      { id: 'install-kubernetes', title: 'Kubernetes & Podman Kube Deployment', section: 'Installation', desc: 'Production Kubernetes manifests, PVC, Ingress, and podman kube play testing.' },
       { id: 'install-binary', title: 'Standalone Binary Release', section: 'Installation', desc: 'Running ProGit as a native systemd daemon on Linux or macOS.' },
       { id: 'install-source', title: 'Compile From Source', section: 'Installation', desc: 'Building the React UI and Go backend from repository source.' },
       { id: 'install-wizard', title: 'Web Installation Wizard', section: 'Installation', desc: 'Initial configuration setup and Super Administrator creation.' },
