@@ -3927,12 +3927,30 @@ Content-Type: application/json
           <span class="current">Backup &amp; Recovery</span>
         </div>
         <h1 class="page-title">Backup &amp; Disaster Recovery</h1>
-        <p class="page-subtitle">Simple, reliable procedures to backup and restore ProGit data.</p>
+        <p class="page-subtitle">Simple, reliable procedures to backup, diagnose, and restore ProGit data.</p>
 
-        <h2>Backup Procedure</h2>
-        <p>Because ProGit uses SQLite and local bare Git repositories, backup requires capturing only two directories:</p>
+        <h2>Atomic Hot Backup CLI (VACUUM INTO)</h2>
+        <p>ProGit provides a native hot backup engine that produces a consistent SQLite snapshot with SHA-256 integrity verification while active transactions are running:</p>
+        <pre><code># Run atomic hot backup with manifest generation
+progit backup --output=/backups/progit-backup-$(date +%F).tar.gz
+
+# Restore from backup archive
+progit restore /backups/progit-backup-2026-11-14.tar.gz</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h2>ProGit Doctor CLI Diagnostics</h2>
+        <p>Run embedded self-diagnostics to verify database integrity, permissions, git version, ports, and security:</p>
+        <pre><code>progit doctor</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h2>Prometheus Telemetry &amp; Metrics</h2>
+        <p>Scrape runtime metrics, Git operations, and HTTP request latencies via the standard Prometheus exposition endpoint:</p>
+        <pre><code>curl -s http://localhost:3000/metrics
+# or through the API:
+curl -s http://localhost:3000/api/v1/metrics</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h2>Manual Backup Procedure</h2>
+        <p>Alternatively, archive directories directly after an administrative checkpoint:</p>
         <pre><code># 1. Trigger SQLite WAL Checkpoint
-curl -X POST http://localhost:3000/api/v1/admin/maintenance/wal-checkpoint -H "Authorization: Bearer &lt;token&gt;"
+curl -X POST http://localhost:3000/api/v1/admin/maintenance -H "Content-Type: application/json" -H "Authorization: Bearer &lt;token&gt;" -d '{"operation":"checkpoint_wal"}'
 
 # 2. Archive data directory
 tar -czvf progit-backup-$(date +%F).tar.gz /data/db /data/repositories /data/config</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
