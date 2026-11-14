@@ -276,3 +276,4 @@ kubectl cp $(kubectl get pod -l app.kubernetes.io/name=progit -o jsonpath='{.ite
 | Health Probes | `/api/health` (Liveness) & `/api/ready` (Readiness) | [✓] |
 | Git Buffer Size | `proxy-body-size: "1024m"`, `proxy-timeout: "1800s"` | [✓] |
 | Podman Compatibility | `podman kube play` and `podman kube down` | [✓] |
+
