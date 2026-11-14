@@ -92,7 +92,7 @@
           "priceCurrency": "USD"
         },
         "description": "A high-performance, single-binary self-hosted Git service and alternative to GitHub, Gogs, Gitea, and GitLab. Built with pure Go and embedded React 19 UI.",
-        "softwareVersion": "1.7.0",
+        "softwareVersion": "1.8.0",
         "license": "https://opensource.org/licenses/MIT",
         "url": "https://progit.co.in/"
       },
@@ -836,7 +836,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
         </div>
         <span class="brand-title">ProGit</span>
-        <span class="version-pill">v1.7.0</span>
+        <span class="version-pill">v1.8.0</span>
       </a>
     </div>
 
@@ -851,6 +851,7 @@
         <a href="#overview" onclick="navigate('overview')">Docs</a>
         <a href="tutorial.html" style="color: var(--accent); font-weight: 600;">Tutorial</a>
         <a href="slides.html" style="color: var(--accent); font-weight: 600;">Slides</a>
+        <a href="#ops-changelog" onclick="navigate('ops-changelog')" style="color: var(--accent); font-weight: 600;">Changelog</a>
         <a href="#quickstart" onclick="navigate('quickstart')">Quickstart</a>
         <a href="#config-cheatsheet" onclick="navigate('config-cheatsheet')">Cheat Sheet</a>
         <a href="#api-overview" onclick="navigate('api-overview')">REST API</a>
@@ -962,6 +963,7 @@
           <li><a href="#ops-backup" data-target="ops-backup" onclick="navigate('ops-backup')">Backup &amp; Disaster Recovery</a></li>
           <li><a href="#ops-upgrade" data-target="ops-upgrade" onclick="navigate('ops-upgrade')">Upgrading ProGit</a></li>
           <li><a href="#ops-faq" data-target="ops-faq" onclick="navigate('ops-faq')">Troubleshooting &amp; FAQ</a></li>
+          <li><a href="#ops-changelog" data-target="ops-changelog" onclick="navigate('ops-changelog')">Version Changelog</a></li>
         </ul>
       </div>
 
@@ -1424,11 +1426,11 @@ git push -u origin main</code><button class="copy-btn" onclick="copyCode(this)">
         <p>ProGit publishes official multi-architecture container images to GitHub Container Registry (<code>ghcr.io</code>), verified for <strong>Linux x86_64</strong> (AMD64) and <strong>ARM64</strong> (Apple Silicon &amp; AWS Graviton):</p>
         <pre><code># Pull the official multi-architecture image (auto-selects amd64 or arm64)
 podman pull ghcr.io/sanjeevsenapati/progit:latest
-podman pull ghcr.io/sanjeevsenapati/progit:1.7.0
+podman pull ghcr.io/sanjeevsenapati/progit:1.8.0
 
 # Or pull platform-specific tags
-podman pull ghcr.io/sanjeevsenapati/progit:1.7.0-linux-amd64
-podman pull ghcr.io/sanjeevsenapati/progit:1.7.0-linux-arm64
+podman pull ghcr.io/sanjeevsenapati/progit:1.8.0-linux-amd64
+podman pull ghcr.io/sanjeevsenapati/progit:1.8.0-linux-arm64
 
 # Run immediately with persistent storage and standard HTTPS / SSH ports
 podman run -d --name progit \
@@ -1474,12 +1476,12 @@ podman run -d --name progit \
         <p>Ensure you pull the container matching your server's CPU architecture:</p>
         <pre><code># Check host architecture
 uname -m
-# If output is 'x86_64': use ghcr.io/sanjeevsenapati/progit:1.7.0-linux-amd64
-# If output is 'aarch64': use ghcr.io/sanjeevsenapati/progit:1.7.0-linux-arm64</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+# If output is 'x86_64': use ghcr.io/sanjeevsenapati/progit:1.8.0-linux-amd64
+# If output is 'aarch64': use ghcr.io/sanjeevsenapati/progit:1.8.0-linux-arm64</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
         <div class="callout callout-warning">
           <div class="callout-title">Architecture Mismatch Warning</div>
-          <p>Running an ARM64 image on an x86_64 CPU produces an immediate <code>exec format error</code> crash. On x86_64 servers, pull <code>1.7.0-linux-amd64</code> or the multi-arch tag <code>1.7.0</code>.</p>
+          <p>Running an ARM64 image on an x86_64 CPU produces an immediate <code>exec format error</code> crash. On x86_64 servers, pull <code>1.8.0-linux-amd64</code> or the multi-arch tag <code>1.8.0</code>.</p>
         </div>
 
         <h3>2. Configure Firewalld Ports</h3>
@@ -1505,7 +1507,7 @@ podman run -d \
   -v progit-repositories:/data/repositories:Z \
   -v progit-config:/data/config:Z \
   -v progit-logs:/data/logs:Z \
-  ghcr.io/sanjeevsenapati/progit:1.7.0-linux-amd64</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+  ghcr.io/sanjeevsenapati/progit:1.8.0-linux-amd64</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
         <h3>4. Enable Systemd Auto-Start on Boot</h3>
         <pre><code># Enable lingering for rootless user
@@ -2969,7 +2971,7 @@ Content-Type: application/json
         <pre><code>{
   "app": "ProGit",
   "status": "ok",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "database": "healthy",
   "repositories": "accessible",
   "ssh_enabled": true,
@@ -4263,6 +4265,81 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
             <span class="dir">&larr; Previous</span>
             <span class="title">Troubleshooting &amp; FAQ</span>
           </a>
+          <a href="#ops-changelog" class="nav-btn" onclick="navigate('ops-changelog')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Version Changelog</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 38. Operations: Changelog -->
+      <article class="doc-page" id="page-ops-changelog">
+        <div class="breadcrumbs">
+          <span>Operations &amp; Releases</span>
+          <span>/</span>
+          <span class="current">Changelog &amp; Release History</span>
+        </div>
+        <h1 class="page-title">Version Changelog &amp; Release History</h1>
+        <p class="page-subtitle">Complete version release history for ProGit adhering to Semantic Versioning.</p>
+
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0; color: var(--accent);">v1.8.0 &mdash; High Performance &amp; Autonomous Zero-Ops <span style="font-size: 0.8rem; background: var(--accent-light); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <p><strong>Release Date:</strong> November 14, 2026</p>
+          <ul>
+            <li><strong>SQLite MMAP Direct I/O</strong>: 256MB direct kernel memory-mapping bypasses userspace buffer copying for microsecond-level query response.</li>
+            <li><strong>Git Commit-Graph &amp; Bloom Filters</strong>: Accelerated commit traversals (<code>git log -- &lt;path&gt;</code>) by 10x&ndash;50x with generation numbers.</li>
+            <li><strong>Prometheus Telemetry</strong>: Zero-dependency native metrics at <code>/metrics</code> and <code>/api/v1/metrics</code> exposing Go runtime, HTTP latencies, Git operations, and DB connection pool gauges.</li>
+            <li><strong>Autonomous Maintenance Worker</strong>: Hourly background zero-ops ticker executing non-blocking WAL truncation (<code>PRAGMA wal_checkpoint(TRUNCATE)</code>), query planner optimization (<code>PRAGMA optimize</code>), and adaptive Git GC.</li>
+            <li><strong>ProGit Doctor CLI</strong>: Built-in <code>progit doctor</code> verifying 15 critical system, DB, permissions, Git, port, and security diagnostics.</li>
+            <li><strong>Atomic Hot Backup</strong>: <code>progit backup</code> with non-locking SQLite <code>VACUUM INTO</code> and automated SHA-256 <code>manifest.json</code>.</li>
+            <li><strong>Deterministic SHA ETag Caching</strong>: HTTP 304 Not Modified caching on <code>/blob</code> and <code>/raw</code> endpoints.</li>
+          </ul>
+        </div>
+
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0;">v1.7.0 &mdash; Global Repo Search &amp; Git Management Dashboard</h2>
+          <p><strong>Release Date:</strong> November 13, 2026</p>
+          <ul>
+            <li><strong>Global Repository Search</strong>: Substring filtering across all hosted repos, owners, and visibility states (public, private, archived, active).</li>
+            <li><strong>Git Management Dashboard</strong>: Real-time object telemetry with <code>git count-objects -v</code>, single-repo GC/repack/fsck, and 1-click global <code>gc_all</code>.</li>
+            <li><strong>ProGit Masterclass Deck</strong>: 20-slide interactive educational presentation deck (<code>slides.html</code>).</li>
+          </ul>
+        </div>
+
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0;">v1.6.0 &mdash; Developer Productivity Toolbox</h2>
+          <p><strong>Release Date:</strong> November 12, 2026</p>
+          <ul>
+            <li><strong>Developer Toolbox (<code>/toolbox</code>)</strong>: 11 offline-first developer utilities including JSON/YAML validator, JWT inspector, Regex tester, Base64/Hash generator, UUID v4/v7, Unix timestamp converter, side-by-side diff, curl to fetch/go, DNS lookup, and Markdown previewer.</li>
+          </ul>
+        </div>
+
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0;">v1.5.0 &mdash; Default Branch Governance</h2>
+          <p><strong>Release Date:</strong> November 8, 2026</p>
+          <ul>
+            <li>Global default branch setting (<code>trunk</code>, <code>main</code>, <code>master</code>) in <code>app.ini</code> and per-repository default branch switcher with automatic HEAD symref update.</li>
+          </ul>
+        </div>
+
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0;">v1.4.0 &mdash; DLP Download Restrictions &amp; ProGit Pages</h2>
+          <p><strong>Release Date:</strong> November 5, 2026</p>
+          <ul>
+            <li>Download restriction mode (<code>can_download: false</code>) protecting intellectual property while preserving web review access. Static site hosting via ProGit Pages at <code>/pages/{owner}/{repo}/</code>.</li>
+          </ul>
+        </div>
+
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0;">v1.0.0 &ndash; v1.3.0 &mdash; Platform Foundations</h2>
+          <p>Automated ECDSA TLS and Let's Encrypt ACME (v1.3.0), rootless Podman/Docker deployment (v1.2.0), pure-Go Smart HTTP and native SSH daemon on port 2222 (v1.1.0), and initial sovereign platform release (v1.0.0).</p>
+        </div>
+
+        <div class="page-nav-buttons">
+          <a href="#ops-faq" class="nav-btn" onclick="navigate('ops-faq')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Troubleshooting &amp; FAQ</span>
+          </a>
           <a href="#overview" class="nav-btn" onclick="navigate('overview')">
             <span class="dir">Return &rarr;</span>
             <span class="title">Overview &amp; Philosophy</span>
@@ -4399,6 +4476,7 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
       { id: 'ops-backup', title: 'Backup & Disaster Recovery', section: 'Operations', desc: 'Archiving /data/db and /data/repositories for safe recovery.' },
       { id: 'ops-upgrade', title: 'Upgrading ProGit', section: 'Operations', desc: 'Zero-downtime container and binary upgrade procedures.' },
       { id: 'ops-faq', title: 'Troubleshooting & FAQ', section: 'Operations', desc: 'Resolving port conflicts, SSH issues, and permissions.' },
+      { id: 'ops-changelog', title: 'Version Changelog & Release History', section: 'Operations', desc: 'Detailed release notes, version bumps, and changelog history for all ProGit minor and patch releases.' },
       { id: 'enterprise-ha', title: 'Multi-Node HA & Commercial Strategy', section: 'Enterprise & Architecture', desc: 'Stateless compute, Patroni PostgreSQL, distributed storage, and commercial pricing models.' }
     ];
 

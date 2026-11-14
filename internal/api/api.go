@@ -33,7 +33,7 @@ import (
 
 var (
 	startTime = time.Now()
-	Version   = "1.7.0"
+	Version   = "1.8.0"
 )
 
 type ipRateLimiter struct {
