@@ -548,3 +548,42 @@ func TestDownloadPermissionsAndViewOnly(t *testing.T) {
 		t.Errorf("super admin on locked repo should still have Download=true: %+v", p)
 	}
 }
+
+func TestPerformancePragmasAndHotBackup(t *testing.T) {
+	cfg, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// 1. Verify Integrity
+	status, err := CheckIntegrity()
+	if err != nil {
+		t.Fatalf("CheckIntegrity failed: %v", err)
+	}
+	if status != "ok" {
+		t.Fatalf("expected integrity status 'ok', got %q", status)
+	}
+
+	// 2. Verify Database Optimization
+	if err := OptimizeDatabase(); err != nil {
+		t.Fatalf("OptimizeDatabase failed: %v", err)
+	}
+
+	// 3. Verify WAL Checkpoint
+	if err := CheckpointWAL(); err != nil {
+		t.Fatalf("CheckpointWAL failed: %v", err)
+	}
+
+	// 4. Verify Hot Backup via VACUUM INTO
+	backupFile := filepath.Join(t.TempDir(), "hot_backup.db")
+	if err := CreateHotBackup(backupFile); err != nil {
+		t.Fatalf("CreateHotBackup failed: %v", err)
+	}
+
+	info, err := os.Stat(backupFile)
+	if err != nil {
+		t.Fatalf("backup file stat failed: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatalf("expected non-empty backup file")
+	}
+	_ = cfg
+}

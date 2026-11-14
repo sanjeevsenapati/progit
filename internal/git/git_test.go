@@ -514,3 +514,42 @@ func TestSetDefaultBranchAndValidation(t *testing.T) {
 	}
 }
 
+func TestGitMaintenanceAndCommitGraph(t *testing.T) {
+	tempDir := t.TempDir()
+	repoPath := filepath.Join(tempDir, "maint-repo.git")
+
+	if err := InitRepositoryWithReadme(repoPath, "maint-repo", "Testing Maintenance", "main", "Tester", "tester@example.com"); err != nil {
+		t.Fatalf("InitRepositoryWithReadme failed: %v", err)
+	}
+
+	// 1. Test InspectRepositoryGit
+	telemetry, err := InspectRepositoryGit(repoPath)
+	if err != nil {
+		t.Fatalf("InspectRepositoryGit failed: %v", err)
+	}
+	if telemetry.HeadRef != "main" {
+		t.Errorf("expected HeadRef main, got %q", telemetry.HeadRef)
+	}
+
+	// 2. Test RunGitMaintenance with commit-graph
+	out, err := RunGitMaintenance(repoPath, "commit-graph")
+	if err != nil {
+		t.Fatalf("RunGitMaintenance(commit-graph) failed: %v", err)
+	}
+	_ = out
+
+	// 3. Test AutoGC and WriteCommitGraph
+	if err := AutoGC(repoPath); err != nil {
+		t.Fatalf("AutoGC failed: %v", err)
+	}
+	if err := WriteCommitGraph(repoPath); err != nil {
+		t.Fatalf("WriteCommitGraph failed: %v", err)
+	}
+
+	// 4. Test RunGitMaintenance gc
+	if _, err := RunGitMaintenance(repoPath, "gc"); err != nil {
+		t.Fatalf("RunGitMaintenance(gc) failed: %v", err)
+	}
+}
+
+

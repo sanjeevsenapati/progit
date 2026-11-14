@@ -140,6 +140,9 @@ func RunGitMaintenance(repoPath, operation string) (string, error) {
 	switch operation {
 	case "gc":
 		args = []string{"gc", "--prune=now"}
+	case "commit-graph":
+		timeout = 60 * time.Second
+		args = []string{"commit-graph", "write", "--reachable", "--changed-paths"}
 	case "repack":
 		args = []string{"repack", "-a", "-d"}
 	case "prune":
@@ -158,5 +161,33 @@ func RunGitMaintenance(repoPath, operation string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	// When running gc, automatically refresh commit-graph with changed-paths bloom filters
+	if operation == "gc" {
+		_, _ = RunGitWithTimeout(60*time.Second, repoPath, "commit-graph", "write", "--reachable", "--changed-paths")
+	}
+
 	return strings.TrimSpace(string(out)), nil
+}
+
+// WriteCommitGraph writes a commit-graph file with generation numbers and changed-path Bloom filters.
+func WriteCommitGraph(repoPath string) error {
+	if _, err := os.Stat(repoPath); err != nil {
+		return fmt.Errorf("repository missing on disk: %w", err)
+	}
+	_, err := RunGitWithTimeout(60*time.Second, repoPath, "commit-graph", "write", "--reachable", "--changed-paths")
+	return err
+}
+
+// AutoGC runs git gc --auto and updates the commit-graph if needed.
+func AutoGC(repoPath string) error {
+	if _, err := os.Stat(repoPath); err != nil {
+		return fmt.Errorf("repository missing on disk: %w", err)
+	}
+	_, err := RunGitWithTimeout(60*time.Second, repoPath, "gc", "--auto")
+	if err != nil {
+		return err
+	}
+	_ = WriteCommitGraph(repoPath)
+	return nil
 }

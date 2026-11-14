@@ -31,7 +31,7 @@ func Init(cfg *config.Config) error {
 		return fmt.Errorf("create database dir: %w", err)
 	}
 
-	dsn := fmt.Sprintf("%s?_pragma=busy_timeout(%d)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)",
+	dsn := fmt.Sprintf("%s?_pragma=busy_timeout(%d)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)&_pragma=mmap_size(268435456)&_pragma=cache_size(-64000)&_pragma=temp_store(MEMORY)",
 		cfg.Database.Path, cfg.Database.BusyTimeout)
 
 	db, err := sql.Open("sqlite", dsn)
@@ -45,6 +45,18 @@ func Init(cfg *config.Config) error {
 
 	if err := db.Ping(); err != nil {
 		return fmt.Errorf("ping sqlite database: %w", err)
+	}
+
+	// Performance Pragmas: Ensure memory-mapped I/O, cache size, and temp storage are applied
+	perfPragmas := []string{
+		"PRAGMA journal_mode = WAL;",
+		"PRAGMA synchronous = NORMAL;",
+		"PRAGMA mmap_size = 268435456;", // 256MB direct memory-mapping bypasses userspace buffer copying
+		"PRAGMA cache_size = -64000;",   // 64MB dedicated B-Tree page cache
+		"PRAGMA temp_store = MEMORY;",   // In-memory temp tables and sorting
+	}
+	for _, p := range perfPragmas {
+		_, _ = db.Exec(p)
 	}
 
 	DB = db
@@ -64,6 +76,80 @@ func Ping() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	return DB.PingContext(ctx)
+}
+
+// OptimizeDatabase runs PRAGMA optimize to refresh query planner statistics and checkpoints WAL.
+func OptimizeDatabase() error {
+	dbMu.RLock()
+	db := DB
+	dbMu.RUnlock()
+	if db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	if _, err := db.Exec("PRAGMA optimize;"); err != nil {
+		return fmt.Errorf("pragma optimize: %w", err)
+	}
+	if _, err := db.Exec("PRAGMA wal_checkpoint(PASSIVE);"); err != nil {
+		return fmt.Errorf("wal checkpoint passive: %w", err)
+	}
+	return nil
+}
+
+// CheckpointWAL truncates the WAL file, flushing all committed transactions to the main DB.
+func CheckpointWAL() error {
+	dbMu.RLock()
+	db := DB
+	dbMu.RUnlock()
+	if db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	if _, err := db.Exec("PRAGMA wal_checkpoint(TRUNCATE);"); err != nil {
+		return fmt.Errorf("wal checkpoint truncate: %w", err)
+	}
+	return nil
+}
+
+// CreateHotBackup safely produces a consistent, atomic point-in-time snapshot of the database
+// into destPath without locking or interrupting concurrent readers or writers using VACUUM INTO.
+func CreateHotBackup(destPath string) error {
+	dbMu.RLock()
+	db := DB
+	dbMu.RUnlock()
+	if db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		return fmt.Errorf("create backup parent dir: %w", err)
+	}
+	_ = os.Remove(destPath) // VACUUM INTO fails if destination file already exists
+
+	// Escape single quotes in destPath for SQLite safety
+	escapedPath := strings.ReplaceAll(destPath, "'", "''")
+	query := fmt.Sprintf("VACUUM INTO '%s';", escapedPath)
+	if _, err := db.Exec(query); err != nil {
+		return fmt.Errorf("vacuum into backup: %w", err)
+	}
+	return nil
+}
+
+// CheckIntegrity runs SQLite PRAGMA integrity_check and returns status.
+func CheckIntegrity() (string, error) {
+	dbMu.RLock()
+	db := DB
+	dbMu.RUnlock()
+	if db == nil {
+		return "", fmt.Errorf("database not initialized")
+	}
+
+	var result string
+	err := db.QueryRow("PRAGMA integrity_check;").Scan(&result)
+	if err != nil {
+		return "", fmt.Errorf("integrity check failed: %w", err)
+	}
+	return result, nil
 }
 
 func runMigrations(db *sql.DB) error {
@@ -694,11 +780,6 @@ func DeleteUser(userID int64) error {
 	_, _ = DB.Exec(`DELETE FROM follows WHERE follower_id = ? OR following_id = ?`, userID, userID)
 	_, _ = DB.Exec(`DELETE FROM activities WHERE user_id = ?`, userID)
 	_, err := DB.Exec(`DELETE FROM users WHERE id = ?`, userID)
-	return err
-}
-
-func CheckpointWAL() error {
-	_, err := DB.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`)
 	return err
 }
 

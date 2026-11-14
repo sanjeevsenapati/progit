@@ -4,7 +4,10 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -26,6 +29,7 @@ import (
 	"progit.io/progit/internal/database"
 	"progit.io/progit/internal/git"
 	"progit.io/progit/internal/https"
+	"progit.io/progit/internal/maintenance"
 	"progit.io/progit/internal/ssh"
 	"progit.io/progit/internal/ui"
 )
@@ -39,6 +43,9 @@ func main() {
 		switch os.Args[1] {
 		case "version", "--version", "-v":
 			fmt.Printf("ProGit version %s\n", Version)
+			return
+		case "doctor":
+			runDoctor(os.Args[2:])
 			return
 		case "backup":
 			runBackup(os.Args[2:])
@@ -123,6 +130,9 @@ func runWeb(args []string) {
 	// Initialize API Router
 	apiRouter := api.NewRouter(cfg)
 
+	// Start Autonomous Zero-Ops Maintenance Worker (runs hourly WAL checkpoint, auto-GC, and query planner optimization)
+	maintenance.Start(cfg, 1*time.Hour)
+
 	// Combine Git Smart HTTP, API, and Web SPA
 	distDir := filepath.Join(".", "web", "dist")
 	spaHandler := ui.Handler(distDir)
@@ -135,8 +145,8 @@ func runWeb(args []string) {
 			}
 		}
 
-		// 2. Try REST API, Health checks, and ProGit Pages
-		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/pages/") || r.URL.Path == "/pages" {
+		// 2. Try REST API, Health checks, Metrics, and ProGit Pages
+		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/pages/") || r.URL.Path == "/pages" || r.URL.Path == "/metrics" {
 			apiRouter.ServeHTTP(w, r)
 			return
 		}
@@ -256,6 +266,9 @@ func runWeb(args []string) {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Printf("[ProGit] Shutting down gracefully...")
+
+	// Stop background maintenance worker
+	maintenance.Stop()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -466,13 +479,42 @@ func runBackup(args []string) {
 		log.Fatalf("Database initialization failed: %v", err)
 	}
 
-	// Checkpoint SQLite WAL to main file
-	log.Printf("[Backup] Checkpointing SQLite WAL mode...")
-	_, _ = database.DB.Exec("PRAGMA wal_checkpoint(TRUNCATE);")
+	tempDir, err := os.MkdirTemp("", "progit-backup-*")
+	if err != nil {
+		log.Fatalf("Create temp backup dir failed: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	tempDB := filepath.Join(tempDir, "database.db")
+	log.Printf("[Backup] Creating atomic hot SQLite database snapshot (VACUUM INTO)...")
+	if err := database.CreateHotBackup(tempDB); err != nil {
+		log.Printf("[Backup] Warning: Hot backup failed (%v), falling back to checkpointed file", err)
+		_ = database.CheckpointWAL()
+		tempDB = cfg.Database.Path
+	}
+
+	// Calculate SHA256 of the backup DB
+	dbBytes, _ := os.ReadFile(tempDB)
+	dbHash := sha256.Sum256(dbBytes)
+	dbSha := hex.EncodeToString(dbHash[:])
+
+	repoCount, _ := database.CountRepositories()
+	userCount, _ := database.CountUsers()
+
+	manifest := map[string]any{
+		"version":            Version,
+		"created_at":         time.Now().UTC().Format(time.RFC3339),
+		"db_sha256":          dbSha,
+		"repositories_count": repoCount,
+		"users_count":        userCount,
+	}
+	manifestBytes, _ := json.MarshalIndent(manifest, "", "  ")
 
 	if *outputPath == "" {
 		_ = os.MkdirAll("backups", 0755)
 		*outputPath = fmt.Sprintf("backups/progit-backup-%s.tar.gz", time.Now().Format("20060102-150405"))
+	} else {
+		_ = os.MkdirAll(filepath.Dir(*outputPath), 0755)
 	}
 
 	outFile, err := os.Create(*outputPath)
@@ -486,17 +528,20 @@ func runBackup(args []string) {
 	tw := tar.NewWriter(gw)
 	defer tw.Close()
 
-	// 1. Add SQLite DB file
-	if err := addFileToTar(tw, cfg.Database.Path, "database.db"); err != nil {
+	// 1. Add manifest
+	_ = addBytesToTar(tw, manifestBytes, "manifest.json")
+
+	// 2. Add SQLite DB file
+	if err := addFileToTar(tw, tempDB, "database.db"); err != nil {
 		log.Printf("Warning adding db: %v", err)
 	}
 
-	// 2. Add Repositories tree
+	// 3. Add Repositories tree
 	if err := addDirToTar(tw, cfg.Repository.Root, "repositories"); err != nil {
 		log.Printf("Warning adding repositories: %v", err)
 	}
 
-	log.Printf("[Backup] Backup archive created successfully at %s", *outputPath)
+	log.Printf("[Backup] Hot backup archive created successfully at %s (DB SHA256: %s...)", *outputPath, dbSha[:12])
 }
 
 func runRestore(args []string) {
@@ -528,6 +573,16 @@ func runRestore(args []string) {
 			log.Fatalf("Tar error: %v", err)
 		}
 
+		if header.Name == "manifest.json" {
+			data, _ := io.ReadAll(tr)
+			var manifest map[string]any
+			if err := json.Unmarshal(data, &manifest); err == nil {
+				log.Printf("[Restore] Found valid backup manifest (ProGit v%v, created: %v, repositories: %v)",
+					manifest["version"], manifest["created_at"], manifest["repositories_count"])
+			}
+			continue
+		}
+
 		if header.Name == "database.db" {
 			_ = os.MkdirAll(filepath.Dir(cfg.Database.Path), 0755)
 			out, err := os.Create(cfg.Database.Path)
@@ -556,6 +611,20 @@ func runRestore(args []string) {
 		}
 	}
 	log.Printf("[Restore] Restore operation completed successfully")
+}
+
+func addBytesToTar(tw *tar.Writer, data []byte, tarName string) error {
+	header := &tar.Header{
+		Name:    tarName,
+		Size:    int64(len(data)),
+		Mode:    0644,
+		ModTime: time.Now(),
+	}
+	if err := tw.WriteHeader(header); err != nil {
+		return err
+	}
+	_, err := tw.Write(data)
+	return err
 }
 
 func addFileToTar(tw *tar.Writer, filePath, tarName string) error {

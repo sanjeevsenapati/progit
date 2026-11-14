@@ -2,6 +2,8 @@ package api
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -25,6 +27,8 @@ import (
 	"progit.io/progit/internal/config"
 	"progit.io/progit/internal/database"
 	"progit.io/progit/internal/git"
+	"progit.io/progit/internal/maintenance"
+	"progit.io/progit/internal/metrics"
 )
 
 var (
@@ -104,8 +108,40 @@ func NewRouter(cfg *config.Config) *Router {
 		dnsSem:      make(chan struct{}, 8),
 		dnsResolver: net.DefaultResolver,
 	}
+
+	// Register metrics providers
+	metrics.SetVersion(Version)
+	metrics.SetDBProvider(func() *sql.DB {
+		return database.DB
+	})
+	metrics.SetStatProvider(func() (int64, int64) {
+		uCount, _ := database.CountUsers()
+		rCount, _ := database.CountRepositories()
+		return int64(uCount), int64(rCount)
+	})
+	metrics.SetDiskProvider(func() (int64, int64) {
+		used, _ := git.DirSizeBytes(cfg.Repository.Root)
+		return used, 0
+	})
+
 	r.registerRoutes()
 	return r
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rec *statusRecorder) WriteHeader(code int) {
+	rec.statusCode = code
+	rec.ResponseWriter.WriteHeader(code)
+}
+
+func (rec *statusRecorder) Flush() {
+	if flusher, ok := rec.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
 }
 
 func (r *Router) isAllowedOrigin(origin string) bool {
@@ -172,14 +208,19 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		req.Body = http.MaxBytesReader(w, req.Body, maxBody)
 	}
 
-	r.mux.ServeHTTP(w, req)
+	start := time.Now()
+	rec := &statusRecorder{ResponseWriter: w, statusCode: http.StatusOK}
+	r.mux.ServeHTTP(rec, req)
+	metrics.RecordHTTPRequest(req.Method, req.URL.Path, rec.statusCode, time.Since(start))
 }
 
 func (r *Router) registerRoutes() {
-	// Health and Readiness
+	// Health, Readiness & Observability
 	r.mux.HandleFunc("GET /api/health", r.handleHealth)
 	r.mux.HandleFunc("GET /api/ready", r.handleReady)
 	r.mux.HandleFunc("GET /api/v1/server/cert", r.handleDownloadCert)
+	r.mux.HandleFunc("GET /metrics", metrics.Handler())
+	r.mux.HandleFunc("GET /api/v1/metrics", metrics.Handler())
 
 	// OIDC / OAuth2 SSO Endpoints
 	r.mux.HandleFunc("GET /api/v1/auth/providers", r.handleAuthProviders)
@@ -2075,6 +2116,17 @@ func (r *Router) handleGetBlob(w http.ResponseWriter, req *http.Request) {
 		jsonError(w, http.StatusNotFound, "File not found")
 		return
 	}
+
+	if blob.SHA != "" {
+		etag := fmt.Sprintf(`"%s"`, blob.SHA)
+		w.Header().Set("ETag", etag)
+		w.Header().Set("Cache-Control", "public, max-age=86400, stale-while-revalidate=3600")
+		if match := req.Header.Get("If-None-Match"); match != "" && strings.Contains(match, blob.SHA) {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+	}
+
 	jsonResponse(w, http.StatusOK, blob)
 }
 
@@ -2099,6 +2151,16 @@ func (r *Router) handleGetRaw(w http.ResponseWriter, req *http.Request) {
 		jsonError(w, http.StatusNotFound, "File not found")
 		return
 	}
+
+	h := sha256.Sum256(bytes)
+	etag := fmt.Sprintf(`"%x"`, h)
+	w.Header().Set("ETag", etag)
+	w.Header().Set("Cache-Control", "public, max-age=86400, stale-while-revalidate=3600")
+	if match := req.Header.Get("If-None-Match"); match == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(bytes)
@@ -5257,6 +5319,29 @@ func (r *Router) handleAdminMaintenance(w http.ResponseWriter, req *http.Request
 			return
 		}
 		jsonResponse(w, http.StatusOK, map[string]string{"message": "Database VACUUM completed successfully"})
+	case "optimize":
+		if err := database.OptimizeDatabase(); err != nil {
+			jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Database optimize failed: %v", err))
+			return
+		}
+		jsonResponse(w, http.StatusOK, map[string]string{"message": "Database query planner optimization and WAL passive checkpoint completed"})
+	case "integrity_check":
+		result, err := database.CheckIntegrity()
+		if err != nil {
+			jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Integrity check error: %v", err))
+			return
+		}
+		jsonResponse(w, http.StatusOK, map[string]string{"status": result, "message": "Database integrity check completed: " + result})
+	case "run_full_cycle":
+		report, err := maintenance.RunOnce(r.cfg)
+		if err != nil {
+			jsonError(w, http.StatusConflict, fmt.Sprintf("Maintenance execution failed: %v", err))
+			return
+		}
+		jsonResponse(w, http.StatusOK, map[string]any{
+			"message": "Full autonomous maintenance cycle executed successfully",
+			"report":  report,
+		})
 	default:
 		jsonError(w, http.StatusBadRequest, "Unknown maintenance operation")
 	}

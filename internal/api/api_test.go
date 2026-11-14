@@ -81,6 +81,26 @@ func TestHealthAndReadiness(t *testing.T) {
 	if recReady.Code != http.StatusOK {
 		t.Errorf("expected 200 OK for readiness, got %d", recReady.Code)
 	}
+
+	// Test GET /metrics and GET /api/v1/metrics
+	reqMetrics := httptest.NewRequest("GET", "/metrics", nil)
+	recMetrics := httptest.NewRecorder()
+	router.ServeHTTP(recMetrics, reqMetrics)
+
+	if recMetrics.Code != http.StatusOK {
+		t.Errorf("expected 200 OK for /metrics, got %d", recMetrics.Code)
+	}
+	bodyStr := recMetrics.Body.String()
+	if !strings.Contains(bodyStr, "progit_info") || !strings.Contains(bodyStr, "progit_http_requests_total") {
+		t.Errorf("metrics response missing expected headers, got:\n%s", bodyStr)
+	}
+
+	reqMetricsV1 := httptest.NewRequest("GET", "/api/v1/metrics", nil)
+	recMetricsV1 := httptest.NewRecorder()
+	router.ServeHTTP(recMetricsV1, reqMetricsV1)
+	if recMetricsV1.Code != http.StatusOK {
+		t.Errorf("expected 200 OK for /api/v1/metrics, got %d", recMetricsV1.Code)
+	}
 }
 
 func TestAuthRegistrationAndLogin(t *testing.T) {
