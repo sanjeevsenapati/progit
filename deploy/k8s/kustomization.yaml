@@ -8,3 +8,4 @@ commonLabels:
   app.kubernetes.io/name: progit
   app.kubernetes.io/version: "1.8.0"
   app.kubernetes.io/part-of: progit-platform
+

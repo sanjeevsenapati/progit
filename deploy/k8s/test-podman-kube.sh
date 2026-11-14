@@ -107,3 +107,4 @@ else
     podman kube down "${K8S_MANIFEST}"
     echo "✓ Test pod cleaned up."
 fi
+

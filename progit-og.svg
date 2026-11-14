@@ -43,20 +43,20 @@
       <path d="M18 9a9 9 0 0 0-9 9"/>
     </svg>
     <text x="92" y="50" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="44" font-weight="800" fill="#f0f6fc" letter-spacing="-1">ProGit</text>
-    <rect x="245" y="18" width="160" height="34" rx="17" fill="rgba(16, 185, 129, 0.15)" stroke="#10b981" stroke-width="1.5" />
-    <text x="325" y="41" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#34d399" text-anchor="middle">v1.2.0 PURE GO</text>
+    <rect x="250" y="18" width="186" height="34" rx="17" fill="rgba(16, 185, 129, 0.15)" stroke="#10b981" stroke-width="1.5" />
+    <text x="343" y="41" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#34d399" text-anchor="middle">v1.8.0 SOVEREIGN GIT</text>
   </g>
 
   <!-- Main Headline for SEO -->
   <g transform="translate(100, 240)">
     <text font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="52" font-weight="800" fill="#f0f6fc" letter-spacing="-1.5">
-      The Modern Self-Hosted Git Service
+      The Modern Self-Hosted Git Platform
     </text>
     <text y="65" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="34" font-weight="600" fill="#10b981">
-      Lightweight GitHub, Gogs &amp; Gitea Alternative
+      Lightweight, Ultra-Fast GitHub &amp; GitLab Alternative
     </text>
     <text y="125" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="400" fill="#8b949e">
-      Zero CGO Dependencies &bull; &lt; 40 MB RAM &bull; Pure-Go SQLite WAL &bull; React 19 UI
+      Pure-Go Engine • SQLite WAL Direct MMAP • Zero CGO • Podman &amp; Kubernetes Ready
     </text>
   </g>
 
@@ -67,20 +67,20 @@
     <text x="90" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#c9d1d9" text-anchor="middle">&lt; 40 MB Memory</text>
 
     <!-- Pill 2 -->
-    <rect x="200" width="180" height="48" rx="10" fill="#21262d" stroke="#30363d" />
-    <text x="290" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#c9d1d9" text-anchor="middle">Docker &amp; Podman</text>
+    <rect x="200" width="190" height="48" rx="10" fill="#21262d" stroke="#30363d" />
+    <text x="295" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#c9d1d9" text-anchor="middle">Podman &amp; K8s Ready</text>
 
     <!-- Pill 3 -->
-    <rect x="400" width="180" height="48" rx="10" fill="#21262d" stroke="#30363d" />
-    <text x="490" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#c9d1d9" text-anchor="middle">Git-Backed Wiki</text>
+    <rect x="410" width="180" height="48" rx="10" fill="#21262d" stroke="#30363d" />
+    <text x="500" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#c9d1d9" text-anchor="middle">Git Commit-Graph</text>
 
     <!-- Pill 4 -->
-    <rect x="600" width="180" height="48" rx="10" fill="#21262d" stroke="#30363d" />
-    <text x="690" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#c9d1d9" text-anchor="middle">ProGit Pages</text>
+    <rect x="610" width="185" height="48" rx="10" fill="#21262d" stroke="#30363d" />
+    <text x="702" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#c9d1d9" text-anchor="middle">Zero-Ops Maintenance</text>
 
     <!-- Pill 5 -->
-    <rect x="800" width="180" height="48" rx="10" fill="#21262d" stroke="#30363d" />
-    <text x="890" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#c9d1d9" text-anchor="middle">Google &amp; OIDC SSO</text>
+    <rect x="815" width="185" height="48" rx="10" fill="#21262d" stroke="#30363d" />
+    <text x="907" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#c9d1d9" text-anchor="middle">OIDC &amp; Google SSO</text>
   </g>
 
   <!-- Footer Link -->
@@ -89,7 +89,7 @@
       https://progit.co.in
     </text>
     <text x="320" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" fill="#6e7681">
-      Open Source (MIT) &bull; Supported by PDIH &bull; Created by ProGit Team &amp; Sanjeev
+      Open Source (MIT) • Supported by PDIH • Created by ProGit Team &amp; Sanjeev
     </text>
   </g>
 </svg>
