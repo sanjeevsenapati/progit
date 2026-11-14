@@ -32,6 +32,10 @@ This release introduces high-throughput kernel-level database optimizations, aut
 - **Git Commit-Graph & Changed-Path Bloom Filters**: Added native `commit-graph` maintenance operation to `internal/git/admin.go` (`git commit-graph write --reachable --changed-paths`), automatically invoked after `git gc` and during repository maintenance.
 - **Atomic Hot Backup (`VACUUM INTO`)**: Enhanced `progit backup` to produce consistent SQLite snapshots via `database.CreateHotBackup` without locking active write transactions, generating an automated SHA-256 `manifest.json`.
 - **Deterministic SHA ETag & HTTP 304 Caching**: Added strong ETag and `Cache-Control: public, max-age=86400, stale-while-revalidate=3600` headers on `handleGetBlob` and `handleGetRaw`. Matching `If-None-Match` returns instant **`304 Not Modified`** without disk reads.
+- **Production Kubernetes Manifests & Podman Kube Compatibility**:
+  - Full Kubernetes deployment suite (`deploy/k8s/progit-deployment.yaml`, `deploy/k8s/kustomization.yaml`): PersistentVolumeClaim (10Gi+), ConfigMap, Secrets, Deployment (`strategy: Recreate`, UID/GID 1000 rootless), Service (ports 3000, 3443, 2222), and Ingress (`proxy-body-size: "1024m"`).
+  - Automated Podman Kubernetes validation script (`deploy/k8s/test-podman-kube.sh`) executing `podman kube play`, health probes, Prometheus metrics, and in-container `progit doctor` diagnostics.
+  - Comprehensive production deployment runbook in `docs/KUBERNETES_DEPLOYMENT.md` and updated interactive documentation portal.
 
 ### Performance
 - **SQLite Kernel MMAP Direct I/O**: Configured `_pragma=mmap_size(268435456)` (256 MB) to bypass user-space buffer copies via direct kernel memory mapping.
@@ -129,3 +133,4 @@ This release introduces high-throughput kernel-level database optimizations, aut
 
 ### Added
 - **Initial Release**: Sovereign single-binary Git platform with user authentication, repository hosting, tree/blob browsing, pull requests, issues, Kanban project boards, and markdown wikis.
+
