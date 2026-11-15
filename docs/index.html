@@ -97,7 +97,7 @@
           "priceCurrency": "USD"
         },
         "description": "A high-performance, single-binary self-hosted Git service and alternative to GitHub, Gogs, Gitea, and GitLab. Built with pure Go and embedded React 19 UI.",
-        "softwareVersion": "1.8.0",
+        "softwareVersion": "1.9.0",
         "license": "https://opensource.org/licenses/MIT",
         "url": "https://progit.co.in/"
       },
@@ -841,7 +841,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
         </div>
         <span class="brand-title">ProGit</span>
-        <span class="version-pill">v1.8.0</span>
+        <span class="version-pill">v1.9.0</span>
       </a>
     </div>
 
@@ -4374,7 +4374,18 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
         <p class="page-subtitle">Complete version release history for ProGit adhering to Semantic Versioning.</p>
 
         <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
-          <h2 style="margin-top: 0; color: var(--accent);">v1.8.0 &mdash; High Performance &amp; Autonomous Zero-Ops <span style="font-size: 0.8rem; background: var(--accent-light); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <h2 style="margin-top: 0; color: var(--accent);">v1.9.0 &mdash; Resilient Wiki &amp; File Operations <span style="font-size: 0.8rem; background: var(--accent-light); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <p><strong>Release Date:</strong> November 15, 2026</p>
+          <ul>
+            <li><strong>Idempotent Wiki Page Saving</strong>: Resolved <code>exit status 1 (stderr: )</code> Git clean working tree error on wiki saves by inspecting <code>git status --porcelain</code> prior to commit. Saving an unchanged page is now a graceful idempotent success.</li>
+            <li><strong>Web File Editor Clean Tree Resilience</strong>: Enhanced <code>SaveFile</code> to return the current HEAD commit SHA gracefully when saving an unchanged file without throwing commit errors.</li>
+            <li><strong>Git Output Diagnostics Capture</strong>: Enhanced <code>RunGit</code> to capture STDOUT when STDERR is empty upon non-zero exit, ensuring complete diagnostic visibility for Git operations.</li>
+            <li><strong>Dynamic Bare Wiki Default Branch Detection</strong>: Updated all wiki operations to dynamically resolve the default branch via <code>GetDefaultBranch()</code> instead of assuming a hardcoded branch.</li>
+          </ul>
+        </div>
+
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0;">v1.8.0 &mdash; High Performance &amp; Autonomous Zero-Ops</h2>
           <p><strong>Release Date:</strong> November 14, 2026</p>
           <ul>
             <li><strong>SQLite MMAP Direct I/O</strong>: 256MB direct kernel memory-mapping bypasses userspace buffer copying for microsecond-level query response.</li>
