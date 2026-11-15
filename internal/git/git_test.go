@@ -552,4 +552,68 @@ func TestGitMaintenanceAndCommitGraph(t *testing.T) {
 	}
 }
 
+func TestSaveWikiPageIdempotentAndUnchanged(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "progit-wiki-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	wikiRepoPath := filepath.Join(tempDir, "test.wiki.git")
+
+	// 1. Initialize first wiki page (Home)
+	err = SaveWikiPage(wikiRepoPath, "test", "Home", "Home", "# Welcome Home", "Admin", "admin@example.com", "Initial Home")
+	if err != nil {
+		t.Fatalf("failed to create initial wiki page: %v", err)
+	}
+
+	page, err := GetWikiPage(wikiRepoPath, "Home")
+	if err != nil {
+		t.Fatalf("failed to load Home wiki page: %v", err)
+	}
+	if page.Content != "# Welcome Home" {
+		t.Fatalf("unexpected Home content: %s", page.Content)
+	}
+
+	// 2. Create second wiki page (T)
+	initialTContent := "# New Page\n\nWrite your wiki content here..."
+	err = SaveWikiPage(wikiRepoPath, "test", "T", "test", initialTContent, "admin3", "admin3@example.com", "Create new wiki page")
+	if err != nil {
+		t.Fatalf("failed to create wiki page T: %v", err)
+	}
+
+	// 3. Save wiki page T with the EXACT SAME CONTENT (this was failing previously with exit status 1)
+	err = SaveWikiPage(wikiRepoPath, "test", "T", "test", initialTContent, "admin3", "admin3@example.com", "Update T")
+	if err != nil {
+		t.Fatalf("saving unchanged wiki page failed: %v", err)
+	}
+
+	// 4. Update wiki page T with modified content
+	updatedTContent := "# Updated Page\n\nNew information added."
+	err = SaveWikiPage(wikiRepoPath, "test", "T", "test", updatedTContent, "admin3", "admin3@example.com", "Update T content")
+	if err != nil {
+		t.Fatalf("failed to update wiki page T: %v", err)
+	}
+
+	pageT, err := GetWikiPage(wikiRepoPath, "T")
+	if err != nil {
+		t.Fatalf("failed to load updated T wiki page: %v", err)
+	}
+	if pageT.Content != updatedTContent {
+		t.Fatalf("expected updated content, got: %s", pageT.Content)
+	}
+
+	// 5. Delete wiki page T
+	err = DeleteWikiPage(wikiRepoPath, "T", "admin3", "admin3@example.com")
+	if err != nil {
+		t.Fatalf("failed to delete wiki page T: %v", err)
+	}
+
+	_, err = GetWikiPage(wikiRepoPath, "T")
+	if err == nil {
+		t.Fatalf("expected wiki page T to be deleted, but it was found")
+	}
+}
+
+
 

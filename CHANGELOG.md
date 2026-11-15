@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.9.0] - 2026-11-15
+
+### Highlights: Resilient Wiki & File Operations with Clean Working Tree Handling
+This release fixes wiki page saving and web-based file editing when changes are clean or unchanged, eliminates false-positive `exit status 1` commit errors, captures standard output diagnostics, and adds automatic dynamic default branch resolution for bare wiki repositories.
+
+### Fixed
+- **Idempotent Wiki Page Saving**: Resolved `commit wiki page failed: exit status 1 (stderr: )` by inspecting `git status --porcelain` before executing commits. Saving an unchanged wiki page or double-clicking "Save Changes" is now treated as a successful idempotent no-op instead of triggering a fatal Git working tree clean error.
+- **Web File Editor Clean Tree Resilience**: Enhanced `SaveFile` to inspect staged changes via `git status --porcelain` and return the current HEAD commit SHA gracefully when saving an unchanged file.
+- **Git Error Output Capture**: Enhanced `RunGit` to capture STDOUT when STDERR is empty upon non-zero exit, ensuring complete diagnostic visibility for Git operations.
+- **Dynamic Bare Wiki Default Branch Detection**: Updated `ListWikiPages`, `GetWikiPage`, `SaveWikiPage`, and `DeleteWikiPage` to dynamically resolve the repository's default branch (`main`, `master`, etc.) via `GetDefaultBranch()` instead of assuming a hardcoded branch name.
+
+---
+
 ## [1.8.0] - 2026-11-14
 
 ### Highlights: Best-in-Class Performance & Autonomous Zero-Ops

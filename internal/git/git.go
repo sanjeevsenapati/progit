@@ -91,7 +91,11 @@ func RunGitWithTimeout(timeout time.Duration, dir string, args ...string) ([]byt
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("git %s failed: %w (stderr: %s)", strings.Join(args, " "), err, stderr.String())
+		errDetails := strings.TrimSpace(stderr.String())
+		if errDetails == "" && len(out) > 0 {
+			errDetails = strings.TrimSpace(string(out))
+		}
+		return nil, fmt.Errorf("git %s failed: %w (stderr: %s)", strings.Join(args, " "), err, errDetails)
 	}
 	return out, nil
 }
@@ -996,7 +1000,12 @@ func ListWikiPages(wikiRepoPath string) ([]WikiPageMeta, error) {
 		return []WikiPageMeta{}, nil
 	}
 
-	entries, err := GetTree(wikiRepoPath, "main", "")
+	branch := GetDefaultBranch(wikiRepoPath)
+	if branch == "" {
+		branch = "main"
+	}
+
+	entries, err := GetTree(wikiRepoPath, branch, "")
 	if err != nil {
 		return []WikiPageMeta{}, nil
 	}
@@ -1006,7 +1015,7 @@ func ListWikiPages(wikiRepoPath string) ([]WikiPageMeta, error) {
 		if strings.HasSuffix(e.Name, ".md") {
 			slug := strings.TrimSuffix(e.Name, ".md")
 			title := strings.ReplaceAll(slug, "-", " ")
-			commits, _ := GetCommits(wikiRepoPath, "main", 1, 0)
+			commits, _ := GetCommits(wikiRepoPath, branch, 1, 0)
 			meta := WikiPageMeta{
 				Slug:  slug,
 				Title: title,
@@ -1033,19 +1042,24 @@ func GetWikiPage(wikiRepoPath, slug string) (*WikiPage, error) {
 	cleanSlug := strings.TrimSuffix(slug, ".md")
 	fileName := cleanSlug + ".md"
 
-	blob, err := GetBlob(wikiRepoPath, "main", fileName)
+	branch := GetDefaultBranch(wikiRepoPath)
+	if branch == "" {
+		branch = "main"
+	}
+
+	blob, err := GetBlob(wikiRepoPath, branch, fileName)
 	if (err != nil || blob == nil) && (strings.EqualFold(cleanSlug, "home") || strings.EqualFold(cleanSlug, "readme")) {
 		if strings.EqualFold(cleanSlug, "home") {
-			blob, err = GetBlob(wikiRepoPath, "main", "README.md")
+			blob, err = GetBlob(wikiRepoPath, branch, "README.md")
 		} else {
-			blob, err = GetBlob(wikiRepoPath, "main", "Home.md")
+			blob, err = GetBlob(wikiRepoPath, branch, "Home.md")
 		}
 	}
 	if err != nil || blob == nil {
 		return nil, fmt.Errorf("wiki page '%s' not found", cleanSlug)
 	}
 
-	commits, _ := GetCommits(wikiRepoPath, "main", 1, 0)
+	commits, _ := GetCommits(wikiRepoPath, branch, 1, 0)
 	author := "ProGit"
 	email := "wiki@progit.io"
 	sha := ""
@@ -1153,6 +1167,13 @@ func SaveWikiPage(wikiRepoPath, repoName, slug, title, content, authorName, auth
 		return err
 	}
 
+	// If no changes were staged, the page already contains the requested content.
+	// Return success (idempotent no-op) instead of failing on git commit clean working tree.
+	statusOut, statusErr := RunGit(tempDir, "status", "--porcelain")
+	if statusErr == nil && len(bytes.TrimSpace(statusOut)) == 0 {
+		return nil
+	}
+
 	authorStr := fmt.Sprintf("%s <%s>", authorName, authorEmail)
 	gitConfigArgs := []string{
 		"-c", "core.hooksPath=",
@@ -1165,7 +1186,14 @@ func SaveWikiPage(wikiRepoPath, repoName, slug, title, content, authorName, auth
 		return fmt.Errorf("commit wiki page failed: %w", err)
 	}
 
-	if _, err := RunGit(tempDir, "push", "origin", "main"); err != nil {
+	// Detect current branch in cloned working tree
+	branchBytes, branchErr := RunGit(tempDir, "rev-parse", "--abbrev-ref", "HEAD")
+	branch := "main"
+	if branchErr == nil && len(bytes.TrimSpace(branchBytes)) > 0 {
+		branch = strings.TrimSpace(string(branchBytes))
+	}
+
+	if _, err := RunGit(tempDir, "push", "origin", branch); err != nil {
 		return fmt.Errorf("push wiki commit failed: %w", err)
 	}
 
@@ -1220,7 +1248,14 @@ func DeleteWikiPage(wikiRepoPath, slug, authorName, authorEmail string) error {
 		return fmt.Errorf("commit page deletion failed: %w", err)
 	}
 
-	if _, err := RunGit(tempDir, "push", "origin", "main"); err != nil {
+	// Detect current branch in cloned working tree
+	branchBytes, branchErr := RunGit(tempDir, "rev-parse", "--abbrev-ref", "HEAD")
+	branch := "main"
+	if branchErr == nil && len(bytes.TrimSpace(branchBytes)) > 0 {
+		branch = strings.TrimSpace(string(branchBytes))
+	}
+
+	if _, err := RunGit(tempDir, "push", "origin", branch); err != nil {
 		return fmt.Errorf("push deletion failed: %w", err)
 	}
 
@@ -1302,6 +1337,13 @@ func SaveFile(repoPath, branch, filePath, content, authorName, authorEmail, mess
 
 	if _, err := RunGit(tempDir, "add", "--", filepath.FromSlash(cleanFilePath)); err != nil {
 		return "", "", fmt.Errorf("git add failed: %w", err)
+	}
+
+	// Check if there are any staged changes. If not, content is identical to HEAD.
+	statusOut, statusErr := RunGit(tempDir, "status", "--porcelain")
+	if statusErr == nil && len(bytes.TrimSpace(statusOut)) == 0 {
+		headSha, _ := RunGit(tempDir, "rev-parse", "HEAD")
+		return strings.TrimSpace(string(headSha)), targetBranch, nil
 	}
 
 	if message == "" {
