@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.11.0] - 2026-11-17
+
+### Highlights: Resilient Viewport Clamping & Inward Alignment for Mega Dropdowns
+This release fixes dropdown menu alignment and page boundary crossing in the documentation header navigation. Dropdowns are now anchored inward with viewport boundary detection, preventing menu cards from overflowing the browser window or hiding content.
+
+### Fixed
+- **Inward & Right-Aligned Dropdown Positioning**: Anchored dropdown panels inward (`right: 0; left: auto`) relative to the header trigger buttons, ensuring panels open cleanly within the visible viewport instead of crossing off-screen to the right.
+- **Dynamic Viewport Boundary Auto-Clamping (`alignDropdownPanel`)**: Added real-time bounding client rect inspection that dynamically detects screen edges on hover, focus, and click. If a menu would exceed the right or left viewport boundary (with a 16px safety margin), it is automatically clamped to stay completely within view.
+- **Responsive Viewport Clamping**: Enforced `max-width: calc(100vw - 32px)` and box-sizing constraints across all mega dropdown panels and grids to guarantee clean rendering on small laptops, tablets, and high-DPI displays.
+- **Dynamic Window Resize Alignment**: Added active window resize listeners that recalculate and smoothly readjust dropdown placement when changing display orientation or window dimensions.
+
+---
+
 ## [1.10.0] - 2026-11-17
 
 ### Highlights: Modern Bigin-Style Dropdown Mega Navigation & Enhanced UI/UX
