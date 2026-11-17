@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.13.0] - 2026-11-17
+
+### Highlights: Resilient Git Working Tree Clean Handling & Toast Spam Prevention
+This release hardens wiki page and repository file saving against clean working tree errors, and optimizes toast notifications to prevent alert stacking from obscuring the user interface.
+
+### Fixed
+- **Resilient Clean Working Tree Handling on Wiki & File Operations**:
+  - Added direct error interception for `nothing to commit` and `working tree clean` across `SaveWikiPage`, `SaveFile`, `DeleteFile`, and `UploadFiles` in `internal/git/git.go`.
+  - Saving an unchanged wiki page or changing only the page title without modifying content now safely succeeds as an idempotent no-op instead of triggering `commit wiki page failed: exit status 1 (stderr: )`.
+- **Toast Notification Spam Prevention & Viewport Guard (`ModalDialog.tsx`)**:
+  - Added automatic deduplication in `handleCustomToast` so identical toasts are not repeated when users click save buttons multiple times.
+  - Capped maximum simultaneous visible toasts to 3, preventing notification banners from stacking vertically and hiding form fields or controls.
+
+---
+
 ## [1.12.0] - 2026-11-17
 
 ### Highlights: Left-and-Right Toolbox Layout & Fullscreen / Expand Comparison

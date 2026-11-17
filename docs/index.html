@@ -97,7 +97,7 @@
           "priceCurrency": "USD"
         },
         "description": "A high-performance, single-binary self-hosted Git service and alternative to GitHub, Gogs, Gitea, and GitLab. Built with pure Go and embedded React 19 UI.",
-        "softwareVersion": "1.12.0",
+        "softwareVersion": "1.13.0",
         "license": "https://opensource.org/licenses/MIT",
         "url": "https://progit.co.in/"
       },
@@ -1159,7 +1159,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
         </div>
         <span class="brand-title">ProGit</span>
-        <span class="version-pill">v1.12.0</span>
+        <span class="version-pill">v1.13.0</span>
       </a>
     </div>
 
@@ -1425,10 +1425,10 @@
                 </div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">
-                    <span>v1.12.0</span>
+                    <span>v1.13.0</span>
                     <span class="dropdown-badge badge-accent">LATEST</span>
                   </div>
-                  <div class="dropdown-desc">Left &amp; Right Toolbox Menu + Fullscreen Comparison</div>
+                  <div class="dropdown-desc">Resilient Git Working Tree Clean &amp; Toast Guard</div>
                 </div>
               </a>
 
@@ -1437,8 +1437,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.11.0</div>
-                  <div class="dropdown-desc">Inward Mega Dropdown Alignment &amp; Viewport Clamping</div>
+                  <div class="dropdown-title">v1.12.0</div>
+                  <div class="dropdown-desc">Left &amp; Right Toolbox Menu + Fullscreen Comparison</div>
                 </div>
               </a>
 
@@ -1447,7 +1447,10 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.10.0</div>
+                  <div class="dropdown-title">v1.11.0</div>
+                  <div class="dropdown-desc">Inward Mega Dropdown Alignment &amp; Viewport Clamping</div>
+                </div>
+              </a>
                   <div class="dropdown-desc">Bigin Dropdown Navigation, Microcopy &amp; UI/UX</div>
                 </div>
               </a>
@@ -4999,7 +5002,16 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
         <p class="page-subtitle">Complete version release history for ProGit adhering to Semantic Versioning.</p>
 
                                 <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
-          <h2 style="margin-top: 0; color: var(--accent);">v1.12.0 &mdash; Left &amp; Right Toolbox Menu &amp; Fullscreen Comparison <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <h2 style="margin-top: 0; color: var(--accent);">v1.13.0 &mdash; Resilient Git Clean Working Tree Handling &amp; Toast Guard <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <p><strong>Release Date:</strong> November 17, 2026</p>
+          <ul>
+            <li><strong>Resilient Git Clean Working Tree Handling</strong>: Added direct error interception for <code>nothing to commit</code> and <code>working tree clean</code> across <code>SaveWikiPage</code>, <code>SaveFile</code>, <code>DeleteFile</code>, and <code>UploadFiles</code>, ensuring unchanged edits or repeated submissions gracefully succeed as idempotent no-ops instead of failing with <code>exit status 1</code>.</li>
+            <li><strong>Toast Notification Spam Prevention &amp; Viewport Guard</strong>: Automatic message deduplication prevents duplicate toast banners from stacking when buttons are clicked multiple times, and active toasts are capped to at most 3 to prevent obstruction of forms and controls.</li>
+          </ul>
+        </div>
+
+                                <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0;">v1.12.0 &mdash; Left &amp; Right Toolbox Menu &amp; Fullscreen Comparison</h2>
           <p><strong>Release Date:</strong> November 17, 2026</p>
           <ul>
             <li><strong>Left-and-Right Toolbox Architecture</strong>: Replaced stacked top-and-bottom layout with a persistent left navigation sidebar menu and right-side interactive tool workspace.</li>
