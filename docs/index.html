@@ -97,7 +97,7 @@
           "priceCurrency": "USD"
         },
         "description": "A high-performance, single-binary self-hosted Git service and alternative to GitHub, Gogs, Gitea, and GitLab. Built with pure Go and embedded React 19 UI.",
-        "softwareVersion": "1.10.0",
+        "softwareVersion": "1.11.0",
         "license": "https://opensource.org/licenses/MIT",
         "url": "https://progit.co.in/"
       },
@@ -348,11 +348,14 @@
       opacity: 1;
     }
 
-    /* Dropdown Panel */
+    /* Dropdown Panel - Right-aligned inward by default to stay inside the page */
     .dropdown-panel {
       position: absolute;
       top: calc(100% + 8px);
-      left: 0;
+      right: 0;
+      left: auto;
+      max-width: calc(100vw - 32px);
+      box-sizing: border-box;
       background: var(--bg);
       border: 1px solid var(--border);
       border-radius: 12px;
@@ -398,13 +401,15 @@
       right: 0;
     }
 
-    /* Multi-column grid container */
+    /* Multi-column grid container - Contained and responsive */
     .dropdown-grid-2col {
       display: grid;
-      grid-template-columns: repeat(2, minmax(260px, 1fr));
+      grid-template-columns: repeat(2, minmax(230px, 1fr));
       gap: 6px;
       padding: 12px;
-      width: 560px;
+      width: 520px;
+      max-width: 100%;
+      box-sizing: border-box;
     }
 
     .dropdown-grid-releases {
@@ -412,7 +417,9 @@
       grid-template-columns: 1fr;
       gap: 6px;
       padding: 12px;
-      width: 380px;
+      width: 360px;
+      max-width: 100%;
+      box-sizing: border-box;
     }
 
     /* Individual dropdown destination card */
@@ -1115,7 +1122,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
         </div>
         <span class="brand-title">ProGit</span>
-        <span class="version-pill">v1.10.0</span>
+        <span class="version-pill">v1.11.0</span>
       </a>
     </div>
 
@@ -1381,10 +1388,10 @@
                 </div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">
-                    <span>v1.10.0</span>
+                    <span>v1.11.0</span>
                     <span class="dropdown-badge badge-accent">LATEST</span>
                   </div>
-                  <div class="dropdown-desc">Bigin Dropdown Navigation, Rich Microcopy &amp; UI/UX</div>
+                  <div class="dropdown-desc">Inward Mega Dropdown Alignment &amp; Viewport Clamping</div>
                 </div>
               </a>
 
@@ -1393,8 +1400,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.9.0</div>
-                  <div class="dropdown-desc">Resilient Wiki &amp; Clean Working Tree Handling</div>
+                  <div class="dropdown-title">v1.10.0</div>
+                  <div class="dropdown-desc">Bigin Dropdown Navigation, Microcopy &amp; UI/UX</div>
                 </div>
               </a>
 
@@ -1403,8 +1410,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.8.0</div>
-                  <div class="dropdown-desc">SQLite MMAP, Git Commit-Graph, Prometheus, &amp; Zero-Ops</div>
+                  <div class="dropdown-title">v1.9.0</div>
+                  <div class="dropdown-desc">Resilient Wiki &amp; Clean Working Tree Handling</div>
                 </div>
               </a>
 
@@ -1413,8 +1420,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.7.0</div>
-                  <div class="dropdown-desc">Global Repo Search &amp; Git Management Dashboard</div>
+                  <div class="dropdown-title">v1.8.0</div>
+                  <div class="dropdown-desc">SQLite MMAP, Git Commit-Graph, Prometheus, &amp; Zero-Ops</div>
                 </div>
               </a>
             </div>
@@ -4948,8 +4955,19 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
         <h1 class="page-title">Version Changelog &amp; Release History</h1>
         <p class="page-subtitle">Complete version release history for ProGit adhering to Semantic Versioning.</p>
 
-                <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
-          <h2 style="margin-top: 0; color: var(--accent);">v1.10.0 &mdash; Modern Bigin-Style Dropdown Mega Navigation &amp; UI/UX <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+                        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0; color: var(--accent);">v1.11.0 &mdash; Resilient Viewport Clamping &amp; Inward Mega Dropdown Alignment <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <p><strong>Release Date:</strong> November 17, 2026</p>
+          <ul>
+            <li><strong>Inward &amp; Right-Aligned Dropdown Positioning</strong>: Anchored all top-right dropdown panels inward (<code>right: 0; left: auto</code>), ensuring panels open smoothly toward the center of the page rather than crossing off the right edge.</li>
+            <li><strong>Dynamic Viewport Boundary Auto-Clamping (<code>alignDropdownPanel</code>)</strong>: Implemented real-time boundary inspection measuring panel geometry against window edges on hover, focus, and click. Any horizontal underflow or overflow is dynamically shifted with a 16px safety margin.</li>
+            <li><strong>Responsive Viewport Constraints</strong>: Enforced <code>max-width: calc(100vw - 32px)</code> and box-sizing constraints across all mega dropdown panels and grids to guarantee perfect display on small laptop screens and tablets.</li>
+            <li><strong>Window Resize Observer</strong>: Added active window resize listeners to maintain alignment and prevent clipping during dynamic browser resizing.</li>
+          </ul>
+        </div>
+
+<div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0;">v1.10.0 &mdash; Modern Bigin-Style Dropdown Mega Navigation &amp; UI/UX</h2>
           <p><strong>Release Date:</strong> November 17, 2026</p>
           <ul>
             <li><strong>Bigin-Style Dropdown Mega Navigation</strong>: Replaced crowded flat header links with 4 organized mega-dropdown categories: <strong>Features ▾</strong>, <strong>Deployment ▾</strong>, <strong>Resources ▾</strong>, and <strong>Releases ▾</strong> with 180&deg; rotating chevrons and hover bridges.</li>
@@ -5174,7 +5192,36 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
 
     // Navigation Handler
     
-    // Bigin-Style Dropdown Handlers
+    // Bigin-Style Dropdown Handlers with Dynamic Viewport Clamping
+    function alignDropdownPanel(dropdown) {
+      if (!dropdown) return;
+      const panel = dropdown.querySelector('.dropdown-panel');
+      if (!panel) return;
+
+      // Reset to default right-aligned style first to measure natural geometry
+      panel.style.right = '0px';
+      panel.style.left = 'auto';
+
+      const panelRect = panel.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const padding = 16; // 16px safety margin from viewport edges
+
+      // 1. Check if panel extends beyond the right edge of viewport
+      if (panelRect.right > viewportWidth - padding) {
+        const overflowRight = panelRect.right - (viewportWidth - padding);
+        panel.style.right = `${overflowRight}px`;
+      }
+
+      // 2. Check if panel extends beyond the left edge of viewport
+      const currentRect = panel.getBoundingClientRect();
+      if (currentRect.left < padding) {
+        const triggerRect = dropdown.getBoundingClientRect();
+        const newLeftOffset = padding - triggerRect.left;
+        panel.style.right = 'auto';
+        panel.style.left = `${newLeftOffset}px`;
+      }
+    }
+
     function toggleNavDropdown(event, id) {
       if (event) {
         event.preventDefault();
@@ -5187,6 +5234,7 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
       closeAllNavDropdowns();
       if (!wasOpen) {
         targetDropdown.classList.add("is-open");
+        alignDropdownPanel(targetDropdown);
         const btn = targetDropdown.querySelector(".dropdown-trigger");
         if (btn) btn.setAttribute("aria-expanded", "true");
       }
@@ -5212,6 +5260,26 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
       if (e.key === "Escape") {
         closeAllNavDropdowns();
       }
+    });
+
+    // Auto-align dropdowns on hover, focus, and window resize
+    document.addEventListener("DOMContentLoaded", function() {
+      document.querySelectorAll(".nav-dropdown").forEach(function(dd) {
+        dd.addEventListener("mouseenter", function() { alignDropdownPanel(dd); });
+        dd.addEventListener("focusin", function() { alignDropdownPanel(dd); });
+      });
+    });
+
+    // Handle immediate execution if DOM is already ready
+    if (document.readyState === "interactive" || document.readyState === "complete") {
+      document.querySelectorAll(".nav-dropdown").forEach(function(dd) {
+        dd.addEventListener("mouseenter", function() { alignDropdownPanel(dd); });
+        dd.addEventListener("focusin", function() { alignDropdownPanel(dd); });
+      });
+    }
+
+    window.addEventListener("resize", function() {
+      document.querySelectorAll(".nav-dropdown.is-open").forEach(alignDropdownPanel);
     });
 
     function navigate(pageId) {
