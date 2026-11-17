@@ -6,6 +6,6 @@ resources:
 
 commonLabels:
   app.kubernetes.io/name: progit
-  app.kubernetes.io/version: "1.11.0"
+  app.kubernetes.io/version: "1.12.0"
   app.kubernetes.io/part-of: progit-platform
 
