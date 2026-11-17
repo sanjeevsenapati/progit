@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROGIT_URL="${PROGIT_URL:-http://localhost:3000}"
+PROGIT_URL="${PROGIT_URL:-https://localhost:3443}"
+export GIT_SSL_NO_VERIFY=true
+curl() {
+  command curl -k "$@"
+}
 TEST_DIR=$(mktemp -d /tmp/progit-test-XXXXXX)
 trap 'rm -rf "${TEST_DIR}"' EXIT
 
@@ -56,7 +60,9 @@ echo "PASSED"
 
 # 5. Git CLI Clone over HTTP
 echo -n "[5/12] Executing live Git CLI clone over HTTP... "
-CLONE_URL="http://${ADMIN_USER}:${ADMIN_PASS}@localhost:3000/${ADMIN_USER}/${REPO_NAME}.git"
+SCHEME="${PROGIT_URL%%://*}"
+HOST_PORT="${PROGIT_URL#*://}"
+CLONE_URL="${SCHEME}://${ADMIN_USER}:${ADMIN_PASS}@${HOST_PORT}/${ADMIN_USER}/${REPO_NAME}.git"
 cd "${TEST_DIR}"
 git clone "${CLONE_URL}" "local_clone" >/dev/null 2>&1
 test -f "local_clone/README.md" || { echo "FAILED: README.md not found in clone"; exit 1; }
@@ -131,7 +137,7 @@ WIKI_SAVE_RES=$(curl -s -b "${TEST_DIR}/cookies.txt" -X POST "${PROGIT_URL}/api/
   -d '{"slug":"Architecture","title":"System Architecture","content":"# Architecture\n\nWiki content test","message":"Init wiki"}')
 echo "${WIKI_SAVE_RES}" | grep -q '"slug":"Architecture"' || { echo "FAILED: ${WIKI_SAVE_RES}"; exit 1; }
 
-WIKI_CLONE_URL="http://${ADMIN_USER}:${ADMIN_PASS}@localhost:3000/${ADMIN_USER}/${REPO_NAME}.wiki.git"
+WIKI_CLONE_URL="${SCHEME}://${ADMIN_USER}:${ADMIN_PASS}@${HOST_PORT}/${ADMIN_USER}/${REPO_NAME}.wiki.git"
 cd "${TEST_DIR}"
 git clone "${WIKI_CLONE_URL}" "wiki_clone" >/dev/null 2>&1
 test -f "wiki_clone/Architecture.md" || { echo "FAILED: Architecture.md not found in cloned wiki repo"; exit 1; }
