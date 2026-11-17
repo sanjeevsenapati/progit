@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.10.0] - 2026-11-17
+
+### Highlights: Modern Bigin-Style Dropdown Mega Navigation & Enhanced UI/UX
+This release introduces a top-header navigation redesign inspired by Zoho's Bigin (`www.bigin.com`), featuring rich multi-column dropdown mega menus, icon containers with semantic color tints, descriptive microcopy, bottom featured callout strips, responsive mobile drawer integration, and direct GitHub integration.
+
+### Added
+- **Bigin-Style Dropdown Mega Navigation**:
+  - Replaced cluttered flat header links with 4 organized mega-dropdown categories: **Features ▾**, **Deployment ▾**, **Resources ▾**, and **Releases ▾**.
+  - **Visual Icon Containers**: Integrated custom SVG icons with distinct semantic tints (Emerald for Core/Container, Blue for Git/K8s, Purple for Collaboration/Binary, Amber for Quickstart/Tools, Cyan for TLS/Docs, Rose for Zero-Ops/Solutions).
+  - **Descriptive Microcopy**: Added subheadings for every menu destination clarifying capabilities before clicking.
+  - **Bigin-Style Bottom Callout Strips**: Added full-width footer action strips to each dropdown directing users to comparisons, Kubernetes runbooks, masterclass decks, and full release history.
+  - **Interactive Animations**: Smooth elevation transitions, hover bridges preventing accidental menu closure, click-outside handling, and 180-degree rotating chevrons.
+- **Dedicated GitHub Header Button**: Added prominent GitHub octocat button with border transitions in the primary header controls.
+
+---
+
 ## [1.9.0] - 2026-11-15
 
 ### Highlights: Resilient Wiki & File Operations with Clean Working Tree Handling

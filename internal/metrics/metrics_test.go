@@ -9,7 +9,7 @@ import (
 )
 
 func TestMetricsTrackingAndExposition(t *testing.T) {
-	SetVersion("1.9.0")
+	SetVersion("1.10.0")
 	SetStatProvider(func() (int64, int64) {
 		return 42, 108
 	})
@@ -35,7 +35,7 @@ func TestMetricsTrackingAndExposition(t *testing.T) {
 	body := rr.Body.String()
 
 	expectedSubstrings := []string{
-		`progit_info{version="1.9.0"`,
+		`progit_info{version="1.10.0"`,
 		`progit_uptime_seconds`,
 		`progit_goroutines`,
 		`progit_http_requests_total`,
