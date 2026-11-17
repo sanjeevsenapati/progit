@@ -97,7 +97,7 @@
           "priceCurrency": "USD"
         },
         "description": "A high-performance, single-binary self-hosted Git service and alternative to GitHub, Gogs, Gitea, and GitLab. Built with pure Go and embedded React 19 UI.",
-        "softwareVersion": "1.11.0",
+        "softwareVersion": "1.12.0",
         "license": "https://opensource.org/licenses/MIT",
         "url": "https://progit.co.in/"
       },
@@ -853,6 +853,43 @@
     }
 
     /* Parameter Tables */
+    
+    /* Comparison Matrix Fullscreen / Expand option */
+    .expand-table-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--accent-soft);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .expand-table-btn:hover {
+      background: var(--accent);
+      color: white;
+    }
+    .table-container.fullscreen-comparison {
+      position: fixed !important;
+      inset: 0 !important;
+      z-index: 99999 !important;
+      background: var(--bg) !important;
+      padding: 32px 24px !important;
+      margin: 0 !important;
+      border-radius: 0 !important;
+      border: none !important;
+      overflow: auto !important;
+      box-shadow: none !important;
+    }
+    .table-container.fullscreen-comparison table {
+      width: 100% !important;
+      min-width: 900px;
+    }
+
     .table-container {
       overflow-x: auto;
       margin-bottom: 24px;
@@ -1122,7 +1159,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
         </div>
         <span class="brand-title">ProGit</span>
-        <span class="version-pill">v1.11.0</span>
+        <span class="version-pill">v1.12.0</span>
       </a>
     </div>
 
@@ -1388,10 +1425,10 @@
                 </div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">
-                    <span>v1.11.0</span>
+                    <span>v1.12.0</span>
                     <span class="dropdown-badge badge-accent">LATEST</span>
                   </div>
-                  <div class="dropdown-desc">Inward Mega Dropdown Alignment &amp; Viewport Clamping</div>
+                  <div class="dropdown-desc">Left &amp; Right Toolbox Menu + Fullscreen Comparison</div>
                 </div>
               </a>
 
@@ -1400,8 +1437,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.10.0</div>
-                  <div class="dropdown-desc">Bigin Dropdown Navigation, Microcopy &amp; UI/UX</div>
+                  <div class="dropdown-title">v1.11.0</div>
+                  <div class="dropdown-desc">Inward Mega Dropdown Alignment &amp; Viewport Clamping</div>
                 </div>
               </a>
 
@@ -1410,8 +1447,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.9.0</div>
-                  <div class="dropdown-desc">Resilient Wiki &amp; Clean Working Tree Handling</div>
+                  <div class="dropdown-title">v1.10.0</div>
+                  <div class="dropdown-desc">Bigin Dropdown Navigation, Microcopy &amp; UI/UX</div>
                 </div>
               </a>
 
@@ -1420,8 +1457,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.8.0</div>
-                  <div class="dropdown-desc">SQLite MMAP, Git Commit-Graph, Prometheus, &amp; Zero-Ops</div>
+                  <div class="dropdown-title">v1.9.0</div>
+                  <div class="dropdown-desc">Resilient Wiki &amp; Clean Working Tree Handling</div>
                 </div>
               </a>
             </div>
@@ -1635,7 +1672,13 @@
 
         <p>ProGit was engineered to solve the primary drawbacks of existing Git services: eliminating massive RAM footprints, removing complex CGO and external database dependencies, modernizing the web UI with React 19, and providing turnkey containerization with Docker and Podman.</p>
 
-        <h2>Technical Comparison Matrix</h2>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 2rem; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 8px;">
+          <h2 style="margin: 0;">Technical Comparison Matrix</h2>
+          <button type="button" class="expand-table-btn" onclick="toggleComparisonFullscreen()" title="Expand Comparison Matrix Fullscreen">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+            <span id="expand-btn-text">Expand Fullscreen</span>
+          </button>
+        </div>
         <div class="table-container">
           <table>
             <thead>
@@ -4955,8 +4998,18 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
         <h1 class="page-title">Version Changelog &amp; Release History</h1>
         <p class="page-subtitle">Complete version release history for ProGit adhering to Semantic Versioning.</p>
 
-                        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
-          <h2 style="margin-top: 0; color: var(--accent);">v1.11.0 &mdash; Resilient Viewport Clamping &amp; Inward Mega Dropdown Alignment <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+                                <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0; color: var(--accent);">v1.12.0 &mdash; Left &amp; Right Toolbox Menu &amp; Fullscreen Comparison <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <p><strong>Release Date:</strong> November 17, 2026</p>
+          <ul>
+            <li><strong>Left-and-Right Toolbox Architecture</strong>: Replaced stacked top-and-bottom layout with a persistent left navigation sidebar menu and right-side interactive tool workspace.</li>
+            <li><strong>Universal Fullscreen Comparison</strong>: Added full-screen and expand option across all comparison views, including Toolbox Text Diff (<code>/toolbox/diff</code>), Git Branch Compare (<code>/:owner/:repo/compare</code>), Pull Request Reviews, and documentation matrices.</li>
+            <li><strong>Interactive Escape &amp; Resize Handlers</strong>: Complete keyboard accessibility with Escape key dismissal and window resize observers across all expanded comparison modes.</li>
+          </ul>
+        </div>
+
+<div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0;">v1.11.0 &mdash; Resilient Viewport Clamping &amp; Inward Mega Dropdown Alignment</h2>
           <p><strong>Release Date:</strong> November 17, 2026</p>
           <ul>
             <li><strong>Inward &amp; Right-Aligned Dropdown Positioning</strong>: Anchored all top-right dropdown panels inward (<code>right: 0; left: auto</code>), ensuring panels open smoothly toward the center of the page rather than crossing off the right edge.</li>
@@ -5221,6 +5274,32 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
         panel.style.left = `${newLeftOffset}px`;
       }
     }
+
+    
+    // Comparison Table Fullscreen Handler
+    function toggleComparisonFullscreen() {
+      const tc = document.querySelector('#page-git-comparison .table-container');
+      const btnText = document.getElementById('expand-btn-text');
+      if (!tc) return;
+
+      const isFs = tc.classList.toggle('fullscreen-comparison');
+      if (btnText) {
+        btnText.textContent = isFs ? 'Exit Fullscreen (Esc)' : 'Expand Fullscreen';
+      }
+      document.body.style.overflow = isFs ? 'hidden' : '';
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        const tc = document.querySelector('#page-git-comparison .table-container.fullscreen-comparison');
+        if (tc) {
+          tc.classList.remove('fullscreen-comparison');
+          const btnText = document.getElementById('expand-btn-text');
+          if (btnText) btnText.textContent = 'Expand Fullscreen';
+          document.body.style.overflow = '';
+        }
+      }
+    });
 
     function toggleNavDropdown(event, id) {
       if (event) {

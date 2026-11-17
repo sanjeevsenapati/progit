@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { ArrowLeftRight, Sparkles, Trash2 } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { ArrowLeftRight, Sparkles, Trash2, Maximize2, Minimize2 } from 'lucide-react';
 import { computeLineDiff } from '../lib/diff';
 
 const SAMPLE_LEFT = `server:
@@ -22,6 +22,25 @@ export const DiffTool: React.FC = () => {
   const [rightText, setRightText] = useState(SAMPLE_RIGHT);
   const [viewMode, setViewMode] = useState<'unified' | 'split'>('split');
   const [ignoreWhitespace, setIgnoreWhitespace] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    if (isFullscreen) {
+      document.body.style.overflow = 'hidden';
+      window.addEventListener('keydown', handleKeyDown);
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isFullscreen]);
 
   const diff = useMemo(
     () => computeLineDiff(leftText, rightText, { ignoreWhitespace }),
@@ -34,7 +53,13 @@ export const DiffTool: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4">
+    <div
+      className={
+        isFullscreen
+          ? 'fixed inset-0 z-50 bg-white dark:bg-dark-bg p-4 sm:p-6 overflow-y-auto space-y-4 shadow-2xl'
+          : 'space-y-4'
+      }
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3 text-xs">
           <div className="inline-flex rounded-lg border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg p-0.5">
@@ -46,7 +71,7 @@ export const DiffTool: React.FC = () => {
                 key={opt.id}
                 type="button"
                 onClick={() => setViewMode(opt.id)}
-                className={`px-2.5 py-1.5 rounded-md font-bold cursor-pointer ${
+                className={`px-2.5 py-1.5 rounded-md font-bold cursor-pointer transition-colors ${
                   viewMode === opt.id
                     ? 'bg-emerald-600 text-white'
                     : 'text-gray-600 dark:text-dark-muted hover:text-gray-900 dark:hover:text-white'
@@ -57,12 +82,12 @@ export const DiffTool: React.FC = () => {
             ))}
           </div>
 
-          <label className="flex items-center space-x-1.5 cursor-pointer text-gray-700 dark:text-dark-text font-medium">
+          <label className="flex items-center space-x-1.5 cursor-pointer text-gray-700 dark:text-dark-text font-medium select-none">
             <input
               type="checkbox"
               checked={ignoreWhitespace}
               onChange={e => setIgnoreWhitespace(e.target.checked)}
-              className="accent-emerald-600"
+              className="accent-emerald-600 rounded"
             />
             <span>Ignore whitespace</span>
           </label>
@@ -78,7 +103,8 @@ export const DiffTool: React.FC = () => {
           <button
             type="button"
             onClick={handleSwap}
-            className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-hover cursor-pointer"
+            title="Swap left and right"
+            className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-hover cursor-pointer transition-colors"
           >
             <ArrowLeftRight className="w-3.5 h-3.5" />
             <span>Swap</span>
@@ -89,7 +115,8 @@ export const DiffTool: React.FC = () => {
               setLeftText(SAMPLE_LEFT);
               setRightText(SAMPLE_RIGHT);
             }}
-            className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-hover cursor-pointer"
+            title="Load sample content"
+            className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-hover cursor-pointer transition-colors"
           >
             <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
             <span>Sample</span>
@@ -100,35 +127,66 @@ export const DiffTool: React.FC = () => {
               setLeftText('');
               setRightText('');
             }}
-            className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-600 dark:text-dark-muted hover:text-gray-900 dark:hover:text-white cursor-pointer"
+            title="Clear all text"
+            className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-600 dark:text-dark-muted hover:text-gray-900 dark:hover:text-white cursor-pointer transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Clear</span>
+          </button>
+
+          {/* Full Screen / Expand Option */}
+          <button
+            type="button"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            title={isFullscreen ? 'Exit Full Screen (Esc)' : 'Expand Comparison to Full Screen'}
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-emerald-300 dark:border-emerald-700/60 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/70 dark:hover:bg-emerald-900/30 cursor-pointer transition-colors"
+          >
+            {isFullscreen ? (
+              <>
+                <Minimize2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>Exit Fullscreen</span>
+              </>
+            ) : (
+              <>
+                <Maximize2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>Fullscreen</span>
+              </>
+            )}
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div className="space-y-1">
-          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-dark-muted">Original</label>
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-dark-muted">
+              Original Text (Left)
+            </label>
+            <span className="text-[11px] font-mono text-gray-400">{leftText.split('\n').length} lines</span>
+          </div>
           <textarea
             value={leftText}
             onChange={e => setLeftText(e.target.value)}
-            rows={8}
+            rows={isFullscreen ? 10 : 7}
             spellCheck={false}
             placeholder="Paste original text..."
-            className="w-full p-3 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg font-mono text-xs text-gray-900 dark:text-white focus:outline-none focus:border-emerald-500"
+            className="w-full p-3 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg font-mono text-xs text-gray-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-colors"
           />
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-dark-muted">Modified</label>
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-dark-muted">
+              Modified Text (Right)
+            </label>
+            <span className="text-[11px] font-mono text-gray-400">{rightText.split('\n').length} lines</span>
+          </div>
           <textarea
             value={rightText}
             onChange={e => setRightText(e.target.value)}
-            rows={8}
+            rows={isFullscreen ? 10 : 7}
             spellCheck={false}
             placeholder="Paste modified text..."
-            className="w-full p-3 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg font-mono text-xs text-gray-900 dark:text-white focus:outline-none focus:border-emerald-500"
+            className="w-full p-3 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg font-mono text-xs text-gray-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-colors"
           />
         </div>
       </div>
@@ -140,7 +198,7 @@ export const DiffTool: React.FC = () => {
       )}
 
       {/* Diff Output */}
-      <div className="rounded-xl border border-gray-200 dark:border-dark-border overflow-x-auto bg-white dark:bg-dark-bg font-mono text-xs">
+      <div className="rounded-xl border border-gray-200 dark:border-dark-border overflow-x-auto bg-white dark:bg-dark-bg font-mono text-xs shadow-xs">
         {viewMode === 'unified' ? (
           <div className="divide-y divide-gray-100/60 dark:divide-dark-border/40">
             {diff.lines.map((line, i) => (
@@ -201,4 +259,3 @@ export const DiffTool: React.FC = () => {
 };
 
 export default DiffTool;
-

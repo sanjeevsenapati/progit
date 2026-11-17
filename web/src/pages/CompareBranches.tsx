@@ -3,7 +3,7 @@ import { api, Repository, RepoResponse, Commit, FileDiff } from '../lib/api';
 import { navigate } from '../lib/router';
 import { RepoNav } from '../components/RepoNav';
 import { showToast } from '../components/ModalDialog';
-import { GitPullRequest, ArrowRight, GitCommit, FileText, CheckCircle2, AlertTriangle, Ban } from 'lucide-react';
+import { GitPullRequest, ArrowRight, GitCommit, FileText, CheckCircle2, AlertTriangle, Ban, Maximize2, Minimize2 } from 'lucide-react';
 
 interface CompareBranchesProps {
   owner: string;
@@ -24,6 +24,27 @@ export const CompareBranches: React.FC<CompareBranchesProps> = ({ owner, repo: r
   const [content, setContent] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isDiffFullscreen, setIsDiffFullscreen] = useState(false);
+  const [maximizedFileIdx, setMaximizedFileIdx] = useState<number | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (maximizedFileIdx !== null) setMaximizedFileIdx(null);
+        else if (isDiffFullscreen) setIsDiffFullscreen(false);
+      }
+    };
+    if (isDiffFullscreen || maximizedFileIdx !== null) {
+      document.body.style.overflow = 'hidden';
+      window.addEventListener('keydown', handleKeyDown);
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isDiffFullscreen, maximizedFileIdx]);
 
   useEffect(() => {
     async function load() {
@@ -239,29 +260,75 @@ export const CompareBranches: React.FC<CompareBranchesProps> = ({ owner, repo: r
 
         {/* Diff preview */}
         {files.length > 0 && (
-          <div className="space-y-4">
-            <h3 className="font-bold text-sm text-gray-900 dark:text-white">Files Changed ({files.length})</h3>
-            {files.map((file, idx) => (
-              <div key={idx} className="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm overflow-hidden">
-                <div className="px-4 py-2 bg-gray-50 dark:bg-dark-hover/40 border-b border-gray-200 dark:border-dark-border flex items-center justify-between text-xs font-mono">
-                  <span className="font-bold text-gray-900 dark:text-white flex items-center space-x-2">
-                    <FileText className="w-4 h-4 text-gray-400" />
-                    <span>{file.new_path || file.old_path}</span>
+          <div className={isDiffFullscreen ? "fixed inset-0 z-50 bg-white dark:bg-dark-bg p-6 overflow-y-auto space-y-4 shadow-2xl" : "space-y-4"}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-sm text-gray-900 dark:text-white flex items-center gap-2">
+                <span>Files Changed ({files.length})</span>
+                {isDiffFullscreen && (
+                  <span className="text-xs px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-normal">
+                    Fullscreen Mode (Press Esc to exit)
                   </span>
-                  <span className="text-gray-400">+{file.additions} -{file.deletions}</span>
+                )}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsDiffFullscreen(!isDiffFullscreen)}
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-xs font-semibold text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-hover transition-colors cursor-pointer"
+              >
+                {isDiffFullscreen ? (
+                  <>
+                    <Minimize2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>Exit Fullscreen</span>
+                  </>
+                ) : (
+                  <>
+                    <Maximize2 className="w-3.5 h-3.5" />
+                    <span>Expand Fullscreen</span>
+                  </>
+                )}
+              </button>
+            </div>
+            {files.map((file, idx) => {
+              const isFileMax = maximizedFileIdx === idx;
+              return (
+                <div
+                  key={idx}
+                  className={
+                    isFileMax
+                      ? "fixed inset-0 z-50 bg-white dark:bg-dark-bg p-6 overflow-y-auto flex flex-col space-y-3"
+                      : "rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm overflow-hidden"
+                  }
+                >
+                  <div className="px-4 py-2 bg-gray-50 dark:bg-dark-hover/40 border-b border-gray-200 dark:border-dark-border flex items-center justify-between text-xs font-mono">
+                    <span className="font-bold text-gray-900 dark:text-white flex items-center space-x-2">
+                      <FileText className="w-4 h-4 text-gray-400" />
+                      <span>{file.new_path || file.old_path}</span>
+                    </span>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-gray-400">+{file.additions} -{file.deletions}</span>
+                      <button
+                        type="button"
+                        onClick={() => setMaximizedFileIdx(isFileMax ? null : idx)}
+                        title={isFileMax ? "Exit Fullscreen (Esc)" : "Expand file diff to Fullscreen"}
+                        className="p-1 rounded hover:bg-gray-200 dark:hover:bg-dark-border text-gray-500 hover:text-gray-900 dark:hover:text-white cursor-pointer"
+                      >
+                        {isFileMax ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className={`p-4 overflow-x-auto text-xs font-mono leading-relaxed bg-gray-950 text-gray-100 ${isFileMax ? "flex-1" : ""}`}>
+                    <pre className="whitespace-pre">
+                      {file.patch.split('\n').map((line, lIdx) => {
+                        let color = 'text-gray-400';
+                        if (line.startsWith('+') && !line.startsWith('+++')) color = 'text-emerald-400';
+                        else if (line.startsWith('-') && !line.startsWith('---')) color = 'text-red-400';
+                        return <div key={lIdx} className={color}>{line}</div>;
+                      })}
+                    </pre>
+                  </div>
                 </div>
-                <div className="p-4 overflow-x-auto text-xs font-mono leading-relaxed bg-gray-950 text-gray-100">
-                  <pre className="whitespace-pre">
-                    {file.patch.split('\n').map((line, lIdx) => {
-                      let color = 'text-gray-400';
-                      if (line.startsWith('+') && !line.startsWith('+++')) color = 'text-emerald-400';
-                      else if (line.startsWith('-') && !line.startsWith('---')) color = 'text-red-400';
-                      return <div key={lIdx} className={color}>{line}</div>;
-                    })}
-                  </pre>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

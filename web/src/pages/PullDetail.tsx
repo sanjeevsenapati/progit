@@ -20,7 +20,9 @@ import {
   Trash2,
   Columns,
   Split,
-  Ban
+  Ban,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { detectLanguage, highlightCode } from '../lib/codeEditor';
 
@@ -149,8 +151,27 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
 
   // Split vs Unified diff mode & post-merge branch deletion
   const [diffViewMode, setDiffViewMode] = useState<'unified' | 'split'>('unified');
+  const [isDiffFullscreen, setIsDiffFullscreen] = useState(false);
   const [deletingBranch, setDeletingBranch] = useState(false);
   const [branchDeleted, setBranchDeleted] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isDiffFullscreen) {
+        setIsDiffFullscreen(false);
+      }
+    };
+    if (isDiffFullscreen) {
+      document.body.style.overflow = 'hidden';
+      window.addEventListener('keydown', handleKeyDown);
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isDiffFullscreen]);
 
   // Inline commenting state
   const [activeInlineComment, setActiveInlineComment] = useState<{ file: string; line: number } | null>(null);
@@ -648,17 +669,41 @@ export const PullDetail: React.FC<PullDetailProps> = ({ owner, repo: repoName, i
           </div>
         ) : (
           /* Files Changed / Diff View with Review Panel */
-          <div className="space-y-6">
+          <div className={isDiffFullscreen ? "fixed inset-0 z-50 bg-white dark:bg-dark-bg p-6 overflow-y-auto space-y-6 shadow-2xl" : "space-y-6"}>
             {/* Top Review Bar */}
             <div className="flex items-center justify-between p-3.5 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl shadow-sm">
-              <div className="text-xs text-gray-600 dark:text-dark-muted font-medium">
-                Showing <strong className="text-gray-900 dark:text-white">{files.length} changed file{files.length === 1 ? '' : 's'}</strong> with{' '}
+              <div className="text-xs text-gray-600 dark:text-dark-muted font-medium flex items-center gap-2">
+                <span>Showing <strong className="text-gray-900 dark:text-white">{files.length} changed file{files.length === 1 ? '' : 's'}</strong> with{' '}
                 <strong className="text-emerald-600">+{totalAdditions}</strong> and{' '}
-                <strong className="text-red-500">-{totalDeletions}</strong> lines
+                <strong className="text-red-500">-{totalDeletions}</strong> lines</span>
+                {isDiffFullscreen && (
+                  <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-semibold">
+                    Fullscreen (Esc)
+                  </span>
+                )}
               </div>
 
-              {/* Review Changes Button & Popover + Split/Unified Toggle */}
+              {/* Review Changes Button & Popover + Split/Unified Toggle + Fullscreen */}
               <div className="flex items-center space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsDiffFullscreen(!isDiffFullscreen)}
+                  title={isDiffFullscreen ? "Exit Fullscreen (Esc)" : "Expand Diffs to Fullscreen"}
+                  className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-xs font-semibold text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-hover transition-colors cursor-pointer"
+                >
+                  {isDiffFullscreen ? (
+                    <>
+                      <Minimize2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>Exit Fullscreen</span>
+                    </>
+                  ) : (
+                    <>
+                      <Maximize2 className="w-3.5 h-3.5" />
+                      <span>Fullscreen</span>
+                    </>
+                  )}
+                </button>
+
                 <div className="flex items-center space-x-1 p-0.5 rounded-lg border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg text-xs">
                   <button
                     type="button"

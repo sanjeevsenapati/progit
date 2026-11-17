@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.12.0] - 2026-11-17
+
+### Highlights: Left-and-Right Toolbox Layout & Fullscreen / Expand Comparison
+This release transforms the Developer Toolbox (`/toolbox`) into an intuitive two-column side-by-side architecture with persistent left navigation and right workspace. Additionally, all comparison views across the platform (Text Diff, Git Branch Compare, PR Review, and Docs Comparison Matrix) now feature full-screen expand modes.
+
+### Added
+- **Left-and-Right Toolbox Navigation**:
+  - Replaced stacked top-and-bottom categories with a sticky left sidebar menu housing quick search (⌘K), category quick-filters, active utility indicator, favorites, and recently used shortcuts.
+  - Right-side workspace dynamically hosts the selected tool component with full-width controls or the hub overview dashboard.
+- **Universal Fullscreen & Expand Option for All Comparisons**:
+  - **Toolbox Diff Tool (`/toolbox/diff`)**: Added full-screen comparison toggle (`Maximize2` / `Minimize2`) with multi-line side-by-side and unified expansion and Escape key dismissal.
+  - **Branch Comparison (`/:owner/:repo/compare`)**: Added whole-comparison and per-file diff fullscreen maximize buttons with dedicated Escape key listeners and syntax-highlighted expansion.
+  - **Pull Request Review (`/:owner/:repo/pulls/:index`)**: Added full-screen diff review toggle in the PR review bar for immersive code audits.
+  - **Technical Comparison Matrix**: Added an interactive "Expand Fullscreen" button with dedicated modal overlay on the Git Services Comparison matrix table in documentation.
+
+---
+
 ## [1.11.0] - 2026-11-17
 
 ### Highlights: Resilient Viewport Clamping & Inward Alignment for Mega Dropdowns
