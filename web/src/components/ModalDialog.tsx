@@ -146,13 +146,25 @@ export const GlobalDialogProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
 
     const handleCustomToast = (e: any) => {
+      const msg = e.detail?.message || '';
+      const toastType = e.detail?.type || 'success';
       const id = Math.random().toString(36).substring(2, 9);
       const newToast: ToastItem = {
         id,
-        type: e.detail.type || 'success',
-        message: e.detail.message || '',
+        type: toastType,
+        message: msg,
       };
-      setToasts((prev) => [...prev, newToast]);
+
+      setToasts((prev) => {
+        // Prevent duplicate toast spam if an identical toast message is already displayed
+        if (prev.some((t) => t.message === msg && t.type === toastType)) {
+          return prev;
+        }
+        // Limit max simultaneous toasts to 3 so they do not stack and hide the UI
+        const pruned = prev.length >= 3 ? prev.slice(prev.length - 2) : prev;
+        return [...pruned, newToast];
+      });
+
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
       }, 4000);

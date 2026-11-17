@@ -1183,6 +1183,10 @@ func SaveWikiPage(wikiRepoPath, repoName, slug, title, content, authorName, auth
 
 	commitArgs := append(gitConfigArgs, "commit", "-m", message, "--author="+authorStr)
 	if _, err := RunGit(tempDir, commitArgs...); err != nil {
+		errLower := strings.ToLower(err.Error())
+		if strings.Contains(errLower, "nothing to commit") || strings.Contains(errLower, "working tree clean") {
+			return nil
+		}
 		return fmt.Errorf("commit wiki page failed: %w", err)
 	}
 
@@ -1364,6 +1368,11 @@ func SaveFile(repoPath, branch, filePath, content, authorName, authorEmail, mess
 
 	commitArgs := append(gitConfigArgs, "commit", "-m", message, "--author="+authorStr)
 	if _, err := RunGit(tempDir, commitArgs...); err != nil {
+		errLower := strings.ToLower(err.Error())
+		if strings.Contains(errLower, "nothing to commit") || strings.Contains(errLower, "working tree clean") {
+			headSha, _ := RunGit(tempDir, "rev-parse", "HEAD")
+			return strings.TrimSpace(string(headSha)), targetBranch, nil
+		}
 		return "", "", fmt.Errorf("git commit failed: %w", err)
 	}
 
@@ -1447,6 +1456,11 @@ func DeleteFile(repoPath, branch, filePath, authorName, authorEmail, message, ne
 
 	commitArgs := append(gitConfigArgs, "commit", "-m", message, "--author="+authorStr)
 	if _, err := RunGit(tempDir, commitArgs...); err != nil {
+		errLower := strings.ToLower(err.Error())
+		if strings.Contains(errLower, "nothing to commit") || strings.Contains(errLower, "working tree clean") {
+			headSha, _ := RunGit(tempDir, "rev-parse", "HEAD")
+			return strings.TrimSpace(string(headSha)), targetBranch, nil
+		}
 		return "", "", fmt.Errorf("git commit failed: %w", err)
 	}
 
@@ -1564,6 +1578,11 @@ func UploadFiles(repoPath, branch, baseSubPath string, files []UploadedFile, aut
 
 	commitArgs := append(gitConfigArgs, "commit", "-m", message, "--author="+authorStr)
 	if _, err := RunGit(tempDir, commitArgs...); err != nil {
+		errLower := strings.ToLower(err.Error())
+		if strings.Contains(errLower, "nothing to commit") || strings.Contains(errLower, "working tree clean") {
+			headSha, _ := RunGit(tempDir, "rev-parse", "HEAD")
+			return strings.TrimSpace(string(headSha)), targetBranch, nil
+		}
 		return "", "", fmt.Errorf("git commit failed: %w", err)
 	}
 
