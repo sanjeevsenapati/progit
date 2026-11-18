@@ -33,8 +33,18 @@ export const Login: React.FC = () => {
       setError('Your user account has been suspended by an administrator.');
     } else if (errCode === 'oidc_disabled') {
       setError('OpenID Connect (OIDC) SSO is currently disabled on this server.');
+    } else if (errCode === 'oidc_config_error') {
+      setError('OIDC provider endpoints are incomplete. Ask your administrator to check SSO / OIDC settings.');
+    } else if (errCode === 'oidc_denied') {
+      setError('Sign-in was cancelled or denied by the identity provider.');
+    } else if (errCode === 'exchange_failed') {
+      setError('Failed to verify OIDC token with the identity provider. Please verify Client Secret and Redirect URI.');
+    } else if (errCode === 'user_not_provisioned') {
+      setError('No matching ProGit account exists and automatic OIDC provisioning is disabled.');
     } else if (errCode === 'provision_failed') {
       setError('Failed to auto-provision account from OIDC identity provider.');
+    } else if (errCode === 'missing_code' || errCode === 'session_failed') {
+      setError('OIDC sign-in could not be completed. Please try again.');
     }
 
     // Fetch enabled auth providers

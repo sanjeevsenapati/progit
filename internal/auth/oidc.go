@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -112,48 +113,87 @@ func InitOIDC(cfg config.OIDCConfig) error {
 	}
 
 	// Dynamic Discovery via /.well-known/openid-configuration if IssuerURL is supplied
-	if cfg.IssuerURL != "" && (globalOIDC.authURL == "" || globalOIDC.tokenURL == "") {
+	if cfg.IssuerURL != "" && (globalOIDC.authURL == "" || globalOIDC.tokenURL == "" || globalOIDC.userInfoURL == "") {
 		_ = discoverEndpoints(cfg.IssuerURL)
 	}
 
 	return nil
 }
 
-// discoverEndpoints queries the provider's discovery endpoint.
-func discoverEndpoints(issuerURL string) error {
-	wellKnownURL := strings.TrimRight(issuerURL, "/") + "/.well-known/openid-configuration"
-	client := &http.Client{Timeout: 5 * time.Second}
+// OIDCDiscoveryResult represents endpoints parsed from /.well-known/openid-configuration.
+type OIDCDiscoveryResult struct {
+	Issuer                string   `json:"issuer"`
+	AuthorizationEndpoint string   `json:"authorization_endpoint"`
+	TokenEndpoint         string   `json:"token_endpoint"`
+	UserinfoEndpoint      string   `json:"userinfo_endpoint"`
+	JwksURI               string   `json:"jwks_uri,omitempty"`
+	ScopesSupported       []string `json:"scopes_supported,omitempty"`
+}
+
+// DiscoverOIDC fetches and parses the OIDC well-known discovery document for a given Issuer URL.
+func DiscoverOIDC(issuerURL string) (*OIDCDiscoveryResult, error) {
+	trimmed := strings.TrimSpace(issuerURL)
+	if trimmed == "" {
+		return nil, errors.New("issuer URL is required")
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return nil, errors.New("issuer URL must be a valid http:// or https:// URL")
+	}
+
+	wellKnownURL := strings.TrimRight(trimmed, "/")
+	if !strings.HasSuffix(wellKnownURL, "/.well-known/openid-configuration") {
+		wellKnownURL += "/.well-known/openid-configuration"
+	}
+
+	client := &http.Client{Timeout: 8 * time.Second}
 	resp, err := client.Get(wellKnownURL)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to reach discovery URL (%s): %w", wellKnownURL, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("discovery endpoint returned %d", resp.StatusCode)
+		return nil, fmt.Errorf("discovery endpoint returned HTTP %d", resp.StatusCode)
 	}
 
-	var doc struct {
-		AuthorizationEndpoint string `json:"authorization_endpoint"`
-		TokenEndpoint         string `json:"token_endpoint"`
-		UserinfoEndpoint      string `json:"userinfo_endpoint"`
-	}
-
+	var doc OIDCDiscoveryResult
 	if err := json.NewDecoder(resp.Body).Decode(&doc); err != nil {
+		return nil, fmt.Errorf("invalid OIDC discovery JSON: %w", err)
+	}
+
+	if doc.AuthorizationEndpoint == "" || doc.TokenEndpoint == "" {
+		return nil, errors.New("discovery document missing required authorization_endpoint or token_endpoint")
+	}
+
+	return &doc, nil
+}
+
+// discoverEndpoints queries the provider's discovery endpoint and populates globalOIDC.
+func discoverEndpoints(issuerURL string) error {
+	doc, err := DiscoverOIDC(issuerURL)
+	if err != nil {
 		return err
 	}
 
-	if doc.AuthorizationEndpoint != "" {
+	if globalOIDC.authURL == "" && doc.AuthorizationEndpoint != "" {
 		globalOIDC.authURL = doc.AuthorizationEndpoint
 	}
-	if doc.TokenEndpoint != "" {
+	if globalOIDC.tokenURL == "" && doc.TokenEndpoint != "" {
 		globalOIDC.tokenURL = doc.TokenEndpoint
 	}
-	if doc.UserinfoEndpoint != "" {
+	if globalOIDC.userInfoURL == "" && doc.UserinfoEndpoint != "" {
 		globalOIDC.userInfoURL = doc.UserinfoEndpoint
 	}
 	globalOIDC.discovered = true
 	return nil
+}
+
+// GetOIDCEndpoints returns the resolved authorization, token, and userinfo URLs currently active.
+func GetOIDCEndpoints() (discovered bool, authURL, tokenURL, userInfoURL string) {
+	globalOIDC.mu.RLock()
+	defer globalOIDC.mu.RUnlock()
+	return globalOIDC.discovered, globalOIDC.authURL, globalOIDC.tokenURL, globalOIDC.userInfoURL
 }
 
 // IsOIDCEnabled returns true if an OIDC provider is configured and ready.
@@ -291,22 +331,48 @@ func ExchangeCode(ctx context.Context, code, redirectURI string) (*OIDCUserInfo,
 			return nil, fmt.Errorf("parse userinfo response: %w", err)
 		}
 
-		// GitHub special case for email if private
-		if strings.ToLower(provider) == "github" && userInfo.Email == "" {
+		// GitHub special case: map login -> PreferredUsername and fetch private primary email if needed
+		if strings.ToLower(provider) == "github" {
 			var ghUser struct {
 				Login string `json:"login"`
 				Name  string `json:"name"`
 				Email string `json:"email"`
 				ID    int64  `json:"id"`
 			}
-			_ = json.Unmarshal(userBody, &ghUser)
-			userInfo.PreferredUsername = ghUser.Login
-			userInfo.Name = ghUser.Name
-			userInfo.Email = ghUser.Email
-			userInfo.Sub = fmt.Sprintf("github_%d", ghUser.ID)
-
+			if err := json.Unmarshal(userBody, &ghUser); err == nil {
+				if ghUser.Login != "" {
+					userInfo.PreferredUsername = ghUser.Login
+				}
+				if ghUser.Name != "" && userInfo.Name == "" {
+					userInfo.Name = ghUser.Name
+				}
+				if ghUser.Email != "" && userInfo.Email == "" {
+					userInfo.Email = ghUser.Email
+				}
+				if ghUser.ID != 0 && userInfo.Sub == "" {
+					userInfo.Sub = fmt.Sprintf("github_%d", ghUser.ID)
+				}
+			}
 			if userInfo.Email == "" {
 				userInfo.Email = fetchGitHubPrimaryEmail(ctx, tokenData.AccessToken)
+			}
+		}
+	}
+
+	// Fallback: parse claims from OIDC ID Token JWT payload if email or name is still missing
+	if userInfo.Email == "" && tokenData.IDToken != "" {
+		if claims := parseJWTClaims(tokenData.IDToken); claims != nil {
+			if userInfo.Email == "" {
+				userInfo.Email = claims.Email
+			}
+			if userInfo.Name == "" {
+				userInfo.Name = claims.Name
+			}
+			if userInfo.PreferredUsername == "" {
+				userInfo.PreferredUsername = claims.PreferredUsername
+			}
+			if userInfo.Sub == "" {
+				userInfo.Sub = claims.Sub
 			}
 		}
 	}
@@ -321,6 +387,23 @@ func ExchangeCode(ctx context.Context, code, redirectURI string) (*OIDCUserInfo,
 	}
 
 	return &userInfo, nil
+}
+
+// parseJWTClaims extracts the JSON payload from a JWT id_token received directly over HTTPS from the token endpoint.
+func parseJWTClaims(idToken string) *OIDCUserInfo {
+	parts := strings.Split(idToken, ".")
+	if len(parts) < 2 {
+		return nil
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil
+	}
+	var claims OIDCUserInfo
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return nil
+	}
+	return &claims
 }
 
 // fetchGitHubPrimaryEmail fetches user emails from GitHub API when primary email is hidden.
