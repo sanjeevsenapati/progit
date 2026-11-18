@@ -333,8 +333,8 @@ export const Toolbox: React.FC<ToolboxProps> = ({ toolId }) => {
             activeTool && ActiveToolComponent ? (
               <div className="space-y-4">
                 {/* Workspace Header Card */}
-                <div className="rounded-2xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-xs overflow-hidden">
-                  <div className="px-5 py-4 border-b border-gray-200 dark:border-dark-border flex flex-wrap items-center justify-between gap-3 bg-gray-50/60 dark:bg-dark-bg/40">
+                <div className="rounded-2xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-xs overflow-visible">
+                  <div className="px-5 py-4 rounded-t-2xl border-b border-gray-200 dark:border-dark-border flex flex-wrap items-center justify-between gap-3 bg-gray-50/60 dark:bg-dark-bg/40">
                     <div className="space-y-0.5">
                       <div className="flex items-center space-x-2 text-xs text-gray-400">
                         <a href="/toolbox" className="hover:text-emerald-600 font-semibold transition-colors">

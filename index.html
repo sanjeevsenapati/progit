@@ -97,7 +97,7 @@
           "priceCurrency": "USD"
         },
         "description": "A high-performance, single-binary self-hosted Git service and alternative to GitHub, Gogs, Gitea, and GitLab. Built with pure Go and embedded React 19 UI.",
-        "softwareVersion": "1.16.0",
+        "softwareVersion": "1.17.0",
         "license": "https://opensource.org/licenses/MIT",
         "url": "https://progit.co.in/"
       },
@@ -1159,7 +1159,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
         </div>
         <span class="brand-title">ProGit</span>
-        <span class="version-pill">v1.16.0</span>
+        <span class="version-pill">v1.17.0</span>
       </a>
     </div>
 
@@ -1425,9 +1425,19 @@
                 </div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">
-                    <span>v1.16.0</span>
+                    <span>v1.17.0</span>
                     <span class="dropdown-badge badge-accent">LATEST</span>
                   </div>
+                  <div class="dropdown-desc">Portal-Backed Select Dropdowns &amp; UI Polish</div>
+                </div>
+              </a>
+
+              <a href="#ops-changelog" class="dropdown-item" onclick="navigate('ops-changelog')">
+                <div class="dropdown-icon-box icon-tint-blue">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                </div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">v1.16.0</div>
                   <div class="dropdown-desc">Database Toolbox: SQL Suite, Connection Strings &amp; JDBC</div>
                 </div>
               </a>
@@ -5096,7 +5106,16 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
         <p class="page-subtitle">Complete version release history for ProGit adhering to Semantic Versioning.</p>
 
                                 <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
-          <h2 style="margin-top: 0; color: var(--accent);">v1.16.0 &mdash; Database Toolbox Utilities (SQL Suite, Connection Strings &amp; JDBC) <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <h2 style="margin-top: 0; color: var(--accent);">v1.17.0 &mdash; Portal-Backed Select Dropdowns &amp; Registration Polish <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <p><strong>Release Date:</strong> November 18, 2026</p>
+          <ul>
+            <li><strong>Viewport-Aware Portal Dropdowns</strong>: Upgraded <code>ThemedSelect</code> to render via a fixed-position React Portal on <code>document.body</code> with automatic upward flipping, horizontal viewport clamping, and Toolbox card <code>overflow-visible</code> support so DNS Lookup record options (<code>NS</code>, <code>PTR</code>) and other dropdown menus are never clipped.</li>
+            <li><strong>Updated Example Placeholders</strong>: Updated Registration and Forgot Password example placeholders from <code>alex</code> to <code>sanjeev</code>.</li>
+          </ul>
+        </div>
+
+                                <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0;">v1.16.0 &mdash; Database Toolbox Utilities (SQL Suite, Connection Strings &amp; JDBC)</h2>
           <p><strong>Release Date:</strong> November 18, 2026</p>
           <ul>
             <li><strong>SQL Formatter, Beautifier &amp; Minifier</strong>: Pure client-side SQL utilities supporting PostgreSQL, MySQL, SQLite, SQL Server, and Oracle dialects, with aligned clause presets, fullscreen expand mode, and byte-savings metrics.</li>
