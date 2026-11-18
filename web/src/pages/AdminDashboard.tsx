@@ -31,6 +31,9 @@ import {
   Archive,
   Lock,
   Globe,
+  KeyRound,
+  Copy,
+  Check,
   X
 } from 'lucide-react';
 
@@ -56,7 +59,7 @@ export const AdminDashboard: React.FC = () => {
   const [inspectLoadingId, setInspectLoadingId] = useState<number | null>(null);
   const [gitBusyKey, setGitBusyKey] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'repos' | 'system'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'repos' | 'oidc' | 'system'>('overview');
   const [loading, setLoading] = useState(true);
 
   // User search & filter
@@ -105,6 +108,34 @@ export const AdminDashboard: React.FC = () => {
   const [cfgDefaultRepoLimit, setCfgDefaultRepoLimit] = useState(-1);
   const [cfgDefaultOrgLimit, setCfgDefaultOrgLimit] = useState(-1);
   const [cfgLoading, setCfgLoading] = useState(false);
+
+  // OIDC / SSO Configuration state
+  const [oidcEnabled, setOidcEnabled] = useState(false);
+  const [oidcActive, setOidcActive] = useState(false);
+  const [oidcProvider, setOidcProvider] = useState('google');
+  const [oidcDisplayName, setOidcDisplayName] = useState('');
+  const [oidcClientId, setOidcClientId] = useState('');
+  const [oidcClientSecret, setOidcClientSecret] = useState('');
+  const [oidcClientSecretSet, setOidcClientSecretSet] = useState(false);
+  const [oidcIssuerUrl, setOidcIssuerUrl] = useState('');
+  const [oidcAuthUrl, setOidcAuthUrl] = useState('');
+  const [oidcTokenUrl, setOidcTokenUrl] = useState('');
+  const [oidcUserInfoUrl, setOidcUserInfoUrl] = useState('');
+  const [oidcScopes, setOidcScopes] = useState('');
+  const [oidcAllowedDomains, setOidcAllowedDomains] = useState('');
+  const [oidcAutoProvision, setOidcAutoProvision] = useState(true);
+  const [oidcCallbackUrl, setOidcCallbackUrl] = useState('');
+  const [oidcResolvedEndpoints, setOidcResolvedEndpoints] = useState<{
+    discovered: boolean;
+    auth_url: string;
+    token_url: string;
+    userinfo_url: string;
+  }>({ discovered: false, auth_url: '', token_url: '', userinfo_url: '' });
+  const [oidcShowAdvanced, setOidcShowAdvanced] = useState(false);
+  const [oidcSaving, setOidcSaving] = useState(false);
+  const [oidcDiscovering, setOidcDiscovering] = useState(false);
+  const [oidcDiscoveryMsg, setOidcDiscoveryMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [oidcCopied, setOidcCopied] = useState(false);
 
   // Status message
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -159,18 +190,114 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const applyOIDCResponse = (o: any) => {
+    if (!o) return;
+    setOidcEnabled(Boolean(o.enabled));
+    setOidcActive(Boolean(o.active));
+    setOidcProvider(o.provider || 'google');
+    setOidcDisplayName(o.display_name || '');
+    setOidcClientId(o.client_id || '');
+    setOidcClientSecret('');
+    setOidcClientSecretSet(Boolean(o.client_secret_set));
+    setOidcIssuerUrl(o.issuer_url || '');
+    setOidcAuthUrl(o.auth_url || '');
+    setOidcTokenUrl(o.token_url || '');
+    setOidcUserInfoUrl(o.userinfo_url || '');
+    setOidcScopes(o.scopes || '');
+    setOidcAllowedDomains(o.allowed_domains || '');
+    setOidcAutoProvision(o.auto_provision !== undefined ? Boolean(o.auto_provision) : true);
+    setOidcCallbackUrl(o.callback_url || '');
+    setOidcResolvedEndpoints({
+      discovered: Boolean(o.discovered),
+      auth_url: o.resolved_auth_url || '',
+      token_url: o.resolved_token_url || '',
+      userinfo_url: o.resolved_userinfo_url || '',
+    });
+  };
+
+  const handleSaveOIDC = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOidcSaving(true);
+    setStatusMsg(null);
+    setOidcDiscoveryMsg(null);
+    try {
+      const res = await api.updateAdminOIDCConfig({
+        enabled: oidcEnabled,
+        provider: oidcProvider,
+        display_name: oidcDisplayName,
+        client_id: oidcClientId,
+        client_secret: oidcClientSecret || undefined,
+        issuer_url: oidcIssuerUrl,
+        auth_url: oidcAuthUrl,
+        token_url: oidcTokenUrl,
+        userinfo_url: oidcUserInfoUrl,
+        scopes: oidcScopes,
+        allowed_domains: oidcAllowedDomains,
+        auto_provision: oidcAutoProvision,
+      });
+      applyOIDCResponse(res);
+      setStatusMsg({
+        type: 'success',
+        text: res.message || 'OIDC Single Sign-On settings saved and applied live.',
+      });
+    } catch (err: any) {
+      setStatusMsg({ type: 'error', text: err.message || 'Failed to update OIDC settings.' });
+    } finally {
+      setOidcSaving(false);
+    }
+  };
+
+  const handleTestOIDCDiscovery = async () => {
+    if (!oidcIssuerUrl.trim()) {
+      setOidcDiscoveryMsg({ type: 'error', text: 'Enter an Issuer URL first (e.g. https://keycloak.example.com/realms/main).' });
+      return;
+    }
+    setOidcDiscovering(true);
+    setOidcDiscoveryMsg(null);
+    try {
+      const res = await api.testAdminOIDCDiscovery(oidcIssuerUrl.trim());
+      setOidcResolvedEndpoints({
+        discovered: true,
+        auth_url: res.authorization_endpoint || '',
+        token_url: res.token_endpoint || '',
+        userinfo_url: res.userinfo_endpoint || '',
+      });
+      setOidcDiscoveryMsg({
+        type: 'success',
+        text: `Discovery succeeded for ${res.issuer || oidcIssuerUrl.trim()}. Endpoints resolved automatically.`,
+      });
+    } catch (err: any) {
+      setOidcDiscoveryMsg({
+        type: 'error',
+        text: err.message || 'Failed to discover OIDC endpoints.',
+      });
+    } finally {
+      setOidcDiscovering(false);
+    }
+  };
+
+  const handleCopyOIDCCallback = () => {
+    if (!oidcCallbackUrl) return;
+    navigator.clipboard?.writeText(oidcCallbackUrl).then(() => {
+      setOidcCopied(true);
+      setTimeout(() => setOidcCopied(false), 2000);
+    }).catch(() => {});
+  };
+
   const loadData = async () => {
     try {
-      const [s, uList, rList, gData] = await Promise.all([
+      const [s, uList, rList, gData, oidcData] = await Promise.all([
         api.getAdminStats(),
         api.getAdminUsers(userSearchRef.current),
         api.getAdminRepos(repoSearchRef.current, repoFilterRef.current, 200, 0),
         api.getAdminGitOverview().catch(() => null),
+        api.getAdminOIDCConfig().catch(() => null),
       ]);
       setStats(s);
       setUsers(uList || []);
       setRepos(rList || []);
       if (gData) setGitOverview(gData);
+      if (oidcData) applyOIDCResponse(oidcData);
     } catch (err: any) {
       console.error(err);
       setStatusMsg({ type: 'error', text: err.message || 'Failed to load administration data.' });
@@ -568,6 +695,22 @@ export const AdminDashboard: React.FC = () => {
           }`}
         >
           Repositories ({stats?.repositories_count ?? repos.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('oidc')}
+          className={`pb-2 border-b-2 transition-colors flex items-center space-x-1.5 ${
+            activeTab === 'oidc'
+              ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+          }`}
+        >
+          <span>SSO / OIDC</span>
+          <span
+            className={`inline-block w-2 h-2 rounded-full ${
+              oidcActive ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'
+            }`}
+            title={oidcActive ? 'OIDC SSO Active' : 'OIDC SSO Disabled'}
+          />
         </button>
         <button
           onClick={() => setActiveTab('system')}
@@ -1228,6 +1371,340 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               ))
             )}
+          </div>
+        </div>
+      )}
+
+      {/* SSO / OIDC Tab */}
+      {activeTab === 'oidc' && (
+        <div className="space-y-6">
+          {/* Header & Status Banner */}
+          <div className="p-6 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface shadow-sm space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-gray-100 dark:border-dark-border">
+              <div className="flex items-start space-x-3">
+                <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-gray-900 dark:text-white flex items-center space-x-2">
+                    <span>OpenID Connect (OIDC) &amp; OAuth2 Single Sign-On</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
+                      Built-in OSS
+                    </span>
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-dark-muted mt-0.5">
+                    Allow team members to sign in with Google Workspace, GitHub, Microsoft 365, Keycloak, Okta, Authentik, or any standard OIDC provider. Changes hot-reload live without restarting ProGit.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2 flex-shrink-0">
+                <span
+                  className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                    oidcActive
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
+                      : 'bg-gray-100 text-gray-600 dark:bg-dark-hover dark:text-dark-muted border border-gray-200 dark:border-dark-border'
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${oidcActive ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+                  <span>{oidcActive ? 'Active on /login' : 'Disabled'}</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Callback / Redirect URI Box */}
+            <div className="p-4 rounded-xl bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-dark-muted">
+                  Authorized Redirect / Callback URI (Register this in your Identity Provider)
+                </div>
+                <div className="font-mono text-xs sm:text-sm font-semibold text-emerald-700 dark:text-emerald-400 mt-1 break-all">
+                  {oidcCallbackUrl || `${window.location.origin}/api/v1/auth/oidc/callback`}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyOIDCCallback}
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-100 dark:hover:bg-dark-hover text-xs font-semibold text-gray-700 dark:text-dark-text transition-colors flex-shrink-0 cursor-pointer"
+              >
+                {oidcCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{oidcCopied ? 'Copied!' : 'Copy URI'}</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveOIDC} className="space-y-5">
+              {/* Master Enable Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg/50">
+                <div>
+                  <div className="text-sm font-bold text-gray-900 dark:text-white">
+                    Enable OpenID Connect (OIDC) SSO
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-dark-muted">
+                    Show the Single Sign-On button on the login page. Local password login always remains available as an emergency fallback.
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4">
+                  <input
+                    type="checkbox"
+                    checked={oidcEnabled}
+                    onChange={e => setOidcEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-600" />
+                </label>
+              </div>
+
+              {/* Provider Preset & Display Name */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                    Identity Provider *
+                  </label>
+                  <select
+                    value={oidcProvider}
+                    onChange={e => {
+                      setOidcProvider(e.target.value);
+                      setOidcDiscoveryMsg(null);
+                    }}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="google">Google Workspace / Gmail</option>
+                    <option value="github">GitHub OAuth2</option>
+                    <option value="microsoft">Microsoft 365 / Entra ID</option>
+                    <option value="keycloak">Keycloak (OIDC Discovery)</option>
+                    <option value="okta">Okta (OIDC Discovery)</option>
+                    <option value="authentik">Authentik (OIDC Discovery)</option>
+                    <option value="generic">Generic OpenID Connect</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                    Login Button Display Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={oidcDisplayName}
+                    onChange={e => setOidcDisplayName(e.target.value)}
+                    placeholder={
+                      oidcProvider === 'google'
+                        ? 'Google Workspace'
+                        : oidcProvider === 'github'
+                        ? 'GitHub'
+                        : oidcProvider === 'microsoft'
+                        ? 'Microsoft 365'
+                        : 'Corporate SSO (OIDC)'
+                    }
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Client ID & Client Secret */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                    Client ID {oidcEnabled ? '*' : ''}
+                  </label>
+                  <input
+                    type="text"
+                    required={oidcEnabled}
+                    value={oidcClientId}
+                    onChange={e => setOidcClientId(e.target.value)}
+                    placeholder="e.g. 123456789-abcdef.apps.googleusercontent.com"
+                    className="w-full px-3 py-2 text-sm font-mono rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text uppercase">
+                      Client Secret
+                    </label>
+                    {oidcClientSecretSet && (
+                      <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                        Secret Configured
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="password"
+                    value={oidcClientSecret}
+                    onChange={e => setOidcClientSecret(e.target.value)}
+                    placeholder={oidcClientSecretSet ? '•••••••••••• (leave blank to keep existing)' : 'Enter OAuth2 / OIDC Client Secret'}
+                    className="w-full px-3 py-2 text-sm font-mono rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Issuer / Discovery URL (Keycloak / Okta / Authentik / Generic) */}
+              {!['google', 'github', 'microsoft'].includes(oidcProvider) && (
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text uppercase">
+                    Issuer / Discovery URL (`/.well-known/openid-configuration`)
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="url"
+                      value={oidcIssuerUrl}
+                      onChange={e => setOidcIssuerUrl(e.target.value)}
+                      placeholder="https://sso.yourcompany.com/realms/main"
+                      className="flex-1 px-3 py-2 text-sm font-mono rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      disabled={oidcDiscovering}
+                      onClick={handleTestOIDCDiscovery}
+                      className="inline-flex items-center justify-center space-x-1.5 px-4 py-2 rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer flex-shrink-0"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${oidcDiscovering ? 'animate-spin' : ''}`} />
+                      <span>{oidcDiscovering ? 'Discovering...' : 'Test Discovery'}</span>
+                    </button>
+                  </div>
+                  {oidcDiscoveryMsg && (
+                    <div
+                      className={`p-3 rounded-lg text-xs flex items-center space-x-2 border ${
+                        oidcDiscoveryMsg.type === 'success'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
+                          : 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400'
+                      }`}
+                    >
+                      {oidcDiscoveryMsg.type === 'success' ? (
+                        <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      )}
+                      <span>{oidcDiscoveryMsg.text}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Security & Provisioning */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                    Allowed Email Domains (Optional Whitelist)
+                  </label>
+                  <input
+                    type="text"
+                    value={oidcAllowedDomains}
+                    onChange={e => setOidcAllowedDomains(e.target.value)}
+                    placeholder="e.g. yourcompany.com, subsidiary.io (blank = allow all)"
+                    className="w-full px-3 py-2 text-sm font-mono rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div className="flex items-center justify-between p-3.5 rounded-lg border border-gray-200 dark:border-dark-border bg-gray-50/70 dark:bg-dark-bg/50">
+                  <div>
+                    <div className="text-xs font-bold text-gray-900 dark:text-white uppercase">
+                      Auto-Provision Users (JIT)
+                    </div>
+                    <div className="text-[11px] text-gray-500 dark:text-dark-muted mt-0.5">
+                      Automatically create ProGit accounts on first OIDC login
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={oidcAutoProvision}
+                    onChange={e => setOidcAutoProvision(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Advanced Manual Endpoints Toggle */}
+              <div className="border-t border-gray-100 dark:border-dark-border pt-3">
+                <button
+                  type="button"
+                  onClick={() => setOidcShowAdvanced(!oidcShowAdvanced)}
+                  className="text-xs font-semibold text-gray-600 dark:text-dark-muted hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center space-x-1 cursor-pointer"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span>{oidcShowAdvanced ? 'Hide Advanced Endpoints & Scopes' : 'Show Advanced Manual Endpoints & Scopes'}</span>
+                </button>
+
+                {oidcShowAdvanced && (
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                        Custom Scopes
+                      </label>
+                      <input
+                        type="text"
+                        value={oidcScopes}
+                        onChange={e => setOidcScopes(e.target.value)}
+                        placeholder="openid email profile"
+                        className="w-full px-3 py-2 text-xs font-mono rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                        Authorization URL Override
+                      </label>
+                      <input
+                        type="url"
+                        value={oidcAuthUrl}
+                        onChange={e => setOidcAuthUrl(e.target.value)}
+                        placeholder="Auto-resolved from preset or discovery"
+                        className="w-full px-3 py-2 text-xs font-mono rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                        Token URL Override
+                      </label>
+                      <input
+                        type="url"
+                        value={oidcTokenUrl}
+                        onChange={e => setOidcTokenUrl(e.target.value)}
+                        placeholder="Auto-resolved from preset or discovery"
+                        className="w-full px-3 py-2 text-xs font-mono rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1 uppercase">
+                        UserInfo URL Override
+                      </label>
+                      <input
+                        type="url"
+                        value={oidcUserInfoUrl}
+                        onChange={e => setOidcUserInfoUrl(e.target.value)}
+                        placeholder="Auto-resolved from preset or discovery"
+                        className="w-full px-3 py-2 text-xs font-mono rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Active Resolved Endpoints Summary */}
+              {oidcResolvedEndpoints.auth_url && (
+                <div className="p-4 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/70 dark:border-emerald-900/50 space-y-1.5 text-xs font-mono">
+                  <div className="font-sans font-bold text-emerald-800 dark:text-emerald-300 text-[11px] uppercase tracking-wider mb-1">
+                    Active Resolved OIDC Endpoints {oidcResolvedEndpoints.discovered ? '(Auto-Discovered)' : '(Preset / Manual)'}
+                  </div>
+                  <div className="text-gray-700 dark:text-dark-text truncate">
+                    <span className="text-gray-500">Auth: </span>{oidcResolvedEndpoints.auth_url}
+                  </div>
+                  <div className="text-gray-700 dark:text-dark-text truncate">
+                    <span className="text-gray-500">Token: </span>{oidcResolvedEndpoints.token_url}
+                  </div>
+                  {oidcResolvedEndpoints.userinfo_url && (
+                    <div className="text-gray-700 dark:text-dark-text truncate">
+                      <span className="text-gray-500">UserInfo: </span>{oidcResolvedEndpoints.userinfo_url}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  disabled={oidcSaving}
+                  className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{oidcSaving ? 'Saving & Hot-Reloading...' : 'Save OIDC Settings & Apply Live'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

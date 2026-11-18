@@ -97,7 +97,7 @@
           "priceCurrency": "USD"
         },
         "description": "A high-performance, single-binary self-hosted Git service and alternative to GitHub, Gogs, Gitea, and GitLab. Built with pure Go and embedded React 19 UI.",
-        "softwareVersion": "1.13.0",
+        "softwareVersion": "1.14.0",
         "license": "https://opensource.org/licenses/MIT",
         "url": "https://progit.co.in/"
       },
@@ -1159,7 +1159,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
         </div>
         <span class="brand-title">ProGit</span>
-        <span class="version-pill">v1.13.0</span>
+        <span class="version-pill">v1.14.0</span>
       </a>
     </div>
 
@@ -1425,10 +1425,10 @@
                 </div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">
-                    <span>v1.13.0</span>
+                    <span>v1.14.0</span>
                     <span class="dropdown-badge badge-accent">LATEST</span>
                   </div>
-                  <div class="dropdown-desc">Resilient Git Working Tree Clean &amp; Toast Guard</div>
+                  <div class="dropdown-desc">OSS OIDC / SSO Admin Panel, Live Hot-Reload &amp; Discovery</div>
                 </div>
               </a>
 
@@ -1437,8 +1437,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.12.0</div>
-                  <div class="dropdown-desc">Left &amp; Right Toolbox Menu + Fullscreen Comparison</div>
+                  <div class="dropdown-title">v1.13.0</div>
+                  <div class="dropdown-desc">Resilient Git Working Tree Clean &amp; Toast Guard</div>
                 </div>
               </a>
 
@@ -1447,8 +1447,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.11.0</div>
-                  <div class="dropdown-desc">Inward Mega Dropdown Alignment &amp; Viewport Clamping</div>
+                  <div class="dropdown-title">v1.12.0</div>
+                  <div class="dropdown-desc">Left &amp; Right Toolbox Menu + Fullscreen Comparison</div>
                 </div>
               </a>
 
@@ -1457,8 +1457,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.10.0</div>
-                  <div class="dropdown-desc">Bigin Dropdown Navigation, Microcopy &amp; UI/UX</div>
+                  <div class="dropdown-title">v1.11.0</div>
+                  <div class="dropdown-desc">Inward Mega Dropdown Alignment &amp; Viewport Clamping</div>
                 </div>
               </a>
 
@@ -1467,8 +1467,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.9.0</div>
-                  <div class="dropdown-desc">Resilient Wiki &amp; Clean Working Tree Handling</div>
+                  <div class="dropdown-title">v1.10.0</div>
+                  <div class="dropdown-desc">Bigin Dropdown Navigation, Microcopy &amp; UI/UX</div>
                 </div>
               </a>
             </div>
@@ -2773,15 +2773,24 @@ PRAGMA foreign_keys = ON;</code><button class="copy-btn" onclick="copyCode(this)
         <div class="breadcrumbs">
           <span>Configuration</span>
           <span>/</span>
-          <span class="current">Enterprise SSO (OIDC / OAuth2)</span>
+          <span class="current">Single Sign-On (OIDC / OAuth2)</span>
         </div>
-        <h1 class="page-title">Enterprise Single Sign-On (OIDC &amp; OAuth2)</h1>
-        <p class="page-subtitle">Enable one-click corporate login via Google Workspace, GitHub, Microsoft 365, Keycloak, or any OpenID Connect identity provider.</p>
+        <h1 class="page-title">Single Sign-On (OIDC &amp; OAuth2) &mdash; Built-in OSS</h1>
+        <p class="page-subtitle">Built directly into ProGit OSS: enable one-click login via Google Workspace, GitHub, Microsoft 365, Keycloak, Okta, Authentik, or any OpenID Connect identity provider.</p>
 
         <div class="callout callout-info">
-          <div class="callout-title">Zero Third-Party SaaS Dependencies</div>
-          <div>ProGit contains a pure Go OIDC and OAuth2 authentication engine. No external proxy, sidecar, or paid SaaS subscription is required. All token verification, standard discovery, and JIT provisioning run locally inside ProGit.</div>
+          <div class="callout-title">100% Built-In Open Source (No License Wall)</div>
+          <div>ProGit OSS contains a pure Go OIDC and OAuth2 authentication engine with live Admin Panel hot-reload. No external proxy, sidecar, or paid enterprise license is required. All token verification, <code>/.well-known/openid-configuration</code> discovery, JWT ID token claim parsing, and JIT user provisioning run locally inside ProGit.</div>
         </div>
+
+        <h2>Quick Setup via Admin Dashboard (Recommended — Live Hot-Reload)</h2>
+        <ol>
+          <li>Sign in as an Administrator and navigate to <strong>Admin &gt; SSO / OIDC</strong>.</li>
+          <li>Copy the <strong>Authorized Redirect / Callback URI</strong> displayed at the top of the panel (<code>https://your-host/api/v1/auth/oidc/callback</code>) and register it in your identity provider.</li>
+          <li>Toggle <strong>Enable OpenID Connect (OIDC) SSO</strong>, select your provider preset (<code>Google Workspace</code>, <code>GitHub</code>, <code>Microsoft 365</code>, <code>Keycloak</code>, <code>Okta</code>, <code>Authentik</code>, or <code>Generic OIDC</code>), and enter your <strong>Client ID</strong> and <strong>Client Secret</strong>.</li>
+          <li>For Keycloak, Okta, Authentik, or generic OIDC, enter your <strong>Issuer URL</strong> and click <strong>Test Discovery</strong> to verify endpoints automatically.</li>
+          <li>Click <strong>Save OIDC Settings &amp; Apply Live</strong> &mdash; the SSO button immediately appears on <code>/login</code> with zero server restart.</li>
+        </ol>
 
         <h2>Supported Identity Providers</h2>
         <div class="table-container">
@@ -5009,7 +5018,17 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
         <p class="page-subtitle">Complete version release history for ProGit adhering to Semantic Versioning.</p>
 
                                 <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
-          <h2 style="margin-top: 0; color: var(--accent);">v1.13.0 &mdash; Resilient Git Clean Working Tree Handling &amp; Toast Guard <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <h2 style="margin-top: 0; color: var(--accent);">v1.14.0 &mdash; Built-in OSS OIDC / SSO Admin Panel &amp; Live Discovery <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <p><strong>Release Date:</strong> November 18, 2026</p>
+          <ul>
+            <li><strong>Admin Dashboard SSO / OIDC Management Panel</strong>: Added a dedicated <strong>SSO / OIDC</strong> tab inside Admin Dashboard allowing OSS administrators to enable, configure, and hot-reload Google Workspace, GitHub, Microsoft 365, Keycloak, Okta, Authentik, or Generic OIDC with zero downtime and no server restart.</li>
+            <li><strong>Live OIDC Discovery Tester (<code>POST /api/v1/admin/oidc/discover</code>)</strong>: Test <code>/.well-known/openid-configuration</code> discovery directly from the Admin UI, inspect resolved endpoints, and copy the Authorized Callback URI with one click.</li>
+            <li><strong>OIDC Engine Hardening</strong>: Added JWT <code>id_token</code> claim fallback parsing, improved GitHub username/email mapping, preserved OIDC settings cleanly in <code>app.ini</code> when toggled off, and added clear Login page feedback for all OIDC error codes.</li>
+          </ul>
+        </div>
+
+                                <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0;">v1.13.0 &mdash; Resilient Git Clean Working Tree Handling &amp; Toast Guard</h2>
           <p><strong>Release Date:</strong> November 17, 2026</p>
           <ul>
             <li><strong>Resilient Git Clean Working Tree Handling</strong>: Added direct error interception for <code>nothing to commit</code> and <code>working tree clean</code> across <code>SaveWikiPage</code>, <code>SaveFile</code>, <code>DeleteFile</code>, and <code>UploadFiles</code>, ensuring unchanged edits or repeated submissions gracefully succeed as idempotent no-ops instead of failing with <code>exit status 1</code>.</li>

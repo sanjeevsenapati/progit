@@ -978,6 +978,84 @@ export const api = {
     });
   },
 
+  async getAdminOIDCConfig() {
+    return fetchJSON<{
+      enabled: boolean;
+      active: boolean;
+      provider: string;
+      display_name: string;
+      client_id: string;
+      client_secret_set: boolean;
+      issuer_url: string;
+      auth_url: string;
+      token_url: string;
+      userinfo_url: string;
+      scopes: string;
+      allowed_domains: string;
+      auto_provision: boolean;
+      callback_url: string;
+      discovered: boolean;
+      resolved_auth_url: string;
+      resolved_token_url: string;
+      resolved_userinfo_url: string;
+    }>('/api/v1/admin/oidc');
+  },
+
+  async updateAdminOIDCConfig(payload: {
+    enabled: boolean;
+    provider: string;
+    display_name: string;
+    client_id: string;
+    client_secret?: string;
+    clear_client_secret?: boolean;
+    issuer_url?: string;
+    auth_url?: string;
+    token_url?: string;
+    userinfo_url?: string;
+    scopes?: string;
+    allowed_domains?: string;
+    auto_provision: boolean;
+  }) {
+    return fetchJSON<{
+      message: string;
+      enabled: boolean;
+      active: boolean;
+      provider: string;
+      display_name: string;
+      client_id: string;
+      client_secret_set: boolean;
+      issuer_url: string;
+      auth_url: string;
+      token_url: string;
+      userinfo_url: string;
+      scopes: string;
+      allowed_domains: string;
+      auto_provision: boolean;
+      callback_url: string;
+      discovered: boolean;
+      resolved_auth_url: string;
+      resolved_token_url: string;
+      resolved_userinfo_url: string;
+    }>('/api/v1/admin/oidc', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async testAdminOIDCDiscovery(issuer_url: string) {
+    return fetchJSON<{
+      message: string;
+      issuer: string;
+      authorization_endpoint: string;
+      token_endpoint: string;
+      userinfo_endpoint: string;
+      scopes_supported?: string[];
+    }>('/api/v1/admin/oidc/discover', {
+      method: 'POST',
+      body: JSON.stringify({ issuer_url }),
+    });
+  },
+
   async getAdminUsers(q?: string, limit?: number, offset?: number) {
     const params = new URLSearchParams();
     if (q && q.trim()) params.set('q', q.trim());

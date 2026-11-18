@@ -646,7 +646,7 @@ func Save(configPath string, cfg *Config) error {
 	sb.WriteString(fmt.Sprintf("MODE = %s\n", cfg.Log.Mode))
 	sb.WriteString(fmt.Sprintf("LEVEL = %s\n\n", cfg.Log.Level))
 
-	if cfg.OIDC.Enabled {
+	if cfg.OIDC.Enabled || cfg.OIDC.ClientID != "" || cfg.OIDC.IssuerURL != "" || cfg.OIDC.AuthURL != "" {
 		sb.WriteString("[oidc]\n")
 		sb.WriteString(fmt.Sprintf("ENABLED = %v\n", cfg.OIDC.Enabled))
 		sb.WriteString(fmt.Sprintf("PROVIDER = %s\n", cfg.OIDC.Provider))
@@ -659,7 +659,7 @@ func Save(configPath string, cfg *Config) error {
 		sb.WriteString(fmt.Sprintf("USERINFO_URL = %s\n", cfg.OIDC.UserInfoURL))
 		sb.WriteString(fmt.Sprintf("SCOPES = %s\n", cfg.OIDC.Scopes))
 		sb.WriteString(fmt.Sprintf("ALLOWED_DOMAINS = %s\n", cfg.OIDC.AllowedDomains))
-		sb.WriteString(fmt.Sprintf("AUTO_PROVISION = %v\n", cfg.OIDC.AutoProvision))
+		sb.WriteString(fmt.Sprintf("AUTO_PROVISION = %v\n\n", cfg.OIDC.AutoProvision))
 	}
 
 	sb.WriteString("[features]\n")

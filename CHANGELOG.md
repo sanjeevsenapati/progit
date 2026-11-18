@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.14.0] - 2026-11-18
+
+### Highlights: Full Built-in OSS OIDC / SSO Admin Panel, Live Discovery & Hot-Reload
+OpenID Connect (OIDC) and OAuth2 Single Sign-On are now first-class, live-configurable directly from the Admin Dashboard in ProGit OSS with zero server restarts and no license wall.
+
+### Added
+- **Admin Dashboard SSO / OIDC Management Tab (`web/src/pages/AdminDashboard.tsx`)**:
+  - Dedicated **SSO / OIDC** tab for enabling, disabling, and configuring Google Workspace, GitHub, Microsoft 365 / Entra ID, Keycloak, Okta, Authentik, and Generic OIDC directly from the browser.
+  - One-click copyable **Authorized Redirect / Callback URI** (`<RootURL>/api/v1/auth/oidc/callback`).
+  - Live **Test Discovery** button querying `/.well-known/openid-configuration` and displaying resolved Authorization, Token, and UserInfo endpoints.
+  - Supports allowed email domain whitelisting, custom scopes, manual endpoint overrides, masked client secret preservation, and JIT auto-provisioning toggle.
+- **Admin OIDC REST API (`internal/api/api.go`)**:
+  - `GET /api/v1/admin/oidc`: Returns active OIDC configuration metadata (without leaking raw Client Secret), resolved endpoints, and computed callback URL.
+  - `PUT /api/v1/admin/oidc`: Validates, persists to `app.ini`, and live hot-reloads `auth.InitOIDC()` immediately with zero downtime.
+  - `POST /api/v1/admin/oidc/discover`: Tests live OIDC discovery against any Issuer URL.
+
+### Fixed & Improved
+- **OIDC Engine Hardening (`internal/auth/oidc.go`)**:
+  - Added JWT `id_token` payload claim fallback parsing when identity providers omit `userinfo_endpoint` or email claims from userinfo.
+  - Improved GitHub OAuth2 login mapping so `PreferredUsername` is always populated from GitHub `login` even when public email is set.
+  - Handled IdP consent error redirects (`?error=access_denied`) cleanly on `/api/v1/auth/oidc/callback` and expanded error messaging in `web/src/pages/Login.tsx`.
+- **Config Persistence (`internal/config/config.go` & `conf/app.ini`)**:
+  - Preserved `[oidc]` settings in `app.ini` even when temporarily toggled off (`ENABLED = false`) and added a clean `[oidc]` template section to default `conf/app.ini`.
+
+---
+
 ## [1.13.0] - 2026-11-17
 
 ### Highlights: Resilient Git Working Tree Clean Handling & Toast Spam Prevention

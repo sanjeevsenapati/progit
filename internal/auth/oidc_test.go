@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -135,5 +136,44 @@ func TestOIDCDiscovery(t *testing.T) {
 
 	if !strings.HasPrefix(authURL, "https://auth.mock.local/oauth/authorize") {
 		t.Errorf("Expected discovered auth URL, got %s", authURL)
+	}
+
+	discovered, aURL, tURL, uURL := GetOIDCEndpoints()
+	if !discovered || aURL != "https://auth.mock.local/oauth/authorize" || tURL != "https://auth.mock.local/oauth/token" || uURL != "https://auth.mock.local/oauth/userinfo" {
+		t.Errorf("Unexpected resolved endpoints: discovered=%v auth=%s token=%s userinfo=%s", discovered, aURL, tURL, uURL)
+	}
+}
+
+func TestDiscoverOIDCDirectAndJWTClaims(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/realms/dev/.well-known/openid-configuration" {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"issuer":                 "https://sso.example.com/realms/dev",
+				"authorization_endpoint": "https://sso.example.com/realms/dev/auth",
+				"token_endpoint":         "https://sso.example.com/realms/dev/token",
+				"userinfo_endpoint":      "https://sso.example.com/realms/dev/userinfo",
+				"scopes_supported":       []string{"openid", "email", "profile"},
+			})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	doc, err := DiscoverOIDC(server.URL + "/realms/dev")
+	if err != nil {
+		t.Fatalf("DiscoverOIDC failed: %v", err)
+	}
+	if doc.AuthorizationEndpoint != "https://sso.example.com/realms/dev/auth" {
+		t.Errorf("Unexpected authorization_endpoint: %s", doc.AuthorizationEndpoint)
+	}
+
+	// Verify JWT ID token fallback parsing
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256"}`))
+	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"u123","email":"dev@progit.io","name":"Dev User","preferred_username":"devuser"}`))
+	claims := parseJWTClaims(header + "." + payload + ".signature")
+	if claims == nil || claims.Email != "dev@progit.io" || claims.PreferredUsername != "devuser" {
+		t.Errorf("Unexpected parsed JWT claims: %+v", claims)
 	}
 }

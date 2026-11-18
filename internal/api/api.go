@@ -33,7 +33,7 @@ import (
 
 var (
 	startTime = time.Now()
-	Version   = "1.13.0"
+	Version   = "1.14.0"
 )
 
 type ipRateLimiter struct {
@@ -419,6 +419,9 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("POST /api/v1/admin/git/maintenance", r.handleAdminGitMaintenance)
 	r.mux.HandleFunc("POST /api/v1/admin/maintenance", r.handleAdminMaintenance)
 	r.mux.HandleFunc("PUT /api/v1/admin/config", r.handleAdminUpdateConfig)
+	r.mux.HandleFunc("GET /api/v1/admin/oidc", r.handleAdminGetOIDCConfig)
+	r.mux.HandleFunc("PUT /api/v1/admin/oidc", r.handleAdminUpdateOIDCConfig)
+	r.mux.HandleFunc("POST /api/v1/admin/oidc/discover", r.handleAdminTestOIDCDiscovery)
 }
 
 // Helpers
@@ -702,6 +705,13 @@ func (r *Router) handleOIDCCallback(w http.ResponseWriter, req *http.Request) {
 		HttpOnly: true,
 		MaxAge:   -1,
 	})
+
+	// Handle provider-returned errors (e.g. user cancelled consent)
+	if idpErr := req.URL.Query().Get("error"); idpErr != "" {
+		log.Printf("[OIDC] Identity provider returned error: %s (%s)", idpErr, req.URL.Query().Get("error_description"))
+		http.Redirect(w, req, "/login?error=oidc_denied", http.StatusTemporaryRedirect)
+		return
+	}
 
 	code := req.URL.Query().Get("code")
 	if code == "" {
@@ -5439,6 +5449,197 @@ func (r *Router) handleAdminUpdateConfig(w http.ResponseWriter, req *http.Reques
 		"default_branch":                  defaultBranch,
 		"default_repo_max_creation_limit": r.cfg.Repository.MaxCreationLimit,
 		"default_org_max_creation_limit":  r.cfg.Organization.MaxCreationLimit,
+	})
+}
+
+func (r *Router) handleAdminGetOIDCConfig(w http.ResponseWriter, req *http.Request) {
+	currentAdmin := auth.AuthenticateRequest(req)
+	if currentAdmin == nil || !currentAdmin.IsAdmin {
+		jsonError(w, http.StatusForbidden, "Administrator privileges required")
+		return
+	}
+
+	discovered, resolvedAuthURL, resolvedTokenURL, resolvedUserInfoURL := auth.GetOIDCEndpoints()
+	rootURL := strings.TrimRight(r.cfg.Server.RootURL, "/")
+	callbackURL := fmt.Sprintf("%s/api/v1/auth/oidc/callback", rootURL)
+
+	provider := r.cfg.OIDC.Provider
+	if provider == "" {
+		provider = "google"
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"enabled":               r.cfg.OIDC.Enabled,
+		"active":                auth.IsOIDCEnabled(),
+		"provider":              provider,
+		"display_name":          r.cfg.OIDC.DisplayName,
+		"client_id":             r.cfg.OIDC.ClientID,
+		"client_secret_set":     r.cfg.OIDC.ClientSecret != "",
+		"issuer_url":            r.cfg.OIDC.IssuerURL,
+		"auth_url":              r.cfg.OIDC.AuthURL,
+		"token_url":             r.cfg.OIDC.TokenURL,
+		"userinfo_url":          r.cfg.OIDC.UserInfoURL,
+		"scopes":                r.cfg.OIDC.Scopes,
+		"allowed_domains":       r.cfg.OIDC.AllowedDomains,
+		"auto_provision":        r.cfg.OIDC.AutoProvision,
+		"callback_url":          callbackURL,
+		"discovered":            discovered,
+		"resolved_auth_url":     resolvedAuthURL,
+		"resolved_token_url":    resolvedTokenURL,
+		"resolved_userinfo_url": resolvedUserInfoURL,
+	})
+}
+
+func (r *Router) handleAdminUpdateOIDCConfig(w http.ResponseWriter, req *http.Request) {
+	currentAdmin := auth.AuthenticateRequest(req)
+	if currentAdmin == nil || !currentAdmin.IsAdmin {
+		jsonError(w, http.StatusForbidden, "Administrator privileges required")
+		return
+	}
+
+	var body struct {
+		Enabled           bool   `json:"enabled"`
+		Provider          string `json:"provider"`
+		DisplayName       string `json:"display_name"`
+		ClientID          string `json:"client_id"`
+		ClientSecret      string `json:"client_secret"`
+		ClearClientSecret bool   `json:"clear_client_secret"`
+		IssuerURL         string `json:"issuer_url"`
+		AuthURL           string `json:"auth_url"`
+		TokenURL          string `json:"token_url"`
+		UserInfoURL       string `json:"userinfo_url"`
+		Scopes            string `json:"scopes"`
+		AllowedDomains    string `json:"allowed_domains"`
+		AutoProvision     bool   `json:"auto_provision"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	provider := strings.ToLower(strings.TrimSpace(body.Provider))
+	if provider == "" {
+		provider = "google"
+	}
+	allowedProviders := map[string]bool{
+		"google":    true,
+		"github":    true,
+		"microsoft": true,
+		"keycloak":  true,
+		"okta":      true,
+		"authentik": true,
+		"generic":   true,
+	}
+	if !allowedProviders[provider] {
+		jsonError(w, http.StatusBadRequest, "Unsupported OIDC provider. Use google, github, microsoft, keycloak, okta, authentik, or generic")
+		return
+	}
+
+	clientID := strings.TrimSpace(body.ClientID)
+	if body.Enabled && clientID == "" {
+		jsonError(w, http.StatusBadRequest, "Client ID is required when OIDC SSO is enabled")
+		return
+	}
+
+	r.cfg.OIDC.Enabled = body.Enabled
+	r.cfg.OIDC.Provider = provider
+	r.cfg.OIDC.DisplayName = strings.TrimSpace(body.DisplayName)
+	r.cfg.OIDC.ClientID = clientID
+	if body.ClearClientSecret {
+		r.cfg.OIDC.ClientSecret = ""
+	} else if strings.TrimSpace(body.ClientSecret) != "" {
+		r.cfg.OIDC.ClientSecret = strings.TrimSpace(body.ClientSecret)
+	}
+	r.cfg.OIDC.IssuerURL = strings.TrimSpace(body.IssuerURL)
+	r.cfg.OIDC.AuthURL = strings.TrimSpace(body.AuthURL)
+	r.cfg.OIDC.TokenURL = strings.TrimSpace(body.TokenURL)
+	r.cfg.OIDC.UserInfoURL = strings.TrimSpace(body.UserInfoURL)
+	r.cfg.OIDC.Scopes = strings.TrimSpace(body.Scopes)
+	r.cfg.OIDC.AllowedDomains = strings.TrimSpace(body.AllowedDomains)
+	r.cfg.OIDC.AutoProvision = body.AutoProvision
+
+	// Live hot-reload the OIDC authentication engine (no server restart required)
+	if err := auth.InitOIDC(r.cfg.OIDC); err != nil {
+		jsonError(w, http.StatusBadRequest, fmt.Sprintf("Failed to initialize OIDC provider: %v", err))
+		return
+	}
+
+	// Persist configuration to app.ini
+	configPaths := []string{
+		"/data/config/app.ini",
+		"data/config/app.ini",
+		"conf/app.ini",
+	}
+	savePath := "conf/app.ini"
+	for _, p := range configPaths {
+		if _, err := os.Stat(p); err == nil {
+			savePath = p
+			break
+		}
+	}
+	_ = config.Save(savePath, r.cfg)
+
+	statusWord := "disabled"
+	if r.cfg.OIDC.Enabled {
+		statusWord = "enabled"
+	}
+	database.CreateActivity(currentAdmin.ID, currentAdmin.Username, nil, "", "admin_oidc", fmt.Sprintf("Updated OIDC SSO configuration (%s, provider=%s)", statusWord, r.cfg.OIDC.Provider))
+
+	discovered, resolvedAuthURL, resolvedTokenURL, resolvedUserInfoURL := auth.GetOIDCEndpoints()
+	rootURL := strings.TrimRight(r.cfg.Server.RootURL, "/")
+	callbackURL := fmt.Sprintf("%s/api/v1/auth/oidc/callback", rootURL)
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"message":               "OIDC Single Sign-On settings saved and applied live",
+		"enabled":               r.cfg.OIDC.Enabled,
+		"active":                auth.IsOIDCEnabled(),
+		"provider":              r.cfg.OIDC.Provider,
+		"display_name":          r.cfg.OIDC.DisplayName,
+		"client_id":             r.cfg.OIDC.ClientID,
+		"client_secret_set":     r.cfg.OIDC.ClientSecret != "",
+		"issuer_url":            r.cfg.OIDC.IssuerURL,
+		"auth_url":              r.cfg.OIDC.AuthURL,
+		"token_url":             r.cfg.OIDC.TokenURL,
+		"userinfo_url":          r.cfg.OIDC.UserInfoURL,
+		"scopes":                r.cfg.OIDC.Scopes,
+		"allowed_domains":       r.cfg.OIDC.AllowedDomains,
+		"auto_provision":        r.cfg.OIDC.AutoProvision,
+		"callback_url":          callbackURL,
+		"discovered":            discovered,
+		"resolved_auth_url":     resolvedAuthURL,
+		"resolved_token_url":    resolvedTokenURL,
+		"resolved_userinfo_url": resolvedUserInfoURL,
+	})
+}
+
+func (r *Router) handleAdminTestOIDCDiscovery(w http.ResponseWriter, req *http.Request) {
+	currentAdmin := auth.AuthenticateRequest(req)
+	if currentAdmin == nil || !currentAdmin.IsAdmin {
+		jsonError(w, http.StatusForbidden, "Administrator privileges required")
+		return
+	}
+
+	var body struct {
+		IssuerURL string `json:"issuer_url"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	doc, err := auth.DiscoverOIDC(body.IssuerURL)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"message":                "OIDC Discovery succeeded",
+		"issuer":                 doc.Issuer,
+		"authorization_endpoint": doc.AuthorizationEndpoint,
+		"token_endpoint":         doc.TokenEndpoint,
+		"userinfo_endpoint":      doc.UserinfoEndpoint,
+		"scopes_supported":       doc.ScopesSupported,
 	})
 }
 
