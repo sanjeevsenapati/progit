@@ -97,7 +97,7 @@
           "priceCurrency": "USD"
         },
         "description": "A high-performance, single-binary self-hosted Git service and alternative to GitHub, Gogs, Gitea, and GitLab. Built with pure Go and embedded React 19 UI.",
-        "softwareVersion": "1.15.0",
+        "softwareVersion": "1.16.0",
         "license": "https://opensource.org/licenses/MIT",
         "url": "https://progit.co.in/"
       },
@@ -1159,7 +1159,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
         </div>
         <span class="brand-title">ProGit</span>
-        <span class="version-pill">v1.15.0</span>
+        <span class="version-pill">v1.16.0</span>
       </a>
     </div>
 
@@ -1425,10 +1425,10 @@
                 </div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">
-                    <span>v1.15.0</span>
+                    <span>v1.16.0</span>
                     <span class="dropdown-badge badge-accent">LATEST</span>
                   </div>
-                  <div class="dropdown-desc">Keycloak &amp; ZTrust OIDC Setup Docs + ZTrust Preset</div>
+                  <div class="dropdown-desc">Database Toolbox: SQL Suite, Connection Strings &amp; JDBC</div>
                 </div>
               </a>
 
@@ -1437,8 +1437,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.14.0</div>
-                  <div class="dropdown-desc">OSS OIDC / SSO Admin Panel, Live Hot-Reload &amp; Discovery</div>
+                  <div class="dropdown-title">v1.15.0</div>
+                  <div class="dropdown-desc">Keycloak &amp; ZTrust OIDC Setup Docs + ZTrust Preset</div>
                 </div>
               </a>
 
@@ -1447,8 +1447,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.13.0</div>
-                  <div class="dropdown-desc">Resilient Git Working Tree Clean &amp; Toast Guard</div>
+                  <div class="dropdown-title">v1.14.0</div>
+                  <div class="dropdown-desc">OSS OIDC / SSO Admin Panel, Live Hot-Reload &amp; Discovery</div>
                 </div>
               </a>
 
@@ -1457,8 +1457,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.12.0</div>
-                  <div class="dropdown-desc">Left &amp; Right Toolbox Menu + Fullscreen Comparison</div>
+                  <div class="dropdown-title">v1.13.0</div>
+                  <div class="dropdown-desc">Resilient Git Working Tree Clean &amp; Toast Guard</div>
                 </div>
               </a>
 
@@ -1467,8 +1467,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.11.0</div>
-                  <div class="dropdown-desc">Inward Mega Dropdown Alignment &amp; Viewport Clamping</div>
+                  <div class="dropdown-title">v1.12.0</div>
+                  <div class="dropdown-desc">Left &amp; Right Toolbox Menu + Fullscreen Comparison</div>
                 </div>
               </a>
             </div>
@@ -3439,10 +3439,11 @@ def verify_progit_signature(payload_bytes, secret_key, header_signature):
           <li><strong>Bounded DNS Resolver</strong>: Live DNS lookup (<code>A</code>, <code>AAAA</code>, <code>CNAME</code>, <code>MX</code>, <code>TXT</code>, <code>NS</code>, <code>PTR</code>, <code>ALL</code>) requires authentication, caps concurrency at 8 slots, times out at 3 seconds, and rate-limits at 30 req/min.</li>
         </ul>
 
-        <h2>Phase-1 Utilities (11 Tools)</h2>
+        <h2>Built-In Developer Utilities (17 Tools)</h2>
         <ul>
           <li><strong>Security</strong>: Password Generator, JWT Decoder &amp; HMAC Verifier, Hash &amp; Checksum Generator (MD5, SHA-1/256/384/512, HMAC, File checksum).</li>
           <li><strong>Formatters</strong>: JSON Formatter &amp; Validator, XML Formatter &amp; Validator, YAML Formatter &amp; YAML &harr; JSON Converter.</li>
+          <li><strong>Database</strong>: SQL Formatter, SQL Beautifier (Aligned Clauses &amp; Fullscreen Expand), SQL Minifier, SQL Validator (Syntax &amp; Safety Linter), Connection String Builder (PostgreSQL, MySQL, JDBC, SQL Server, Oracle, SQLite, MongoDB, Redis), and Java JDBC URL Generator (Spring Boot / HikariCP / Maven / Gradle).</li>
           <li><strong>Network</strong>: Server-assisted DNS Lookup.</li>
           <li><strong>Cron &amp; Time</strong>: Cron Expression Parser (5-field Linux, macros, 6-field Quartz/Spring) + Next 10 Runs in Local/UTC.</li>
           <li><strong>Converters</strong>: Base64 Encode/Decode (UTF-8, URL-safe, File to Data URL).</li>
@@ -5095,7 +5096,17 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
         <p class="page-subtitle">Complete version release history for ProGit adhering to Semantic Versioning.</p>
 
                                 <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
-          <h2 style="margin-top: 0; color: var(--accent);">v1.15.0 &mdash; Keycloak &amp; ZTrust OIDC Documentation + First-Class ZTrust Preset <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <h2 style="margin-top: 0; color: var(--accent);">v1.16.0 &mdash; Database Toolbox Utilities (SQL Suite, Connection Strings &amp; JDBC) <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <p><strong>Release Date:</strong> November 18, 2026</p>
+          <ul>
+            <li><strong>SQL Formatter, Beautifier &amp; Minifier</strong>: Pure client-side SQL utilities supporting PostgreSQL, MySQL, SQLite, SQL Server, and Oracle dialects, with aligned clause presets, fullscreen expand mode, and byte-savings metrics.</li>
+            <li><strong>SQL Validator</strong>: Validates SQL syntax, quote/comment/parenthesis balance, clause order, dialect rules, and destructive DML safety warnings with statement breakdown.</li>
+            <li><strong>Connection String Builder &amp; Java JDBC URL Generator</strong>: Build &amp; parse URIs/DSNs for PostgreSQL, MySQL, MariaDB, JDBC, SQL Server, Oracle, SQLite, MongoDB, and Redis, plus Java JDBC URLs with Driver classes, Spring Boot HikariCP configs, Maven XML, and Gradle snippets.</li>
+          </ul>
+        </div>
+
+                                <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0;">v1.15.0 &mdash; Keycloak &amp; ZTrust OIDC Documentation + First-Class ZTrust Preset</h2>
           <p><strong>Release Date:</strong> November 18, 2026</p>
           <ul>
             <li><strong>First-Class ZTrust IAM Preset (<code>ztrust</code>)</strong>: Added dedicated <strong>ZTrust IAM (OIDC Discovery)</strong> preset to the OIDC engine, Admin API, and Admin Dashboard dropdown alongside Keycloak.</li>

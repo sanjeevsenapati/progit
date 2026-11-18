@@ -3,6 +3,7 @@ import React, { lazy } from 'react';
 export type ToolboxCategoryId =
   | 'security'
   | 'formatters'
+  | 'database'
   | 'network'
   | 'cron-time'
   | 'converters'
@@ -37,6 +38,12 @@ export const TOOLBOX_CATEGORIES: ToolboxCategoryMeta[] = [
     name: 'Formatters',
     subtitle: 'JSON, XML, YAML',
     accentClass: 'text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40',
+  },
+  {
+    id: 'database',
+    name: 'Database',
+    subtitle: 'SQL, Connection Strings, JDBC',
+    accentClass: 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40',
   },
   {
     id: 'network',
@@ -164,6 +171,60 @@ export const TOOLBOX_TOOLS: ToolboxToolMeta[] = [
     keywords: ['diff', 'compare', 'patch', 'unified', 'side by side', 'text'],
     execution: 'local',
   },
+  {
+    id: 'sql-formatter',
+    name: 'SQL Formatter',
+    shortName: 'SQL Formatter',
+    category: 'database',
+    description: 'Format SQL queries cleanly across PostgreSQL, MySQL, SQLite, T-SQL, and Oracle dialects.',
+    keywords: ['sql', 'format', 'formatter', 'database', 'query', 'postgres', 'mysql', 'oracle', 'sqlite'],
+    execution: 'local',
+  },
+  {
+    id: 'sql-beautifier',
+    name: 'SQL Beautifier',
+    shortName: 'SQL Beautifier',
+    category: 'database',
+    description: 'Improve SQL readability with aligned clause rivers, CTE/CASE formatting presets, and fullscreen view.',
+    keywords: ['sql', 'beautify', 'beautifier', 'pretty', 'align', 'readable', 'cte', 'database'],
+    execution: 'local',
+  },
+  {
+    id: 'sql-minifier',
+    name: 'SQL Minifier',
+    shortName: 'SQL Minifier',
+    category: 'database',
+    description: 'Compact SQL queries into single-line strings while safely preserving literals and optional comments.',
+    keywords: ['sql', 'minify', 'minifier', 'compact', 'compress', 'single line', 'database'],
+    execution: 'local',
+  },
+  {
+    id: 'sql-validator',
+    name: 'SQL Validator',
+    shortName: 'SQL Validator',
+    category: 'database',
+    description: 'Validate SQL syntax, parentheses/quote balance, clause order, dialect rules, and DML safety warnings.',
+    keywords: ['sql', 'validate', 'validator', 'syntax', 'lint', 'check', 'parser', 'database'],
+    execution: 'local',
+  },
+  {
+    id: 'conn-string',
+    name: 'Connection String Builder',
+    shortName: 'Conn String',
+    category: 'database',
+    description: 'Build and parse connection strings for PostgreSQL, MySQL, JDBC, SQL Server, Oracle, SQLite, MongoDB & Redis.',
+    keywords: ['connection string', 'dsn', 'database', 'postgresql', 'mysql', 'jdbc', 'mongodb', 'redis', 'oracle', 'sqlite'],
+    execution: 'local',
+  },
+  {
+    id: 'jdbc-url',
+    name: 'JDBC URL Generator',
+    shortName: 'JDBC URL',
+    category: 'database',
+    description: 'Generate Java JDBC URLs with Driver class, Spring Boot HikariCP configs, Maven/Gradle coordinates & Java code.',
+    keywords: ['jdbc', 'java', 'spring', 'hikari', 'maven', 'gradle', 'postgresql', 'mysql', 'oracle', 'sqlserver', 'h2'],
+    execution: 'local',
+  },
 ];
 
 export const FAVORITES_STORAGE_KEY = 'progit_toolbox_favorites';
@@ -228,6 +289,12 @@ const TOOL_COMPONENT_MAP: Record<string, React.LazyExoticComponent<React.Compone
   cron: lazy(() => import('./tools/CronTool')),
   dns: lazy(() => import('./tools/DnsTool')),
   diff: lazy(() => import('./tools/DiffTool')),
+  'sql-formatter': lazy(() => import('./tools/SqlFormatterTool')),
+  'sql-beautifier': lazy(() => import('./tools/SqlBeautifierTool')),
+  'sql-minifier': lazy(() => import('./tools/SqlMinifierTool')),
+  'sql-validator': lazy(() => import('./tools/SqlValidatorTool')),
+  'conn-string': lazy(() => import('./tools/ConnectionStringTool')),
+  'jdbc-url': lazy(() => import('./tools/JdbcUrlTool')),
 };
 
 export function getLazyToolComponent(toolId: string): React.LazyExoticComponent<React.ComponentType> | null {
