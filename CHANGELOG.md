@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.15.0] - 2026-11-18
+
+### Highlights: Comprehensive Keycloak & ZTrust OIDC Documentation + First-Class ZTrust Preset
+Added step-by-step documentation for configuring and using OpenID Connect Single Sign-On with **Keycloak** and **ZTrust IAM**, along with first-class `ztrust` preset support across the backend and Admin Dashboard UI.
+
+### Added
+- **First-Class ZTrust IAM OIDC Preset (`ztrust`)**:
+  - Added `ztrust` (default display name `ZTrust SSO`) and `keycloak` (default display name `Keycloak SSO`) presets in `internal/auth/oidc.go`, `internal/api/api.go`, and the Admin Dashboard **SSO / OIDC** dropdown (`web/src/pages/AdminDashboard.tsx`).
+- **Complete Keycloak & ZTrust OIDC Documentation**:
+  - Created standalone runbook [`docs/OIDC_SSO_GUIDE.md`](docs/OIDC_SSO_GUIDE.md) and upgraded `#page-config-oidc` in `docs/index.html` & `index.html`.
+  - Covers Keycloak (v24/v25/v26+) and ZTrust IAM client setup, live Admin Web UI hot-reload & discovery testing, `app.ini` / Podman / Kubernetes configuration, end-user SSO login & Git CLI authentication (SSH Keys & Personal Access Tokens), local Podman pod testing, and troubleshooting.
+
+---
+
 ## [1.14.0] - 2026-11-18
 
 ### Highlights: Full Built-in OSS OIDC / SSO Admin Panel, Live Discovery & Hot-Reload

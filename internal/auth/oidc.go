@@ -99,8 +99,30 @@ func InitOIDC(cfg config.OIDCConfig) error {
 			globalOIDC.cfg.Scopes = "openid email profile"
 		}
 
+	case "keycloak":
+		if globalOIDC.cfg.DisplayName == "" {
+			globalOIDC.cfg.DisplayName = "Keycloak SSO"
+		}
+		if globalOIDC.cfg.Scopes == "" {
+			globalOIDC.cfg.Scopes = "openid email profile"
+		}
+		globalOIDC.authURL = cfg.AuthURL
+		globalOIDC.tokenURL = cfg.TokenURL
+		globalOIDC.userInfoURL = cfg.UserInfoURL
+
+	case "ztrust":
+		if globalOIDC.cfg.DisplayName == "" {
+			globalOIDC.cfg.DisplayName = "ZTrust SSO"
+		}
+		if globalOIDC.cfg.Scopes == "" {
+			globalOIDC.cfg.Scopes = "openid email profile"
+		}
+		globalOIDC.authURL = cfg.AuthURL
+		globalOIDC.tokenURL = cfg.TokenURL
+		globalOIDC.userInfoURL = cfg.UserInfoURL
+
 	default:
-		// Generic OIDC / Keycloak / Authentik
+		// Generic OIDC / Okta / Authentik
 		if globalOIDC.cfg.DisplayName == "" {
 			globalOIDC.cfg.DisplayName = "Corporate SSO (OIDC)"
 		}
