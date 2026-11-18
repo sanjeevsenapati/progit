@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.17.0] - 2026-11-18
+
+### Highlights: Portal-Backed Select Dropdowns & Registration Placeholder Updates
+Fixed clipped dropdown menus inside Toolbox cards (such as DNS Lookup record type selection) by upgrading `ThemedSelect` to a viewport-aware portal overlay, and updated registration/reset placeholder examples.
+
+### Fixed
+- **DNS Lookup & Toolbox Dropdown Clipping (`web/src/components/ThemedSelect.tsx`, `web/src/pages/Toolbox.tsx`)**:
+  - Upgraded `ThemedSelect` to render its dropdown menu via a React Portal (`document.body`) with fixed viewport coordinates, automatic upward flipping when near the bottom of the screen, horizontal viewport clamping, and scroll/resize tracking so options like `NS` and `PTR` in DNS Lookup are never cut off by parent cards.
+  - Changed the Toolbox workspace card container from `overflow-hidden` to `overflow-visible` with `rounded-t-2xl` header styling as an extra safeguard against popout clipping.
+
+### Changed
+- **Updated Example User Placeholders (`web/src/pages/Register.tsx`, `web/src/pages/ForgotPassword.tsx`)**:
+  - Replaced `alex` / `alex@example.com` / `Alex Mercer` placeholders with `sanjeev` / `sanjeev@example.com` / `Sanjeev`.
+
+---
+
 ## [1.16.0] - 2026-11-18
 
 ### Highlights: Developer Toolbox Database Utilities (SQL Suite, Connection String Builder & JDBC URL Generator)
