@@ -33,7 +33,7 @@ import (
 
 var (
 	startTime = time.Now()
-	Version   = "1.14.0"
+	Version   = "1.15.0"
 )
 
 type ipRateLimiter struct {
@@ -5526,12 +5526,13 @@ func (r *Router) handleAdminUpdateOIDCConfig(w http.ResponseWriter, req *http.Re
 		"github":    true,
 		"microsoft": true,
 		"keycloak":  true,
+		"ztrust":    true,
 		"okta":      true,
 		"authentik": true,
 		"generic":   true,
 	}
 	if !allowedProviders[provider] {
-		jsonError(w, http.StatusBadRequest, "Unsupported OIDC provider. Use google, github, microsoft, keycloak, okta, authentik, or generic")
+		jsonError(w, http.StatusBadRequest, "Unsupported OIDC provider. Use google, github, microsoft, keycloak, ztrust, okta, authentik, or generic")
 		return
 	}
 

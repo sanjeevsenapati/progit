@@ -97,7 +97,7 @@
           "priceCurrency": "USD"
         },
         "description": "A high-performance, single-binary self-hosted Git service and alternative to GitHub, Gogs, Gitea, and GitLab. Built with pure Go and embedded React 19 UI.",
-        "softwareVersion": "1.14.0",
+        "softwareVersion": "1.15.0",
         "license": "https://opensource.org/licenses/MIT",
         "url": "https://progit.co.in/"
       },
@@ -1159,7 +1159,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
         </div>
         <span class="brand-title">ProGit</span>
-        <span class="version-pill">v1.14.0</span>
+        <span class="version-pill">v1.15.0</span>
       </a>
     </div>
 
@@ -1425,10 +1425,10 @@
                 </div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">
-                    <span>v1.14.0</span>
+                    <span>v1.15.0</span>
                     <span class="dropdown-badge badge-accent">LATEST</span>
                   </div>
-                  <div class="dropdown-desc">OSS OIDC / SSO Admin Panel, Live Hot-Reload &amp; Discovery</div>
+                  <div class="dropdown-desc">Keycloak &amp; ZTrust OIDC Setup Docs + ZTrust Preset</div>
                 </div>
               </a>
 
@@ -1437,8 +1437,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.13.0</div>
-                  <div class="dropdown-desc">Resilient Git Working Tree Clean &amp; Toast Guard</div>
+                  <div class="dropdown-title">v1.14.0</div>
+                  <div class="dropdown-desc">OSS OIDC / SSO Admin Panel, Live Hot-Reload &amp; Discovery</div>
                 </div>
               </a>
 
@@ -1447,8 +1447,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.12.0</div>
-                  <div class="dropdown-desc">Left &amp; Right Toolbox Menu + Fullscreen Comparison</div>
+                  <div class="dropdown-title">v1.13.0</div>
+                  <div class="dropdown-desc">Resilient Git Working Tree Clean &amp; Toast Guard</div>
                 </div>
               </a>
 
@@ -1457,8 +1457,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.11.0</div>
-                  <div class="dropdown-desc">Inward Mega Dropdown Alignment &amp; Viewport Clamping</div>
+                  <div class="dropdown-title">v1.12.0</div>
+                  <div class="dropdown-desc">Left &amp; Right Toolbox Menu + Fullscreen Comparison</div>
                 </div>
               </a>
 
@@ -1467,8 +1467,8 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 </div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">v1.10.0</div>
-                  <div class="dropdown-desc">Bigin Dropdown Navigation, Microcopy &amp; UI/UX</div>
+                  <div class="dropdown-title">v1.11.0</div>
+                  <div class="dropdown-desc">Inward Mega Dropdown Alignment &amp; Viewport Clamping</div>
                 </div>
               </a>
             </div>
@@ -1536,7 +1536,7 @@
           <li><a href="#config-env-vars" data-target="config-env-vars" onclick="navigate('config-env-vars')">Environment Variables (PROGIT_*)</a></li>
           <li><a href="#config-database" data-target="config-database" onclick="navigate('config-database')">SQLite WAL Mode Database</a></li>
           <li><a href="#config-ssh" data-target="config-ssh" onclick="navigate('config-ssh')">Built-in SSH Server (Port 2222)</a></li>
-          <li><a href="#config-oidc" data-target="config-oidc" onclick="navigate('config-oidc')">Enterprise SSO (OIDC / OAuth2)</a></li>
+          <li><a href="#config-oidc" data-target="config-oidc" onclick="navigate('config-oidc')">SSO / OIDC (Keycloak &amp; ZTrust)</a></li>
         </ul>
       </div>
 
@@ -2676,7 +2676,7 @@ ENABLED = true</code><button class="copy-btn" onclick="copyCode(this)">Copy</but
               <tr><td><code>PROGIT_SSH_PORT</code></td><td><code>server.SSH_PORT</code></td><td><code>2222</code></td></tr>
               <tr><td><code>PROGIT_SSH_ENABLED</code></td><td><code>server.DISABLE_SSH</code></td><td><code>true</code> (inverts to false)</td></tr>
               <tr><td><code>PROGIT_OIDC_ENABLED</code></td><td><code>oidc.ENABLED</code></td><td><code>false</code> (explicit disable overrides credentials)</td></tr>
-              <tr><td><code>PROGIT_OIDC_PROVIDER</code></td><td><code>oidc.PROVIDER</code></td><td><code>google</code> (<code>google</code>, <code>github</code>, <code>microsoft</code>, <code>keycloak</code>, <code>generic</code>)</td></tr>
+              <tr><td><code>PROGIT_OIDC_PROVIDER</code></td><td><code>oidc.PROVIDER</code></td><td><code>google</code> (<code>keycloak</code>, <code>ztrust</code>, <code>google</code>, <code>github</code>, <code>microsoft</code>, <code>okta</code>, <code>authentik</code>, <code>generic</code>)</td></tr>
               <tr><td><code>PROGIT_OIDC_CLIENT_ID</code></td><td><code>oidc.CLIENT_ID</code></td><td><code>""</code> (OAuth2 Client ID)</td></tr>
               <tr><td><code>PROGIT_OIDC_CLIENT_SECRET</code></td><td><code>oidc.CLIENT_SECRET</code></td><td><code>""</code> (OAuth2 Client Secret)</td></tr>
               <tr><td><code>PROGIT_OIDC_ISSUER_URL</code></td><td><code>oidc.ISSUER_URL</code></td><td><code>""</code> (OIDC Discovery URL)</td></tr>
@@ -2763,7 +2763,7 @@ PRAGMA foreign_keys = ON;</code><button class="copy-btn" onclick="copyCode(this)
           </a>
           <a href="#config-oidc" class="nav-btn" onclick="navigate('config-oidc')">
             <span class="dir">Next &rarr;</span>
-            <span class="title">Enterprise SSO (OIDC)</span>
+            <span class="title">SSO / OIDC (Keycloak &amp; ZTrust)</span>
           </a>
         </div>
       </article>
@@ -2773,64 +2773,108 @@ PRAGMA foreign_keys = ON;</code><button class="copy-btn" onclick="copyCode(this)
         <div class="breadcrumbs">
           <span>Configuration</span>
           <span>/</span>
-          <span class="current">Single Sign-On (OIDC / OAuth2)</span>
+          <span class="current">SSO / OIDC (Keycloak &amp; ZTrust)</span>
         </div>
-        <h1 class="page-title">Single Sign-On (OIDC &amp; OAuth2) &mdash; Built-in OSS</h1>
-        <p class="page-subtitle">Built directly into ProGit OSS: enable one-click login via Google Workspace, GitHub, Microsoft 365, Keycloak, Okta, Authentik, or any OpenID Connect identity provider.</p>
+        <h1 class="page-title">Single Sign-On (OIDC &amp; OAuth2) &mdash; Keycloak &amp; ZTrust Guide</h1>
+        <p class="page-subtitle">Built directly into ProGit OSS: configure and use one-click corporate login with Keycloak, ZTrust IAM, Google Workspace, GitHub, Microsoft 365, Okta, or Authentik with live hot-reload.</p>
 
         <div class="callout callout-info">
           <div class="callout-title">100% Built-In Open Source (No License Wall)</div>
           <div>ProGit OSS contains a pure Go OIDC and OAuth2 authentication engine with live Admin Panel hot-reload. No external proxy, sidecar, or paid enterprise license is required. All token verification, <code>/.well-known/openid-configuration</code> discovery, JWT ID token claim parsing, and JIT user provisioning run locally inside ProGit.</div>
         </div>
 
-        <h2>Quick Setup via Admin Dashboard (Recommended — Live Hot-Reload)</h2>
-        <ol>
-          <li>Sign in as an Administrator and navigate to <strong>Admin &gt; SSO / OIDC</strong>.</li>
-          <li>Copy the <strong>Authorized Redirect / Callback URI</strong> displayed at the top of the panel (<code>https://your-host/api/v1/auth/oidc/callback</code>) and register it in your identity provider.</li>
-          <li>Toggle <strong>Enable OpenID Connect (OIDC) SSO</strong>, select your provider preset (<code>Google Workspace</code>, <code>GitHub</code>, <code>Microsoft 365</code>, <code>Keycloak</code>, <code>Okta</code>, <code>Authentik</code>, or <code>Generic OIDC</code>), and enter your <strong>Client ID</strong> and <strong>Client Secret</strong>.</li>
-          <li>For Keycloak, Okta, Authentik, or generic OIDC, enter your <strong>Issuer URL</strong> and click <strong>Test Discovery</strong> to verify endpoints automatically.</li>
-          <li>Click <strong>Save OIDC Settings &amp; Apply Live</strong> &mdash; the SSO button immediately appears on <code>/login</code> with zero server restart.</li>
-        </ol>
-
         <h2>Supported Identity Providers</h2>
         <div class="table-container">
           <table>
-            <thead><tr><th>Provider</th><th>Preset Value</th><th>Default Auth Endpoint</th><th>Notes</th></tr></thead>
+            <thead><tr><th>Provider</th><th>Preset Value</th><th>Discovery / Endpoint</th><th>Notes</th></tr></thead>
             <tbody>
+              <tr><td><strong>Keycloak (v24 / v25 / v26+)</strong></td><td><code>keycloak</code></td><td>Auto-discovered via <code>ISSUER_URL</code></td><td>Standard realm discovery (<code>/realms/&lt;realm&gt;/.well-known/openid-configuration</code>)</td></tr>
+              <tr><td><strong>ZTrust IAM</strong></td><td><code>ztrust</code></td><td>Auto-discovered via <code>ISSUER_URL</code></td><td>Zero-Trust IAM OpenID Connect realm discovery &amp; MFA support</td></tr>
               <tr><td><strong>Google Workspace</strong></td><td><code>google</code></td><td><code>accounts.google.com</code></td><td>One-click Google Workspace login with domain filtering</td></tr>
               <tr><td><strong>GitHub</strong></td><td><code>github</code></td><td><code>github.com/login/oauth</code></td><td>Standard developer OAuth2 authentication</td></tr>
-              <tr><td><strong>Microsoft 365</strong></td><td><code>microsoft</code></td><td><code>login.microsoftonline.com/common</code></td><td>Azure AD / Entra ID enterprise tenant authentication</td></tr>
-              <tr><td><strong>Keycloak / Okta / Generic</strong></td><td><code>generic</code> or <code>keycloak</code></td><td>Auto-discovered via <code>ISSUER_URL</code></td><td>Standard <code>/.well-known/openid-configuration</code> discovery</td></tr>
+              <tr><td><strong>Microsoft 365 / Entra ID</strong></td><td><code>microsoft</code></td><td><code>login.microsoftonline.com/common</code></td><td>Azure AD / Entra ID enterprise tenant authentication</td></tr>
+              <tr><td><strong>Okta / Authentik / Generic</strong></td><td><code>okta</code> / <code>authentik</code> / <code>generic</code></td><td>Auto-discovered via <code>ISSUER_URL</code></td><td>Any OpenID Connect 1.0 compliant provider</td></tr>
             </tbody>
           </table>
         </div>
 
-        <h2>Google Workspace Setup Walkthrough</h2>
+        <h2>Prerequisites: Callback / Redirect URI</h2>
+        <p>Before configuring Keycloak or ZTrust, ensure ProGit's <code>ROOT_URL</code> matches the exact URL users open in their browser. ProGit automatically uses this callback endpoint:</p>
+        <pre><code>https://git.yourcompany.com/api/v1/auth/oidc/callback</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+        <p style="font-size: 0.9rem; color: var(--text-muted);">For local testing on port 3000, use <code>http://localhost:3000/api/v1/auth/oidc/callback</code>. You can also copy the exact computed URI directly from <strong>Admin &gt; SSO / OIDC</strong>.</p>
+
+        <h2>Part 1: Configuring Keycloak (v24 / v25 / v26+)</h2>
         <ol>
-          <li>Navigate to the <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Google Cloud Console &gt; APIs &amp; Services &gt; Credentials</a>.</li>
-          <li>Click <strong>Create Credentials &gt; OAuth client ID</strong>.</li>
-          <li>Select <strong>Application type: Web application</strong>.</li>
-          <li>Add your ProGit server URL to <strong>Authorized JavaScript origins</strong>:
-            <pre><code>https://git.yourcompany.com</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          <li>Sign in to the <strong>Keycloak Admin Console</strong> (e.g. <code>https://sso.yourcompany.com/admin</code>) and select or create your target <strong>Realm</strong> (e.g. <code>progit</code>).</li>
+          <li>Navigate to <strong>Clients &gt; Create client</strong>:
+            <ul>
+              <li><strong>Client type</strong>: <code>OpenID Connect</code></li>
+              <li><strong>Client ID</strong>: <code>progit-client</code></li>
+              <li><strong>Client authentication</strong>: <code>ON</code> <em>(enables confidential client + Client Secret)</em></li>
+              <li><strong>Authentication flow</strong>: Check <strong>Standard flow</strong> (Authorization Code Flow)</li>
+            </ul>
           </li>
-          <li>Add the callback URL to <strong>Authorized redirect URIs</strong>:
-            <pre><code>https://git.yourcompany.com/api/v1/auth/oidc/callback</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          <li>Under <strong>Login settings</strong>, configure:
+            <ul>
+              <li><strong>Root URL</strong>: <code>https://git.yourcompany.com</code></li>
+              <li><strong>Valid redirect URIs</strong>: <code>https://git.yourcompany.com/api/v1/auth/oidc/callback</code></li>
+              <li><strong>Web origins</strong>: <code>https://git.yourcompany.com</code> (or <code>+</code>)</li>
+            </ul>
           </li>
-          <li>Copy your <strong>Client ID</strong> and <strong>Client Secret</strong>.</li>
+          <li>Click <strong>Save</strong>, open the <strong>Credentials</strong> tab, and copy the <strong>Client Secret</strong>.</li>
+          <li>Under <strong>Users</strong>, ensure your users have a valid <strong>Email</strong> address and <strong>Email verified</strong> enabled.</li>
+          <li>Your Keycloak <strong>Issuer URL</strong> is:
+            <pre><code>https://sso.yourcompany.com/realms/progit</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </li>
         </ol>
 
-        <h2>Configuration via app.ini</h2>
-        <p>Add the <code>[oidc]</code> section to <code>/data/config/app.ini</code>:</p>
+        <h2>Part 2: Configuring ZTrust IAM</h2>
+        <p><strong>ZTrust IAM</strong> implements standard OpenID Connect 1.0 discovery and works seamlessly with ProGit's built-in <code>ztrust</code> preset:</p>
+        <ol>
+          <li>Sign in to the <strong>ZTrust Admin Console</strong> (e.g. <code>https://ztrust.yourcompany.com</code>) and select your organization's <strong>Realm / Tenant</strong> (e.g. <code>enterprise</code>).</li>
+          <li>Navigate to <strong>Clients / Applications &gt; Create Client</strong>:
+            <ul>
+              <li><strong>Protocol / Client Type</strong>: <code>OpenID Connect (OIDC)</code></li>
+              <li><strong>Client ID</strong>: <code>progit-client</code></li>
+              <li><strong>Client Authentication (Confidential)</strong>: <code>ON</code></li>
+              <li><strong>Standard Flow (Authorization Code)</strong>: <code>ON</code></li>
+              <li><strong>Valid Redirect URIs</strong>: <code>https://git.yourcompany.com/api/v1/auth/oidc/callback</code></li>
+              <li><strong>Web Origins</strong>: <code>https://git.yourcompany.com</code></li>
+            </ul>
+          </li>
+          <li>Save the application, open the <strong>Credentials</strong> tab, and copy the generated <strong>Client Secret</strong>.</li>
+          <li>Confirm default client scopes include <code>openid</code>, <code>email</code>, and <code>profile</code> so ZTrust returns user email and display name claims.</li>
+          <li>Your ZTrust <strong>Issuer URL</strong> is:
+            <pre><code>https://ztrust.yourcompany.com/realms/enterprise</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </li>
+        </ol>
+
+        <h2>Part 3: Connecting ProGit to Keycloak or ZTrust</h2>
+
+        <h3>Method A: Admin Dashboard Web UI (Recommended &mdash; Live Hot-Reload)</h3>
+        <ol>
+          <li>Sign in to ProGit as an Administrator and open <strong>Admin &gt; SSO / OIDC</strong> (<code>/admin</code>).</li>
+          <li>Toggle <strong>Enable OpenID Connect (OIDC) SSO</strong> to <strong>ON</strong>.</li>
+          <li>Choose <strong>Keycloak (OIDC Discovery)</strong> or <strong>ZTrust IAM (OIDC Discovery)</strong> from the Identity Provider dropdown.</li>
+          <li>Enter your <strong>Client ID</strong> (<code>progit-client</code>), <strong>Client Secret</strong>, and <strong>Issuer URL</strong> (e.g. <code>https://ztrust.yourcompany.com/realms/enterprise</code> or <code>https://sso.yourcompany.com/realms/progit</code>).</li>
+          <li>Click <strong>Test Discovery</strong> &mdash; ProGit queries <code>/.well-known/openid-configuration</code> live and displays the resolved Authorization, Token, and UserInfo endpoints.</li>
+          <li><em>(Optional)</em> Set <strong>Allowed Email Domains</strong> (e.g. <code>yourcompany.com</code>) and keep <strong>Auto-Provision Users (JIT)</strong> enabled.</li>
+          <li>Click <strong>Save OIDC Settings &amp; Apply Live</strong> &mdash; the SSO button immediately appears on <code>/login</code> with zero downtime and no server restart.</li>
+        </ol>
+
+        <h3>Method B: Configuration via app.ini</h3>
+        <p>Add the <code>[oidc]</code> section to <code>/data/config/app.ini</code> (use <code>PROVIDER = keycloak</code> for Keycloak or <code>PROVIDER = ztrust</code> for ZTrust):</p>
         <pre><code>[oidc]
 ENABLED = true
-PROVIDER = google
-CLIENT_ID = 123456789-abcdef.apps.googleusercontent.com
-CLIENT_SECRET = GOCSPX-your-secret-here
-DISPLAY_NAME = Google Workspace
-ALLOWED_DOMAINS = yourcompany.com,subsidiary.org
+PROVIDER = ztrust
+DISPLAY_NAME = ZTrust SSO
+CLIENT_ID = progit-client
+CLIENT_SECRET = your-client-secret
+ISSUER_URL = https://ztrust.yourcompany.com/realms/enterprise
+ALLOWED_DOMAINS = yourcompany.com
 AUTO_PROVISION = true</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
-        <h2>Configuration via Environment Variables (Podman / Docker)</h2>
+        <h3>Method C: Environment Variables (Podman / Docker / Kubernetes)</h3>
         <pre><code>podman run -d \
   --name progit \
   --restart=unless-stopped \
@@ -2838,33 +2882,66 @@ AUTO_PROVISION = true</code><button class="copy-btn" onclick="copyCode(this)">Co
   -v progit-data:/data/db:Z \
   -v progit-repositories:/data/repositories:Z \
   -v progit-config:/data/config:Z \
+  -e PROGIT_ROOT_URL="https://git.yourcompany.com/" \
   -e PROGIT_OIDC_ENABLED="true" \
-  -e PROGIT_OIDC_PROVIDER="google" \
-  -e PROGIT_OIDC_CLIENT_ID="123456789-abcdef.apps.googleusercontent.com" \
-  -e PROGIT_OIDC_CLIENT_SECRET="GOCSPX-your-secret-here" \
+  -e PROGIT_OIDC_PROVIDER="keycloak" \
+  -e PROGIT_OIDC_DISPLAY_NAME="Keycloak SSO" \
+  -e PROGIT_OIDC_CLIENT_ID="progit-client" \
+  -e PROGIT_OIDC_CLIENT_SECRET="your-client-secret" \
+  -e PROGIT_OIDC_ISSUER_URL="https://sso.yourcompany.com/realms/progit" \
   -e PROGIT_OIDC_ALLOWED_DOMAINS="yourcompany.com" \
   -e PROGIT_OIDC_AUTO_PROVISION="true" \
   ghcr.io/sanjeevsenapati/progit:latest</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
 
-        <h2>Keycloak / Okta / Generic OIDC Configuration</h2>
-        <p>When using a self-hosted Keycloak realm or Okta domain, provide the <code>ISSUER_URL</code>. ProGit automatically queries <code>/.well-known/openid-configuration</code> on startup to discover authorization, token, and userinfo endpoints:</p>
-        <pre><code>[oidc]
-ENABLED = true
-PROVIDER = generic
-CLIENT_ID = progit-client
-CLIENT_SECRET = your-keycloak-client-secret
-ISSUER_URL = https://idp.yourcompany.com/realms/master
-DISPLAY_NAME = Company Single Sign-On
-ALLOWED_DOMAINS = yourcompany.com
-AUTO_PROVISION = true</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+        <h2>Part 4: How Users Sign In &amp; Use ProGit with SSO</h2>
+        <ol>
+          <li><strong>Web Sign-In</strong>: Visit <code>/login</code> and click <strong>Keycloak SSO</strong> or <strong>ZTrust SSO</strong>. Authenticate on your identity provider (including MFA/TOTP if enforced), and ProGit redirects you straight to <code>/dashboard</code>.</li>
+          <li><strong>First-Time JIT Account Creation</strong>: If your email already exists in ProGit, it links automatically. Otherwise, when <code>AUTO_PROVISION = true</code>, ProGit automatically provisions your account with your IdP username, full name, and email.</li>
+          <li><strong>Using Git CLI (<code>git clone</code> / <code>git push</code>)</strong>: Because SSO users authenticate via Keycloak or ZTrust rather than a local password, configure one of the following after signing in:
+            <ul>
+              <li><strong>SSH Keys (Recommended)</strong>: Go to <strong>User Settings &gt; SSH Keys</strong>, add your public key (<code>~/.ssh/id_ed25519.pub</code>), and clone via <code>ssh://git@git.yourcompany.com:2222/owner/repo.git</code>.</li>
+              <li><strong>Personal Access Token (PAT)</strong>: Go to <strong>User Settings &gt; Access Tokens</strong>, create a token, and enter your ProGit username + PAT as the password for HTTPS <code>git clone</code> / <code>git push</code>.</li>
+            </ul>
+          </li>
+        </ol>
 
-        <h2>Security &amp; Domain Whitelisting</h2>
-        <ul>
-          <li><strong>Domain Filtering (<code>ALLOWED_DOMAINS</code>)</strong>: Restricts authentication strictly to corporate domains. If an employee attempts to sign in with a personal account (e.g. <code>alice@gmail.com</code>), the login is blocked and an unauthorized domain alert is displayed.</li>
-          <li><strong>Cryptographic CSRF Mitigation</strong>: Every login request generates a random 32-byte <code>state</code> stored in an <code>HttpOnly</code>, <code>SameSite=Lax</code>, <code>Secure</code> cookie. Mismatched or forged callbacks are rejected.</li>
-          <li><strong>Just-In-Time (JIT) Provisioning</strong>: New employees logging in for the first time automatically have their ProGit account created with matching username and email.</li>
-          <li><strong>Emergency Local Login Fallback</strong>: Disabling OIDC via <code>PROGIT_OIDC_ENABLED="false"</code> immediately disables the SSO button, and local database credentials remain available so teams are never locked out during IDP outages.</li>
-        </ul>
+        <h2>Local Testing with Podman Pod (ProGit + Keycloak)</h2>
+        <p>Run both ProGit and Keycloak inside a shared Podman pod so both browser redirects and container-to-container OIDC discovery work identically over <code>localhost</code>:</p>
+        <pre><code>podman pod create --name progit-sso-pod -p 3000:3000 -p 3443:3443 -p 2222:2222 -p 8080:8080
+
+podman run -d --pod progit-sso-pod --name keycloak \
+  -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
+  -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+  -e KC_HTTP_ENABLED=true -e KC_HOSTNAME_STRICT=false \
+  quay.io/keycloak/keycloak:26.0 start-dev
+
+podman run -d --pod progit-sso-pod --name progit \
+  -e PROGIT_PROTOCOL="http" -e PROGIT_HTTP_PORT="3000" \
+  -e PROGIT_DOMAIN="localhost" -e PROGIT_ROOT_URL="http://localhost:3000/" \
+  -e PROGIT_COOKIE_SECURE="false" -e PROGIT_ADMIN_USER="admin" \
+  -e PROGIT_ADMIN_PASSWORD="Admin12345!" \
+  ghcr.io/sanjeevsenapati/progit:latest</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+
+        <h2>Google Workspace Setup Walkthrough</h2>
+        <ol>
+          <li>Navigate to the <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Google Cloud Console &gt; APIs &amp; Services &gt; Credentials</a> and click <strong>Create Credentials &gt; OAuth client ID</strong> (<strong>Web application</strong>).</li>
+          <li>Add <code>https://git.yourcompany.com</code> to <strong>Authorized JavaScript origins</strong> and <code>https://git.yourcompany.com/api/v1/auth/oidc/callback</code> to <strong>Authorized redirect URIs</strong>.</li>
+          <li>In ProGit <strong>Admin &gt; SSO / OIDC</strong>, select <strong>Google Workspace / Gmail</strong>, paste your Client ID &amp; Secret, and click <strong>Save OIDC Settings &amp; Apply Live</strong>.</li>
+        </ol>
+
+        <h2>Security &amp; Troubleshooting</h2>
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Error / Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+            <tbody>
+              <tr><td><code>Invalid parameter: redirect_uri</code></td><td>IdP redirect URI mismatch</td><td>Copy the exact Callback URI from <strong>Admin &gt; SSO / OIDC</strong> into Keycloak/ZTrust <strong>Valid redirect URIs</strong>.</td></tr>
+              <tr><td><code>invalid_state</code> / state mismatch</td><td>Cookie blocked on HTTP or host mismatch</td><td>Ensure <code>PROGIT_ROOT_URL</code> matches your browser URL; set <code>PROGIT_COOKIE_SECURE="false"</code> when testing over plain HTTP.</td></tr>
+              <tr><td><code>exchange_failed</code></td><td>Invalid secret or network/CA issue</td><td>Verify Client Secret in Keycloak/ZTrust and ensure ProGit can reach the Token URL over the network.</td></tr>
+              <tr><td><code>domain_not_allowed</code></td><td>Email domain blocked by whitelist</td><td>Add the user's domain to <strong>Allowed Email Domains</strong> or leave blank to allow all IdP users.</td></tr>
+              <tr><td><strong>Emergency Local Access</strong></td><td>IdP unreachable during outage</td><td>Local password login always stays active on <code>/login</code>; disable OIDC anytime via <strong>Admin &gt; SSO / OIDC</strong> or <code>PROGIT_OIDC_ENABLED="false"</code>.</td></tr>
+            </tbody>
+          </table>
+        </div>
 
         <div class="page-nav-buttons">
           <a href="#config-ssh" class="nav-btn" onclick="navigate('config-ssh')">
@@ -5018,7 +5095,16 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
         <p class="page-subtitle">Complete version release history for ProGit adhering to Semantic Versioning.</p>
 
                                 <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
-          <h2 style="margin-top: 0; color: var(--accent);">v1.14.0 &mdash; Built-in OSS OIDC / SSO Admin Panel &amp; Live Discovery <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <h2 style="margin-top: 0; color: var(--accent);">v1.15.0 &mdash; Keycloak &amp; ZTrust OIDC Documentation + First-Class ZTrust Preset <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <p><strong>Release Date:</strong> November 18, 2026</p>
+          <ul>
+            <li><strong>First-Class ZTrust IAM Preset (<code>ztrust</code>)</strong>: Added dedicated <strong>ZTrust IAM (OIDC Discovery)</strong> preset to the OIDC engine, Admin API, and Admin Dashboard dropdown alongside Keycloak.</li>
+            <li><strong>Comprehensive Keycloak &amp; ZTrust OIDC Guide</strong>: Updated interactive documentation (<code>#config-oidc</code>) and published <code>docs/OIDC_SSO_GUIDE.md</code> covering step-by-step Keycloak &amp; ZTrust setup, Admin Web UI live hot-reload, <code>app.ini</code> &amp; Podman/Kubernetes deployment, SSO Git CLI usage (SSH Keys &amp; PATs), local Podman pod testing, and troubleshooting.</li>
+          </ul>
+        </div>
+
+                                <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0;">v1.14.0 &mdash; Built-in OSS OIDC / SSO Admin Panel &amp; Live Discovery</h2>
           <p><strong>Release Date:</strong> November 18, 2026</p>
           <ul>
             <li><strong>Admin Dashboard SSO / OIDC Management Panel</strong>: Added a dedicated <strong>SSO / OIDC</strong> tab inside Admin Dashboard allowing OSS administrators to enable, configure, and hot-reload Google Workspace, GitHub, Microsoft 365, Keycloak, Okta, Authentik, or Generic OIDC with zero downtime and no server restart.</li>
@@ -5239,7 +5325,7 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
       { id: 'config-env-vars', title: 'Environment Variables (PROGIT_*)', section: 'Configuration', desc: 'Container environment variable overrides for app.ini.' },
       { id: 'config-database', title: 'SQLite WAL Mode Database', section: 'Configuration', desc: 'High-concurrency SQLite configuration, pragmas, and checkpoints.' },
       { id: 'config-ssh', title: 'Built-in SSH Server (Port 2222)', section: 'Configuration', desc: 'Key-based SSH Git cloning and pushing on port 2222.' },
-      { id: 'config-oidc', title: 'Enterprise SSO (OpenID Connect / OAuth2)', section: 'Configuration', desc: 'Google Workspace, GitHub, Microsoft 365, and Keycloak SSO integration with domain whitelisting.' },
+      { id: 'config-oidc', title: 'SSO / OIDC (Keycloak, ZTrust, Google, GitHub, Microsoft)', section: 'Configuration', desc: 'Step-by-step Keycloak and ZTrust IAM OIDC setup, Admin UI hot-reload, JIT provisioning, Git CLI PAT/SSH usage, and troubleshooting.' },
       { id: 'feature-git', title: 'Smart HTTP & SSH Git Operations', section: 'Features', desc: 'Git v2 Smart Protocol, clone formats, and Personal Access Tokens.' },
       { id: 'feature-editor', title: 'Online Code Editor & Prettier', section: 'Features', desc: '8 curated syntax themes (Dracula, Nord, Synthwave) and online commits.' },
       { id: 'feature-files', title: 'File Creation & Directory Uploads', section: 'Features', desc: 'In-browser file creation with nested paths and multi-file directory upload.' },

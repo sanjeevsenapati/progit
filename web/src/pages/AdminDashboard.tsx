@@ -1393,7 +1393,7 @@ export const AdminDashboard: React.FC = () => {
                     </span>
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-dark-muted mt-0.5">
-                    Allow team members to sign in with Google Workspace, GitHub, Microsoft 365, Keycloak, Okta, Authentik, or any standard OIDC provider. Changes hot-reload live without restarting ProGit.
+                    Allow team members to sign in with Keycloak, ZTrust, Google Workspace, GitHub, Microsoft 365, Okta, Authentik, or any standard OIDC provider. Changes hot-reload live without restarting ProGit.
                   </p>
                 </div>
               </div>
@@ -1467,10 +1467,11 @@ export const AdminDashboard: React.FC = () => {
                     }}
                     className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
+                    <option value="keycloak">Keycloak (OIDC Discovery)</option>
+                    <option value="ztrust">ZTrust IAM (OIDC Discovery)</option>
                     <option value="google">Google Workspace / Gmail</option>
                     <option value="github">GitHub OAuth2</option>
                     <option value="microsoft">Microsoft 365 / Entra ID</option>
-                    <option value="keycloak">Keycloak (OIDC Discovery)</option>
                     <option value="okta">Okta (OIDC Discovery)</option>
                     <option value="authentik">Authentik (OIDC Discovery)</option>
                     <option value="generic">Generic OpenID Connect</option>
@@ -1485,7 +1486,11 @@ export const AdminDashboard: React.FC = () => {
                     value={oidcDisplayName}
                     onChange={e => setOidcDisplayName(e.target.value)}
                     placeholder={
-                      oidcProvider === 'google'
+                      oidcProvider === 'keycloak'
+                        ? 'Keycloak SSO'
+                        : oidcProvider === 'ztrust'
+                        ? 'ZTrust SSO'
+                        : oidcProvider === 'google'
                         ? 'Google Workspace'
                         : oidcProvider === 'github'
                         ? 'GitHub'
