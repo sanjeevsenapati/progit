@@ -75,7 +75,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: progit
-          image: localhost/progit:1.15.0
+          image: localhost/progit:1.16.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

@@ -8,6 +8,7 @@ import {
   Clock,
   Code2,
   Cpu,
+  Database,
   Globe,
   Grid,
   Layers,
@@ -41,6 +42,7 @@ import { ThemedSelect } from './toolbox/components/ToolUI';
 const CATEGORY_ICONS: Record<ToolboxCategoryId, React.ReactNode> = {
   security: <Shield className="w-4 h-4" />,
   formatters: <Braces className="w-4 h-4" />,
+  database: <Database className="w-4 h-4" />,
   network: <Globe className="w-4 h-4" />,
   'cron-time': <Clock className="w-4 h-4" />,
   converters: <ArrowLeftRight className="w-4 h-4" />,

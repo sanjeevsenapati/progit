@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.16.0] - 2026-11-18
+
+### Highlights: Developer Toolbox Database Utilities (SQL Suite, Connection String Builder & JDBC URL Generator)
+Expanded the Developer Toolbox (`/toolbox`) with a dedicated **Database** category containing 6 pure client-side, zero-dependency developer utilities.
+
+### Added
+- **SQL Formatter (`/toolbox/sql-formatter`)**: Dialect-aware SQL formatter supporting ANSI, PostgreSQL, MySQL/MariaDB, SQLite, SQL Server (T-SQL), and Oracle (PL/SQL) with configurable indentation (2/4 spaces, tabs), keyword casing, leading/trailing commas, and optional comment stripping.
+- **SQL Beautifier (`/toolbox/sql-beautifier`)**: Advanced query readability tool with 4 presets (**Aligned Clauses**, **Readable 4sp**, **Analytics Leading Commas**, **Compact**), CTE & `CASE`/`WHEN` formatting, and a Fullscreen/Expand comparison toggle (`Escape` to exit).
+- **SQL Minifier (`/toolbox/sql-minifier`)**: Safely minifies SQL into compact single-line queries while preserving single-quoted strings, dollar-quoted PostgreSQL strings, and quoted identifiers, plus byte-savings metrics and JSON-string escaping.
+- **SQL Validator (`/toolbox/sql-validator`)**: Client-side SQL lexer and validator detecting unclosed quotes/comments, mismatched parentheses and `CASE`/`END` blocks, trailing/unexpected commas, invalid clause order, dialect-specific warnings, destructive `UPDATE`/`DELETE` without `WHERE` alerts, and a parsed statement breakdown table.
+- **Connection String Builder (`/toolbox/conn-string`)**: Interactive builder and reverse URI parser supporting PostgreSQL, MySQL, MariaDB, JDBC, SQL Server, Oracle, SQLite, MongoDB, and Redis with automatic password URL-encoding, SSL/TLS options, custom query parameters, and ready-to-copy `.env` / driver DSN outputs.
+- **JDBC URL Generator (`/toolbox/jdbc-url`)**: Dedicated Java JDBC URL generator for PostgreSQL, MySQL, MariaDB, Oracle Thin (Service Name & SID), SQL Server, H2, SQLite, and IBM DB2 with auto-filled Driver class names, Spring Boot HikariCP (`application.properties` & `application.yml`), Maven XML, Gradle, and Java `DriverManager` snippets.
+
+---
+
 ## [1.15.0] - 2026-11-18
 
 ### Highlights: Comprehensive Keycloak & ZTrust OIDC Documentation + First-Class ZTrust Preset
