@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Release-v2.0.0--LTS-blue.svg?style=flat" alt="Version 2.0.0-LTS" />
   <img src="https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat&logo=go" alt="Go Version" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react" alt="React 19" />
   <img src="https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=flat&logo=tailwind-css" alt="Tailwind CSS" />
@@ -17,8 +18,10 @@
 
 ## Highlights
 
+- **Enterprise Long-Term Support (LTS)**: Production-hardened v2.0.0-LTS release with guaranteed 36-month support lifecycle, vulnerability mitigations, and pure-Go runtime stability.
 - **Single Static Binary**: Built with pure Go (`modernc.org/sqlite`, zero CGO) and embedded modern React single-page application using `embed.FS`.
 - **Full Git Engine**: Native Git Smart HTTP (`git-upload-pack`, `git-receive-pack`) and integrated pure-Go SSH server on port 2222.
+- **Developer Toolbox Suite**: Integrated 36-tool productivity suite including Mermaid Live Editor (with full-page mode), Regex Library, Code Snippets, JSONPath/XPath testers, SQL/Stack Trace explainers, and media generators.
 - **Modern GitHub-Like Experience**: React 19 + TypeScript + Vite + Tailwind CSS with dark mode, responsive layout, and reactive updates.
 - **Git-Backed Wiki Engine**: Every repository features an independent, real Git-backed wiki (`<owner>/<repo>.wiki.git`) accessible via Web UI (Markdown preview, revisions, history) and Git CLI (HTTP/SSH).
 - **ProGit Pages (GitHub Pages)**: Host static websites, portfolios, or documentation directly from `gh-pages` or `main` branches with automatic Markdown rendering and access control.
@@ -150,6 +153,7 @@ curl http://localhost:3000/api/health
 ## Documentation
 
 Detailed architectural and deployment documentation is available in the [`docs/`](./docs) directory:
+- [Release Cycle & Version Management Policy](./docs/RELEASE_CYCLE_AND_VERSIONING.md)
 - [Architecture & Design Decisions](./docs/ARCHITECTURE.md)
 - [Feature Inventory & Roadmap](./docs/FEATURE_INVENTORY.md)
 - [Database Design & Schema](./docs/DATABASE_DESIGN.md)
@@ -157,6 +161,7 @@ Detailed architectural and deployment documentation is available in the [`docs/`
 - [Security Model & Hardening](./docs/SECURITY.md)
 - [User Guide & Workflows](./docs/USER_GUIDE.md)
 - [Podman Deployment & Operations](./docs/PODMAN_DEPLOYMENT.md)
+- [Platform Changelog](./CHANGELOG.md)
 
 ---
 

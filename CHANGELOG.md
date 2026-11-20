@@ -41,6 +41,13 @@ ProGit 2.0.0-LTS marks the inaugural enterprise Long-Term Support release of the
   - Converted custom select components to React `createPortal` attached to `document.body` with `fixed` coordinates and `z-index: 9999`, preventing dropdown menus from being clipped by cards or modals.
 - **Repository Fork Conflict Detection**:
   - Added real-time conflict checking when selecting destination accounts, automatically proposing distinct repository names (e.g. `<repo>-fork`).
+- **Mermaid Live Editor Full Page View**:
+  - Added dedicated full page presentation and editing mode (`Maximize2` / `Minimize2` toggle) with flexible layout controls (`Split`, `Diagram Only`, `Code Only`), canvas zoom controls, and quick <kbd>Esc</kbd> keyboard dismissal.
+
+### Governance & Release Management
+- **Formal Release Cycle & Version Management Policy**:
+  - Published [Release Cycle and Version Management Document](docs/RELEASE_CYCLE_AND_VERSIONING.md) codifying Semantic Versioning (`MAJOR.MINOR.PATCH`), the **10-Minor Rule** (every 10 minor versions triggers a major rollover), and a 36-month enterprise Long-Term Support (LTS) lifecycle vs. 6-month standard feature releases.
+
 
 ## [1.19.0] - 2026-11-20
 
