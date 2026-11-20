@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.18.0] - 2026-11-20
+
+### Highlights: Flexible Repository Forking & Same-Account Fork Support
+Fixed public repository forking restrictions that previously prevented users from forking repositories in their account or organizations. Users can now fork any accessible repository into the same account or organization by specifying a distinct repository name, with intelligent auto-suggested `-fork` naming.
+
+### Fixed
+- **Same-Account Repository Forking (`web/src/components/RepoNav.tsx`, `internal/api/api.go`)**:
+  - Removed unconditional prohibition against forking repositories within the same account or organization (`selectedOwner === repo.owner_name`).
+  - Added smart collision detection: when forking into the same account, the fork modal automatically pre-fills `${repo.name}-fork` and dynamically validates against name collisions.
+  - Allowed creating standalone forks under distinct repository names within the same user or organization namespace across both frontend modal and backend API (`POST /api/v1/repos/{owner}/{repo}/forks`).
+  - Updated inline guidance to clearly display when a fork will be created in the current account under a new name and only block submission when an exact name collision exists.
+
+---
+
 ## [1.17.0] - 2026-11-18
 
 ### Highlights: Portal-Backed Select Dropdowns & Registration Placeholder Updates
