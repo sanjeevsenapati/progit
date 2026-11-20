@@ -1,0 +1,196 @@
+export interface RegexItem {
+  id: string;
+  name: string;
+  category: 'web' | 'validation' | 'numbers' | 'code' | 'security';
+  pattern: string;
+  flags: string;
+  description: string;
+  sampleMatch: string;
+  sampleNonMatch: string;
+  tokens: { token: string; explanation: string }[];
+}
+
+export const REGEX_PATTERNS: RegexItem[] = [
+  {
+    id: 'email',
+    name: 'Email Address (RFC 5322 standard)',
+    category: 'web',
+    pattern: '^[a-zA-Z0-9.!#$%&\'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$',
+    flags: '',
+    description: 'Validates standard user@domain.tld email addresses conforming to HTML5/RFC 5322 specification.',
+    sampleMatch: 'sanjeev.dev+ops@sub.domain.co.in',
+    sampleNonMatch: 'plainaddress-without-at',
+    tokens: [
+      { token: '^[a-zA-Z0-9.!#$%...]+', explanation: 'Valid username characters before the @ symbol' },
+      { token: '@', explanation: 'Required literal @ delimiter' },
+      { token: '[a-zA-Z0-9-]{0,61}', explanation: 'Domain labels up to 63 characters' },
+      { token: '(\\.[a-zA-Z0-9-]+)+$', explanation: 'At least one top-level domain suffix' },
+    ],
+  },
+  {
+    id: 'url',
+    name: 'HTTP / HTTPS Web URL',
+    category: 'web',
+    pattern: '^https?:\\/\\/(?:www\\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b(?:[-a-zA-Z0-9()@:%_+.~#?&//=]*)$',
+    flags: 'i',
+    description: 'Matches full web URLs with optional port, query parameters, anchors, and path strings.',
+    sampleMatch: 'https://progit.dev:8443/repos/sanjeev/app?branch=main#readme',
+    sampleNonMatch: 'httpx://bad scheme',
+    tokens: [
+      { token: '^https?:\\/\\/', explanation: 'Protocol must be http:// or https://' },
+      { token: '(?:www\\.)?', explanation: 'Optional www. subdomain' },
+      { token: '[-a-zA-Z0-9...]{1,256}', explanation: 'Domain host name and top level domain' },
+      { token: '(?:[-a-zA-Z0-9...]*)$', explanation: 'Optional path, query strings, and hashes' },
+    ],
+  },
+  {
+    id: 'ipv4',
+    name: 'IPv4 Address with Port',
+    category: 'web',
+    pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?::(?:6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?$',
+    flags: '',
+    description: 'Matches 0.0.0.0 to 255.255.255.255 with an optional valid port number (1-65535).',
+    sampleMatch: '192.168.1.100:8080',
+    sampleNonMatch: '256.300.1.1',
+    tokens: [
+      { token: '25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?', explanation: 'Valid 8-bit octet 0-255' },
+      { token: '\\.', explanation: 'Literal dot delimiter between octets' },
+      { token: ':{port}', explanation: 'Optional TCP/UDP port bounded between 1 and 65535' },
+    ],
+  },
+  {
+    id: 'ipv6',
+    name: 'IPv6 Address',
+    category: 'web',
+    pattern: '^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::(?:[0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4}$|^(?:[0-9a-fA-F]{1,4}:){1,7}:$',
+    flags: '',
+    description: 'Matches full and abbreviated IPv6 addresses with colons and double-colon compression.',
+    sampleMatch: '2001:0db8:85a3:0000:0000:8a2e:0370:7334',
+    sampleNonMatch: '2001:xyz:1',
+    tokens: [
+      { token: '[0-9a-fA-F]{1,4}', explanation: '16-bit hex group' },
+      { token: ':', explanation: 'Colon delimiter' },
+    ],
+  },
+  {
+    id: 'uuid',
+    name: 'UUID / GUID (v1-v7)',
+    category: 'code',
+    pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-7][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+    flags: '',
+    description: 'Matches standard 36-character hyphenated UUID strings with valid version and variant bits.',
+    sampleMatch: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+    sampleNonMatch: '6ba7b8109dad11d180b400c04fd430c8',
+    tokens: [
+      { token: '[0-9a-fA-F]{8}', explanation: '8-hex-digit time_low' },
+      { token: '[1-7][0-9a-fA-F]{3}', explanation: 'Version byte (versions 1 through 7)' },
+      { token: '[89abAB][0-9a-fA-F]{3}', explanation: 'RFC 4122 variant bits' },
+    ],
+  },
+  {
+    id: 'semver',
+    name: 'Semantic Versioning (SemVer 2.0)',
+    category: 'code',
+    pattern: '^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$',
+    flags: '',
+    description: 'Matches SemVer specifications e.g. 1.19.0, 2.0.0-rc.1+20261120.',
+    sampleMatch: '1.19.0-beta.2+build.892',
+    sampleNonMatch: '01.2.3',
+    tokens: [
+      { token: '(0|[1-9]\\d*)', explanation: 'Major, Minor, and Patch numbers (no leading zeroes)' },
+      { token: '(?:-(...))?', explanation: 'Optional prerelease tag with dot-separated identifiers' },
+      { token: '(?:\\+(...))?', explanation: 'Optional build metadata string' },
+    ],
+  },
+  {
+    id: 'slug',
+    name: 'URL Slug / Repository Name',
+    category: 'validation',
+    pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$',
+    flags: '',
+    description: 'Matches lowercase kebab-case strings suitable for URL paths, git branch names, and repo identifiers.',
+    sampleMatch: 'progit-developer-tools-2026',
+    sampleNonMatch: 'Progit_Invalid Slug!',
+    tokens: [
+      { token: '^[a-z0-9]+', explanation: 'Starts with lowercase letter or digit' },
+      { token: '(?:-[a-z0-9]+)*$', explanation: 'Zero or more hyphen-delimited alphanumeric segments' },
+    ],
+  },
+  {
+    id: 'password-strength',
+    name: 'Strong Password (8+ chars, upper, lower, digit, special)',
+    category: 'security',
+    pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$',
+    flags: '',
+    description: 'Enforces minimum 8 characters, at least 1 uppercase, 1 lowercase, 1 number, and 1 special character.',
+    sampleMatch: 'P@ssw0rd2026!',
+    sampleNonMatch: 'weakpassword',
+    tokens: [
+      { token: '(?=.*[a-z])', explanation: 'Positive lookahead for at least one lowercase letter' },
+      { token: '(?=.*[A-Z])', explanation: 'Positive lookahead for at least one uppercase letter' },
+      { token: '(?=.*\\d)', explanation: 'Positive lookahead for at least one number' },
+      { token: '(?=.*[@$!%*?&])', explanation: 'Positive lookahead for special symbols' },
+      { token: '{8,}', explanation: 'Minimum length of 8 characters' },
+    ],
+  },
+  {
+    id: 'date-iso',
+    name: 'ISO 8601 Date (YYYY-MM-DD)',
+    category: 'numbers',
+    pattern: '^\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])$',
+    flags: '',
+    description: 'Matches standard Gregorian calendar dates in year-month-day order with two-digit padding.',
+    sampleMatch: '2026-11-20',
+    sampleNonMatch: '2026-13-45',
+    tokens: [
+      { token: '\\d{4}', explanation: '4-digit year' },
+      { token: '(?:0[1-9]|1[0-2])', explanation: 'Month bounded 01 to 12' },
+      { token: '(?:0[1-9]|[12]\\d|3[01])', explanation: 'Day bounded 01 to 31' },
+    ],
+  },
+  {
+    id: 'hex-color',
+    name: 'Hexadecimal Color (#RGB, #RRGGBB, #RRGGBBAA)',
+    category: 'code',
+    pattern: '^#([a-fA-F0-9]{3}|[a-fA-F0-9]{4}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$',
+    flags: '',
+    description: 'Matches CSS hex colors in 3, 4, 6, or 8 character hex notation with leading hash.',
+    sampleMatch: '#10b981f2',
+    sampleNonMatch: '#12345',
+    tokens: [
+      { token: '#', explanation: 'Literal hash symbol' },
+      { token: '[a-fA-F0-9]{3,8}', explanation: 'Hex color channels (RGB, RGBA, RRGGBB, RRGGBBAA)' },
+    ],
+  },
+  {
+    id: 'jwt',
+    name: 'JWT Bearer Token Format',
+    category: 'security',
+    pattern: '^[A-Za-z0-9-_=]+\\.[A-Za-z0-9-_=]+\\.?[A-Za-z0-9-_.+/=]*$',
+    flags: '',
+    description: 'Matches base64url-encoded JSON Web Tokens with header, payload, and signature segments.',
+    sampleMatch: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4ifQ.dozG4BwWj9_kY0',
+    sampleNonMatch: 'not.a.valid jwt token!!',
+    tokens: [
+      { token: '[A-Za-z0-9-_=]+', explanation: 'Base64URL Header' },
+      { token: '\\.', explanation: 'Dot separator' },
+      { token: '[A-Za-z0-9-_=]+', explanation: 'Base64URL Claims Payload' },
+      { token: '\\.?[A-Za-z0-9-_.+/=]*', explanation: 'Cryptographic Signature' },
+    ],
+  },
+  {
+    id: 'credit-card',
+    name: 'Credit Card Number (Visa, MC, Amex, Discover)',
+    category: 'validation',
+    pattern: '^(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|6(?:011|5[0-9][0-9])[0-9]{12}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|(?:2131|1800|35\\d{3})\\d{11})$',
+    flags: '',
+    description: 'Validates primary card brands: Visa (4), MasterCard (51-55), Amex (34/37), Discover (6011).',
+    sampleMatch: '4111111111111111',
+    sampleNonMatch: '1234567890123456',
+    tokens: [
+      { token: '4[0-9]{12}(?:[0-9]{3})?', explanation: 'Visa card (13 or 16 digits starting with 4)' },
+      { token: '5[1-5][0-9]{14}', explanation: 'MasterCard (16 digits starting with 51-55)' },
+      { token: '3[47][0-9]{13}', explanation: 'American Express (15 digits starting with 34 or 37)' },
+    ],
+  },
+];

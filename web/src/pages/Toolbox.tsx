@@ -47,6 +47,7 @@ const CATEGORY_ICONS: Record<ToolboxCategoryId, React.ReactNode> = {
   'cron-time': <Clock className="w-4 h-4" />,
   converters: <ArrowLeftRight className="w-4 h-4" />,
   'text-code': <Code2 className="w-4 h-4" />,
+  'dev-tools': <Terminal className="w-4 h-4" />,
 };
 
 interface ToolboxProps {
