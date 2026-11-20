@@ -9,8 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.19.0] - 2026-11-20
 
-### Highlights: Fork Modal Lifecycle & Keycloak OIDC SSO Integration
-Resolved an issue where the repository fork modal would stay open in a spinning "Forking..." state with duplicate name warnings after creation, and verified local Keycloak OpenID Connect Single Sign-On end-to-end.
+### Highlights: Developer Productivity Suite (20 Tools), Fork Modal Lifecycle & Keycloak OIDC SSO
+Added a comprehensive suite of 20 developer productivity utilities to the Toolbox covering diagrams, regex, code management, log analysis, and generators. Resolved an issue where the repository fork modal would stay open in a spinning state, and verified Keycloak OIDC SSO.
+
+### Added
+- **Developer Productivity Tools Category (`web/src/pages/toolbox/`)**:
+  - **Mermaid Live Editor**: Interactive diagram and flowchart editor supporting Flowcharts (TD/LR), Sequence Diagrams, State Diagrams, and Pie Charts with pan/zoom and SVG/PNG export.
+  - **Regex Library**: Searchable library of production regular expressions (Web, Forms, Numbers, Code, Security) with live syntax tester and group extraction.
+  - **Code Snippet Manager**: Browser-persisted developer snippet vault with language categorization, tag search, starter templates, and JSON backup/restore.
+  - **JSON Path Tester**: Real-time JSONPath evaluator supporting `$`, child/wildcard access, recursive descent `..`, array slicing, and predicate filters `[?(@.field == val)]`.
+  - **XPath Tester**: XML XPath 1.0 tester with DOM evaluation, matched node serialization, and error detection.
+  - **SQL Query Explainer**: Static SQL analyzer detailing logical query execution order, clause mechanics, complexity estimates, and performance/index warnings.
+  - **Stack Trace Explainer**: Stack trace parser for Java, Python, Node.js, and Go; highlights root cause exceptions, filters runtime noise, and recommends code fixes.
+  - **Error Code Search**: Directory of HTTP status codes, Linux/POSIX errno & signals, Java exceptions, and Docker/Git error remediations.
+  - **Log Analyzer**: Log parser with severity level badges, text/regex search, and filtered log export.
+  - **Log Pattern Extractor**: Log clustering utility that groups high-volume log streams by replacing variable timestamps, UUIDs, IPs, and numbers with abstraction tokens.
+  - **CSV Viewer**: Large tabular CSV/TSV viewer with auto delimiter detection, pagination, column sorting, and JSON export.
+  - **Markdown Editor**: GitHub-flavored Markdown editor with split-pane live preview, toolbar formatting, and `.md` file download.
+  - **Markdown Table Generator**: Interactive WYSIWYG spreadsheet grid with alignment selectors, row/col management, and Markdown table output.
+  - **Color Picker**: Color space converter (HEX, RGB, HSL, HSV, CMYK) with WCAG 2.1 contrast ratio checker and Tailwind-style shades/tints.
+  - **CSS Gradient Generator**: Builder for linear, radial, and conic CSS gradients with angle controls, draggable color stops, and CSS copy.
+  - **SVG Optimizer**: SVG markup cleaner removing comments, editor namespaces, and metadata with precision rounding and byte savings metrics.
+  - **QR Code Generator**: Standard QR matrix generator (ISO/IEC 18004) for URLs, text, and Wi-Fi networks with error correction and SVG/PNG download.
+  - **Barcode Generator**: Linear barcode generator supporting Code 128, Code 39, EAN-13, and UPC-A symbologies with check digit calculation.
+  - **Image Compressor**: Canvas-based client-side image compression and resizing for PNG, JPEG, and WebP with savings percentages.
+  - **Favicon Generator**: Multi-resolution website icon suite generator (16px to 512px) with browser tab preview mockup and HTML `<head>` snippet.
 
 ### Fixed
 - **Repository Fork Modal Lifecycle (`web/src/components/RepoNav.tsx`)**:
