@@ -33,7 +33,7 @@ import (
 
 var (
 	startTime = time.Now()
-	Version   = "1.17.0"
+	Version   = "1.18.0"
 )
 
 type ipRateLimiter struct {
@@ -3367,14 +3367,16 @@ func (r *Router) handleForkRepo(w http.ResponseWriter, req *http.Request) {
 		}
 		destOwnerID = orgUser.ID
 		destOwnerName = org.Name
-	} else if parentRepo.OwnerID == user.ID {
-		jsonError(w, http.StatusBadRequest, "You cannot fork your own repository to your personal account")
-		return
 	}
 
 	forkRepoName := strings.TrimSpace(body.Name)
 	if forkRepoName == "" {
 		forkRepoName = parentRepo.Name
+	}
+
+	if destOwnerID == parentRepo.OwnerID && strings.EqualFold(forkRepoName, parentRepo.Name) {
+		jsonError(w, http.StatusBadRequest, fmt.Sprintf("A repository named '%s' already exists in this account. Choose a different repository name (e.g. '%s-fork').", parentRepo.Name, parentRepo.Name))
+		return
 	}
 
 	// Enforce repository creation limits for non-admin users

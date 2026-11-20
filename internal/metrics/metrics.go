@@ -13,7 +13,7 @@ import (
 
 var (
 	startTime = time.Now()
-	version   = "1.17.0"
+	version   = "1.18.0"
 
 	// HTTP metrics
 	httpRequestsTotal atomic.Uint64

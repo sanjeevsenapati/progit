@@ -62,8 +62,26 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, permissions, isStarred, 
       return;
     }
     setForkError(null);
-    setForkName(repo.name);
+    const initialOwner = selectedOwner || user.username;
+    if (initialOwner === repo.owner_name) {
+      setForkName(`${repo.name}-fork`);
+    } else {
+      setForkName(repo.name);
+    }
     setShowForkModal(true);
+  };
+
+  const handleOwnerChange = (newOwner: string) => {
+    setSelectedOwner(newOwner);
+    if (newOwner === repo.owner_name) {
+      if (forkName.trim() === repo.name || !forkName.trim()) {
+        setForkName(`${repo.name}-fork`);
+      }
+    } else {
+      if (forkName.trim() === `${repo.name}-fork`) {
+        setForkName(repo.name);
+      }
+    }
   };
 
   const handleCreateFork = async (e: React.FormEvent) => {
@@ -338,13 +356,15 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, permissions, isStarred, 
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white">Create a new fork</h3>
-                  <p className="text-xs text-gray-500 dark:text-dark-muted">Fork {repo.owner_name}/{repo.name} to your account</p>
+                  <p className="text-xs text-gray-500 dark:text-dark-muted">
+                    Fork {repo.owner_name}/{repo.name} to {selectedOwner ? (selectedOwner === user?.username ? 'your account' : selectedOwner) : 'your account'}
+                  </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowForkModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1 rounded-lg transition-colors"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -360,13 +380,13 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, permissions, isStarred, 
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-dark-text mb-1.5">
-                  Owner & Repository name
+                  Owner &amp; Repository name
                 </label>
                 <div className="flex items-center space-x-2">
                   <select
                     value={selectedOwner}
-                    onChange={(e) => setSelectedOwner(e.target.value)}
-                    className="w-1/2 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                    onChange={(e) => handleOwnerChange(e.target.value)}
+                    className="w-1/2 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                   >
                     {user && <option value={user.username}>{user.username}</option>}
                     {orgs.map((org) => (
@@ -382,18 +402,24 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, permissions, isStarred, 
                     onChange={(e) => setForkName(e.target.value)}
                     required
                     placeholder="Repository name"
-                    className="w-1/2 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                    className="w-1/2 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 font-mono"
                   />
                 </div>
-                {selectedOwner === repo.owner_name && (
+                {selectedOwner === repo.owner_name && forkName.trim().toLowerCase() === repo.name.toLowerCase() ? (
                   <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                    You cannot fork into the same account that currently owns the repository. Select an organization or different destination.
+                    A repository named &quot;{repo.name}&quot; already exists in this account. Choose a different repository name (e.g. &quot;{repo.name}-fork&quot;) to create a fork.
                   </p>
-                )}
+                ) : selectedOwner === repo.owner_name && forkName.trim() ? (
+                  <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+                    Forking into the same account as a separate repository named &quot;{forkName.trim()}&quot;.
+                  </p>
+                ) : null}
               </div>
 
               <div className="p-3 bg-gray-50 dark:bg-dark-hover rounded-lg text-xs text-gray-500 dark:text-dark-muted space-y-1">
-                <p>• A copy of <strong>{repo.owner_name}/{repo.name}</strong> will be created in <strong>{selectedOwner || 'your account'}</strong>.</p>
+                <p>
+                  • A copy of <strong>{repo.owner_name}/{repo.name}</strong> will be created in <strong>{selectedOwner || 'your account'}</strong> as <strong>{forkName.trim() || repo.name}</strong>.
+                </p>
                 <p>• All branches, commits, tags, and commit histories will be preserved.</p>
               </div>
 
@@ -401,14 +427,14 @@ export const RepoNav: React.FC<RepoNavProps> = ({ repo, permissions, isStarred, 
                 <button
                   type="button"
                   onClick={() => setShowForkModal(false)}
-                  className="px-4 py-2 text-xs font-semibold border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors rounded-lg"
+                  className="px-4 py-2 text-xs font-semibold border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-hover text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-border/60 transition-colors rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={forking || (selectedOwner === repo.owner_name)}
-                  className="inline-flex items-center px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors"
+                  disabled={forking || !forkName.trim() || (selectedOwner === repo.owner_name && forkName.trim().toLowerCase() === repo.name.toLowerCase())}
+                  className="inline-flex items-center px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {forking ? (
                     <>

@@ -1,4 +1,4 @@
-import{r as n,j as e,n as b,m as o,s as x,f as p,t as i,l as h,I as k}from"./index-Y_a-O6bU.js";import{v as g,S as u}from"./sql-D3KtkEdS.js";const c=`SELECT
+import{r as n,j as e,n as b,m as o,s as x,f as p,t as i,l as h,I as k}from"./index-C-Pj-ZjT.js";import{v as g,S as u}from"./sql-D3KtkEdS.js";const c=`SELECT
   u.id,
   u.username,
   COUNT(r.id) AS total_repos
