@@ -101,6 +101,14 @@ ProGit features a global, real-time repository search engine:
 
 ![ProGit Explore & Repository Catalog](../assets/images/progit-explore.jpg)
 
+### 2.5 Forking a Repository
+1. Click the **Fork** button in the top right of any repository header.
+2. Select the destination owner (your personal account or an organization you administer).
+3. If forking into the same account, customize the fork name (pre-filled with `<repo>-fork`).
+4. Click **Create fork**. ProGit creates a complete Git mirror clone preserving all branches, commits, tags, and history.
+
+![ProGit Themed Repository Fork Modal and Destination Selector](../assets/images/repo-fork-dialog.jpg)
+
 ---
 
 ## 3. Code Browsing & Explorer Layout
@@ -128,12 +136,16 @@ ProGit features a responsive, full-featured web code editor with live syntax hig
 - **Create New File**: Click **Add file > Create new file** or click the `+` icon in the explorer sidebar. You can type nested paths (e.g. `src/utils/math.js`) and ProGit will automatically create the required directories.
 - **Edit Existing File**: In the file view (`FileView`), click the **Edit** (pencil) button. This opens the online editor with the same explorer sidebar, auto-theme matching, line numbers, and a **Preview** tab for Markdown files.
 
+![ProGit Online Code Editor with Live Syntax Highlighting and Prettier](../assets/images/repo-online-editor.jpg)
+
 ### 3.2 Uploading Files and Directories
 - Click **Add file > Upload files** from any repository code view.
 - **Drag & Drop**: Drag one or more files directly into the upload dropzone.
 - **Choose Files**: Click **choose files** to pick multiple files.
 - **Upload Directory**: Click **upload a directory** to select an entire folder structure. ProGit preserves relative subdirectories (e.g., `assets/images/logo.svg`).
 - Review the staged file list, enter a commit message, select the target branch, and click **Commit changes**. All uploaded files are committed in a single atomic Git commit.
+
+![ProGit Drag and Drop File and Directory Upload Dropzone](../assets/images/repo-file-upload.jpg)
 
 ### 3.3 Online File Deletion
 - In the file view, click the **Delete** (trash) button.
@@ -164,9 +176,13 @@ ProGit features a responsive, full-featured web code editor with live syntax hig
 - **Auto-Closing Issues**: Referencing issues in PR descriptions or commit messages using `Fixes #X`, `Closes #X`, or `Resolves #X` automatically closes the referenced issues when the PR is merged.
 - **Post-Merge Branch Deletion**: Once merged, a 1-click **Delete branch** button is displayed to immediately delete the head branch and keep the repository clean.
 
+![ProGit Pull Request Review, Branch Status and Native Git Merge](../assets/images/repo-pull-request.jpg)
+
 ---
 
 ## 5. Repository Settings & Branch Protection
+
+![ProGit Branch Management, Default Branch Protection and Tracking](../assets/images/repo-branch-management.jpg)
 
 ### 5.1 Default Branch Settings
 Repository owners and administrators can customize a repository's default branch at any stage:
@@ -212,6 +228,8 @@ Protect important branches like `main` or release branches:
 ## 6. Project Wiki Documentation
 
 Each ProGit repository includes a built-in, Git-backed wiki for architecture documents, guides, walkthroughs, and roadmaps.
+
+![ProGit Git-Backed Wiki Engine and Offline Clone URI](../assets/images/repo-wiki-engine.jpg)
 
 ### 6.1 First-Time Wiki Experience (GitHub-Style Onboarding)
 When navigating to the **Wiki** tab for a repository that does not yet have any wiki content:
@@ -263,6 +281,8 @@ Changes pushed over HTTPS or SSH are instantly indexed and reflected in the ProG
 
 ProGit Pages lets you host static websites, portfolios, or documentation directly from any Git branch.
 
+![ProGit Pages Static Site Hosting and Branch Configuration](../assets/images/repo-pages-hosting.jpg)
+
 ### 7.1 Enabling ProGit Pages (Owner / Repository Admin Only)
 1. Go to repository **Settings** (or the **Pages** tab — only visible for configuration to the repository owner and administrators).
 2. Check **Enable ProGit Pages**.
@@ -312,6 +332,8 @@ ProGit strictly enforces access control boundaries across all online write opera
 
 Like GitHub, ProGit allows users to create Organizations to manage shared repositories, access permissions, and developer teams.
 
+![ProGit Organization Profile, Team Roles and Repositories](../assets/images/org-profile-teams.jpg)
+
 ### 9.1 Creating an Organization
 1. Click the **+** (Create) menu in the navigation bar and select **New Organization** (or visit `/org/new`).
 2. Enter a unique organization handle (e.g. `acme-corp`), full name, and description.
@@ -332,6 +354,8 @@ Like GitHub, ProGit allows users to create Organizations to manage shared reposi
 ## 10. Projects & Kanban Boards
 
 ProGit features interactive Kanban project boards for repositories to organize sprint tasks, roadmap epics, and repository issues.
+
+![ProGit Kanban Project Board with Columns and Sprint Tasks](../assets/images/repo-project-board.jpg)
 
 ### 10.1 Creating a Project Board
 1. In your repository header, click the **Projects** tab.
@@ -354,6 +378,8 @@ ProGit features interactive Kanban project boards for repositories to organize s
 ## 11. Developer Direct Messaging & Collaboration
 
 ProGit includes a secure, privacy-preserving messaging portal allowing developers to collaborate directly without external tooling:
+
+![ProGit Direct Developer Messages and Consent Workflow](../assets/images/progit-developer-messaging.jpg)
 
 ### 11.1 Recipient Discovery & Anti-Enumeration Protection
 To safeguard user privacy and prevent account harvesting or credential scraping:
@@ -393,6 +419,8 @@ Server administrators can enable or disable direct developer messaging globally:
 
 Webhooks allow external services (CI/CD engines, Slack, Discord, custom servers) to be notified whenever repository events occur.
 
+![ProGit Webhook Management, HMAC Signature and Event Selection](../assets/images/repo-webhooks-management.jpg)
+
 ### 12.1 Configuring a Webhook
 1. In your repository, navigate to **Settings > Webhooks**.
 2. Click **Add Webhook**.
@@ -420,6 +448,8 @@ X-Hub-Signature-256: sha256=d254f3879...
 ## 13. Repository Danger Zone & Protection
 
 Located in **Settings > Danger Zone**, these actions provide high-stakes repository lifecycle operations with multiple confirmation safeguards:
+
+![ProGit Danger Zone Administrative Actions and Safeguards](../assets/images/repo-danger-zone.jpg)
 
 ### 13.1 Changing Repository Visibility
 - Toggle your repository between **Public** and **Private**.
