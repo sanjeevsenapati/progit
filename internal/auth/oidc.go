@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -163,6 +164,10 @@ func DiscoverOIDC(issuerURL string) (*OIDCDiscoveryResult, error) {
 		return nil, errors.New("issuer URL must be a valid http:// or https:// URL")
 	}
 
+	if err := isProhibitedSSRFAddress(parsed.Host); err != nil {
+		return nil, fmt.Errorf("OIDC discovery blocked by security policy: %w", err)
+	}
+
 	wellKnownURL := strings.TrimRight(trimmed, "/")
 	if !strings.HasSuffix(wellKnownURL, "/.well-known/openid-configuration") {
 		wellKnownURL += "/.well-known/openid-configuration"
@@ -189,6 +194,60 @@ func DiscoverOIDC(issuerURL string) (*OIDCDiscoveryResult, error) {
 	}
 
 	return &doc, nil
+}
+
+func isProhibitedSSRFAddress(rawHost string) error {
+	host := rawHost
+	if h, _, err := net.SplitHostPort(rawHost); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+
+	lower := strings.ToLower(host)
+	if lower == "metadata.google.internal" || lower == "instance-data" || strings.HasSuffix(lower, ".internal.cloudapp.net") {
+		return errors.New("access to cloud instance metadata service is prohibited")
+	}
+
+	// Check if host is direct IP literal
+	if ip := net.ParseIP(host); ip != nil {
+		if err := checkIPProhibited(ip); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// Resolve hostname to check for metadata redirection (DNS rebinding / alias)
+	ips, err := net.LookupIP(host)
+	if err == nil {
+		for _, ip := range ips {
+			if err := checkIPProhibited(ip); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func checkIPProhibited(ip net.IP) error {
+	if ip == nil {
+		return nil
+	}
+	// Check IPv4 link-local (169.254.0.0/16, including 169.254.169.254 IMDS)
+	if ip4 := ip.To4(); ip4 != nil {
+		if ip4[0] == 169 && ip4[1] == 254 {
+			return errors.New("access to cloud metadata or link-local address (169.254.x.x) is prohibited")
+		}
+		if ip4.IsMulticast() || ip4.IsUnspecified() {
+			return errors.New("access to multicast or unspecified address is prohibited")
+		}
+		return nil
+	}
+	// IPv6 link-local, AWS IMDSv6, multicast, unspecified
+	if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() || ip.String() == "fd00:ec2::254" {
+		return errors.New("access to cloud metadata, link-local, or multicast IPv6 address is prohibited")
+	}
+	return nil
 }
 
 // discoverEndpoints queries the provider's discovery endpoint and populates globalOIDC.

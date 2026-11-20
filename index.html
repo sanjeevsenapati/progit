@@ -24,20 +24,34 @@
   <meta property="og:description" content="Looking for git services or a self-hosted GitHub, Gogs, or Gitea alternative? ProGit is a high-performance Git collaboration platform written in pure Go &amp; React 19 with zero CGO dependencies.">
   <meta property="og:url" content="https://progit.co.in/">
   <meta property="og:site_name" content="ProGit">
+
+  <!-- Primary Image: Highly optimized JPEG for WhatsApp, Facebook, LinkedIn (102 KB < 300 KB limit) -->
+  <meta property="og:image" content="https://progit.co.in/progit-og.jpg">
+  <meta property="og:image:secure_url" content="https://progit.co.in/progit-og.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="ProGit v2.0.0-LTS — The Modern Sovereign Self-Hosted Git Platform">
+
+  <!-- Secondary PNG fallback -->
   <meta property="og:image" content="https://progit.co.in/progit-og.png">
   <meta property="og:image:secure_url" content="https://progit.co.in/progit-og.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="ProGit — The Modern Sovereign Self-Hosted Git Platform">
+
+  <!-- WhatsApp, Telegram & Search Engine Image Link Fallbacks -->
+  <link rel="image_src" href="https://progit.co.in/progit-og.jpg">
+  <meta itemprop="image" content="https://progit.co.in/progit-og.jpg">
+  <meta name="image" content="https://progit.co.in/progit-og.jpg">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:url" content="https://progit.co.in/">
   <meta name="twitter:title" content="ProGit — Modern Self-Hosted Git Service | GitHub, Gogs &amp; Gitea Alternative">
   <meta name="twitter:description" content="Lightweight GitHub, Gogs, and Gitea alternative written in pure Go with zero CGO dependencies. < 40 MB RAM, Docker &amp; Podman ready.">
-  <meta name="twitter:image" content="https://progit.co.in/progit-og.png">
-  <meta name="twitter:image:alt" content="ProGit — The Modern Sovereign Self-Hosted Git Platform">
+  <meta name="twitter:image" content="https://progit.co.in/progit-og.jpg">
+  <meta name="twitter:image:alt" content="ProGit v2.0.0-LTS — The Modern Sovereign Self-Hosted Git Platform">
 
   <!-- Schema.org JSON-LD Structured Data for Google Rich Snippets -->
   <script type="application/ld+json">
@@ -97,7 +111,7 @@
           "priceCurrency": "USD"
         },
         "description": "A high-performance, single-binary self-hosted Git service and alternative to GitHub, Gogs, Gitea, and GitLab. Built with pure Go and embedded React 19 UI.",
-        "softwareVersion": "1.19.0",
+        "softwareVersion": "2.0.0-LTS",
         "license": "https://opensource.org/licenses/MIT",
         "url": "https://progit.co.in/"
       },
@@ -1159,7 +1173,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
         </div>
         <span class="brand-title">ProGit</span>
-        <span class="version-pill">v1.19.0</span>
+        <span class="version-pill">v2.0.0-LTS</span>
       </a>
     </div>
 
@@ -1419,16 +1433,29 @@
           </button>
           <div class="dropdown-panel dropdown-align-right">
             <div class="dropdown-grid-releases">
+              <a href="#ops-versioning" class="dropdown-item" onclick="navigate('ops-versioning')">
+                <div class="dropdown-icon-box icon-tint-cyan">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4"/><path d="M12 18v4"/><path d="m4.93 4.93 2.83 2.83"/><path d="m16.24 16.24 2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="m4.93 19.07 2.83-2.83"/><path d="m16.24 7.76 2.83-2.83"/></svg>
+                </div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">
+                    <span>Release Policy &amp; Lifecycle</span>
+                    <span class="dropdown-badge badge-accent">POLICY</span>
+                  </div>
+                  <div class="dropdown-desc">The 10-Minor Rule, SemVer &amp; LTS vs Non-LTS Comparison</div>
+                </div>
+              </a>
+
               <a href="#ops-changelog" class="dropdown-item" onclick="navigate('ops-changelog')">
                 <div class="dropdown-icon-box icon-tint-emerald">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9"/><path d="M12 12v3"/></svg>
                 </div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">
-                    <span>v1.19.0</span>
-                    <span class="dropdown-badge badge-accent">LATEST</span>
+                    <span>v2.0.0-LTS</span>
+                    <span class="dropdown-badge badge-accent">LTS</span>
                   </div>
-                  <div class="dropdown-desc">Fork Modal Lifecycle Fix &amp; Keycloak OIDC SSO</div>
+                  <div class="dropdown-desc">Long-Term Support, Security Hardening &amp; Performance Tuning</div>
                 </div>
               </a>
 
@@ -1627,6 +1654,7 @@
         <ul class="sidebar-nav">
           <li><a href="#ops-backup" data-target="ops-backup" onclick="navigate('ops-backup')">Backup &amp; Disaster Recovery</a></li>
           <li><a href="#ops-upgrade" data-target="ops-upgrade" onclick="navigate('ops-upgrade')">Upgrading ProGit</a></li>
+          <li><a href="#ops-versioning" data-target="ops-versioning" onclick="navigate('ops-versioning')">Release Cycle &amp; Versioning</a></li>
           <li><a href="#ops-faq" data-target="ops-faq" onclick="navigate('ops-faq')">Troubleshooting &amp; FAQ</a></li>
           <li><a href="#ops-changelog" data-target="ops-changelog" onclick="navigate('ops-changelog')">Version Changelog</a></li>
         </ul>
@@ -5108,6 +5136,90 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
             <span class="dir">&larr; Previous</span>
             <span class="title">Troubleshooting &amp; FAQ</span>
           </a>
+          <a href="#ops-versioning" class="nav-btn" onclick="navigate('ops-versioning')">
+            <span class="dir">Next &rarr;</span>
+            <span class="title">Release Cycle &amp; Versioning</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- 37b. Operations: Release Cycle & Version Management Policy -->
+      <article class="doc-page" id="page-ops-versioning">
+        <div class="breadcrumbs">
+          <span>Operations &amp; Releases</span>
+          <span>/</span>
+          <span class="current">Release Cycle &amp; Versioning Policy</span>
+        </div>
+        <h1 class="page-title">Release Cycle &amp; Version Management Policy</h1>
+        <p class="page-subtitle">Governance guidelines for Semantic Versioning, the 10-Minor Rule, LTS vs Non-LTS support windows, and enterprise SLAs.</p>
+
+        <div class="callout callout-tip" style="margin-bottom: 2rem;">
+          <div class="callout-title">Enterprise Long-Term Support (LTS) Baseline</div>
+          <div>ProGit <strong>v2.0.0-LTS</strong> establishes the official enterprise Long-Term Support release baseline, supported for <strong>36 consecutive months</strong> (24 months active support + 12 months critical security backports).</div>
+        </div>
+
+        <h2>Semantic Versioning Schema</h2>
+        <p>ProGit adheres to the <code>MAJOR.MINOR.PATCH[-PRERELEASE]</code> format, augmented by the strict <strong>10-Minor Rule</strong>:</p>
+
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; font-family: var(--font-mono, monospace);">
+          <div style="font-size: 1.5rem; color: var(--accent); font-weight: 700; margin-bottom: 0.75rem;">vMAJOR.MINOR.PATCH[-LTS]</div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-top: 1rem; font-family: var(--font-sans, inherit);">
+            <div style="padding: 1rem; border-left: 3px solid #10b981; background: rgba(16,185,129,0.06); border-radius: 4px;">
+              <div style="font-weight: 700; color: #10b981; margin-bottom: 4px;">PATCH (x.y.Z)</div>
+              <div style="font-size: 13px; color: var(--text-muted);">Bug fixes, vulnerability mitigations (CVE/VA), performance tuning. Zero breaking changes, zero database schema drops. Drop-in binary replacement.</div>
+            </div>
+            <div style="padding: 1rem; border-left: 3px solid #3b82f6; background: rgba(59,130,246,0.06); border-radius: 4px;">
+              <div style="font-weight: 700; color: #3b82f6; margin-bottom: 4px;">MINOR (x.Y.0)</div>
+              <div style="font-size: 13px; color: var(--text-muted);">New feature additions, Developer Toolbox utilities, additive non-breaking REST endpoints, backward-compatible SQLite schema migrations.</div>
+            </div>
+            <div style="padding: 1rem; border-left: 3px solid #a855f7; background: rgba(168,85,247,0.06); border-radius: 4px;">
+              <div style="font-weight: 700; color: #a855f7; margin-bottom: 4px;">MAJOR (X.0.0)</div>
+              <div style="font-size: 13px; color: var(--text-muted);">Major architectural transitions OR triggered automatically by the <strong>10-Minor Rule</strong>. Designates an enterprise LTS baseline.</div>
+            </div>
+          </div>
+        </div>
+
+        <h2>The 10-Minor Rule</h2>
+        <p>To eliminate version number drift and cap administrative complexity, ProGit strictly limits minor versions to 10 releases per major generation:</p>
+        <div class="callout callout-warning">
+          <div class="callout-title">The 10-Minor Rule Principle</div>
+          <div>Every 10 minor versions (cycles <code>x.0</code> through <code>x.9</code>), the next release <strong>MUST increment the MAJOR version number</strong>.<br>
+          <em>Example:</em> Following <code>v2.9.x</code>, the subsequent release is strictly designated as <strong><code>v3.0.0-LTS</code></strong>, never <code>v2.10.0</code>.</div>
+        </div>
+
+        <h2>LTS vs. Non-LTS Releases: Comparison</h2>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr><th>Dimension</th><th>Long-Term Support (LTS)</th><th>Non-LTS (Standard / Feature)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Release Cadence</strong></td><td>Every 10 Minor Cycles (~18&ndash;24 Months)</td><td>Monthly / Bi-Monthly Feature Cadence</td></tr>
+              <tr><td><strong>Support Window</strong></td><td><strong>36 Months (3 Years)</strong><br><small style="color: var(--text-muted);">24 mo active + 12 mo security maintenance</small></td><td><strong>6 Months</strong><br><small style="color: var(--text-muted);">Until superseded by 2 subsequent releases</small></td></tr>
+              <tr><td><strong>Target Environments</strong></td><td>Enterprise production, financial, air-gapped, government</td><td>Early adopters, agile dev teams, rapid feature testers</td></tr>
+              <tr><td><strong>Scope of Changes</strong></td><td>Strictly bug fixes, security backports, perf tuning</td><td>New capabilities, UI overhauls, additive APIs</td></tr>
+              <tr><td><strong>API Stability Guarantee</strong></td><td>100% frozen; zero breaking changes for 36 months</td><td>Backward compatible; deprecation notice for 2 minors</td></tr>
+              <tr><td><strong>Security SLA</strong></td><td>Critical: <strong>&lt; 48 hours</strong> &bull; High: <strong>&lt; 7 days</strong></td><td>Next scheduled monthly or minor release</td></tr>
+              <tr><td><strong>Container Tags</strong></td><td><code>progit:2.0.0-LTS</code>, <code>progit:2.0-lts</code></td><td><code>progit:2.1.0</code>, <code>progit:latest</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2>Release Lifecycle &amp; Support Timeline</h2>
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h3 style="margin-top: 0;">Multi-Year Support Roadmap</h3>
+          <ul>
+            <li><strong>v2.0.0-LTS</strong> &mdash; <em>Active Support:</em> Nov 2026 &ndash; Nov 2028 | <em>Maintenance:</em> Nov 2028 &ndash; Nov 2029 | <em>EOL:</em> Nov 2029</li>
+            <li><strong>v2.1.0 &ndash; v2.9.0 (Standard)</strong> &mdash; 6-month support window per minor version.</li>
+            <li><strong>v3.0.0-LTS (Next LTS)</strong> &mdash; Scheduled following conclusion of <code>v2.9.x</code> cycle.</li>
+          </ul>
+        </div>
+
+        <div class="page-nav-buttons">
+          <a href="#enterprise-ha" class="nav-btn" onclick="navigate('enterprise-ha')">
+            <span class="dir">&larr; Previous</span>
+            <span class="title">Enterprise HA Strategy</span>
+          </a>
           <a href="#ops-changelog" class="nav-btn" onclick="navigate('ops-changelog')">
             <span class="dir">Next &rarr;</span>
             <span class="title">Version Changelog</span>
@@ -5126,7 +5238,20 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
         <p class="page-subtitle">Complete version release history for ProGit adhering to Semantic Versioning.</p>
 
                                 <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
-          <h2 style="margin-top: 0; color: var(--accent);">v1.19.0 &mdash; Fork Modal Lifecycle Fix &amp; Keycloak OIDC SSO Integration <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <h2 style="margin-top: 0; color: var(--accent);">v2.0.0-LTS &mdash; Enterprise Long-Term Support, Security Hardening &amp; Performance Tuning <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">LTS</span></h2>
+          <p><strong>Release Date:</strong> November 20, 2026</p>
+          <ul>
+            <li><strong>Long-Term Support (LTS) Baseline</strong>: Official enterprise LTS release with guaranteed 36-month security maintenance, zero-breaking-change API guarantees, and high-performance multi-platform builds.</li>
+            <li><strong>Complete Vulnerability Assessment (VA) Remediations</strong>: Full defense-in-depth resolutions for 13 security vectors, including OIDC SSO random token generation (VA-OIDC-1), Cloud Instance Metadata (IMDS) SSRF filtering (VA-OIDC-2), repository name traversal and CLI flag injection prevention (VA-REPO-1), DOM XSS neutralization (VA-XSS-1), and W3C SVG sandbox isolation (VA-XSS-2).</li>
+            <li><strong>Full 36-Tool Developer Productivity Suite</strong>: Complete suite of offline developer tools including diagrams (Mermaid), regex library, JSONPath/XPath testers, SQL/stack-trace explainers, log analyzer/pattern extractor, CSV viewer, and vector generators.</li>
+            <li><strong>Mermaid Live Editor Full Page View</strong>: Added full page editing and presentation overlay mode with interactive split, diagram-only, and code-only layouts, smooth canvas zoom controls, and quick <kbd>Esc</kbd> dismissal.</li>
+            <li><strong>Release Cycle &amp; Version Management Policy</strong>: Formalized Semantic Versioning, the <strong>10-Minor Rule</strong> (every 10 minor versions triggers a major rollover), and a 36-month enterprise Long-Term Support (LTS) lifecycle vs. 6-month standard feature releases.</li>
+            <li><strong>Performance &amp; Memory Optimizations</strong>: Sub-300ms initial load time with Vite 6 48-chunk code-splitting, pure-Go SQLite WAL mode, and Unix process group isolation.</li>
+          </ul>
+        </div>
+
+                                <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0;">v1.19.0 &mdash; Fork Modal Lifecycle Fix &amp; Keycloak OIDC SSO Integration</h2>
           <p><strong>Release Date:</strong> November 20, 2026</p>
           <ul>
             <li><strong>Fork Modal Lifecycle &amp; State Cleanup</strong>: Resolved perpetual spinning &quot;Forking...&quot; state upon repository fork creation by cleanly unmounting and resetting modal state and issuing a hard reload to the new repository fork.</li>
@@ -5431,6 +5556,7 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
       { id: 'api-admin', title: 'System Admin & Maintenance API', section: 'REST API', desc: 'Endpoints for system telemetry, user administration, and WAL checkpoints.' },
       { id: 'ops-backup', title: 'Backup & Disaster Recovery', section: 'Operations', desc: 'Archiving /data/db and /data/repositories for safe recovery.' },
       { id: 'ops-upgrade', title: 'Upgrading ProGit', section: 'Operations', desc: 'Zero-downtime container and binary upgrade procedures.' },
+      { id: 'ops-versioning', title: 'Release Cycle & Version Management Policy', section: 'Operations', desc: 'Semantic Versioning, 10-Minor Rule, LTS vs Non-LTS lifecycle, and enterprise support policies.' },
       { id: 'ops-faq', title: 'Troubleshooting & FAQ', section: 'Operations', desc: 'Resolving port conflicts, SSH issues, and permissions.' },
       { id: 'ops-changelog', title: 'Version Changelog & Release History', section: 'Operations', desc: 'Detailed release notes, version bumps, and changelog history for all ProGit minor and patch releases.' },
       { id: 'enterprise-ha', title: 'Multi-Node HA & Commercial Strategy', section: 'Enterprise & Architecture', desc: 'Stateless compute, Patroni PostgreSQL, distributed storage, and commercial pricing models.' }
