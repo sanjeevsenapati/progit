@@ -305,7 +305,7 @@ func IsValidBranchName(branch string) bool {
 	if strings.Contains(branch, "//") || strings.Contains(branch, "..") || strings.Contains(branch, "@{") {
 		return false
 	}
-	if strings.ContainsAny(branch, " ~^:?*[\\") {
+	if strings.ContainsAny(branch, " ~^:?*[\\]") {
 		return false
 	}
 	for _, r := range branch {
@@ -315,6 +315,27 @@ func IsValidBranchName(branch string) bool {
 	}
 	_, err := RunGit("", "check-ref-format", "refs/heads/"+branch)
 	return err == nil
+}
+
+var repoNameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
+
+// IsValidRepoName validates that a repository name contains only safe characters,
+// preventing path traversal, option injection, and reserved names.
+func IsValidRepoName(name string) bool {
+	if name == "" || name != strings.TrimSpace(name) || len(name) > 100 {
+		return false
+	}
+	if strings.HasPrefix(name, "-") || strings.HasPrefix(name, ".") || strings.HasSuffix(name, ".") {
+		return false
+	}
+	if strings.Contains(name, "..") || strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		return false
+	}
+	lower := strings.ToLower(name)
+	if lower == ".git" || strings.HasSuffix(lower, ".git") || strings.HasSuffix(lower, ".wiki") {
+		return false
+	}
+	return repoNameRegex.MatchString(name)
 }
 
 // GetDefaultBranch returns the default branch for a bare repository.
@@ -396,7 +417,7 @@ func ForkRepository(srcRepoPath, destRepoPath string) error {
 	if _, err := os.Stat(srcRepoPath); err != nil {
 		return InitBareRepository(destRepoPath, "main")
 	}
-	_, err := RunGit("", "clone", "--bare", srcRepoPath, destRepoPath)
+	_, err := RunGit("", "-c", "core.hooksPath=/dev/null", "clone", "--bare", "--", srcRepoPath, destRepoPath)
 	return err
 }
 

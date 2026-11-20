@@ -775,7 +775,9 @@ func (r *Router) handleOIDCCallback(w http.ResponseWriter, req *http.Request) {
 			name = username
 		}
 
-		placeholderHash, _ := auth.HashPassword(username + "-oidc-sso-pwd")
+		randomBytes := make([]byte, 32)
+		_, _ = rand.Read(randomBytes)
+		placeholderHash, _ := auth.HashPassword(hex.EncodeToString(randomBytes))
 		user, err = database.CreateUser(username, userInfo.Email, placeholderHash, name, false)
 		if err != nil {
 			log.Printf("[OIDC] Failed to provision user %s: %v", userInfo.Email, err)
@@ -1398,6 +1400,10 @@ func (r *Router) handleCreateRepo(w http.ResponseWriter, req *http.Request) {
 		jsonError(w, http.StatusBadRequest, "Repository name is required")
 		return
 	}
+	if !git.IsValidRepoName(body.Name) {
+		jsonError(w, http.StatusBadRequest, "Invalid repository name. Names must contain only alphanumeric characters, dashes, underscores, and dots, must not start with a dash or dot, and cannot contain path traversal sequences.")
+		return
+	}
 
 	defaultBranch := strings.TrimSpace(body.DefaultBranch)
 	if defaultBranch == "" {
@@ -1546,8 +1552,7 @@ func (r *Router) handleImportRepo(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	validName := regexp.MustCompile(`^[a-zA-Z0-9_\.\-]+$`)
-	if !validName.MatchString(body.Name) || body.Name == "." || body.Name == ".." {
+	if !git.IsValidRepoName(body.Name) {
 		jsonError(w, http.StatusBadRequest, "Invalid repository name")
 		return
 	}
@@ -3372,6 +3377,10 @@ func (r *Router) handleForkRepo(w http.ResponseWriter, req *http.Request) {
 	forkRepoName := strings.TrimSpace(body.Name)
 	if forkRepoName == "" {
 		forkRepoName = parentRepo.Name
+	}
+	if !git.IsValidRepoName(forkRepoName) {
+		jsonError(w, http.StatusBadRequest, "Invalid repository name. Names must contain only alphanumeric characters, dashes, underscores, and dots, must not start with a dash or dot, and cannot contain path traversal sequences.")
+		return
 	}
 
 	if destOwnerID == parentRepo.OwnerID && strings.EqualFold(forkRepoName, parentRepo.Name) {

@@ -65,7 +65,13 @@ export const SvgOptimizerTool: React.FC = () => {
         });
       }
 
-      // 6. Minify whitespace
+      // 6. Security sanitization: Strip dangerous script and event handler injection
+      result = result
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+        .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, '');
+
+      // 7. Minify whitespace
       result = result
         .replace(/>\s+</g, '><')
         .replace(/\s{2,}/g, ' ')
@@ -185,9 +191,10 @@ export const SvgOptimizerTool: React.FC = () => {
 
             <div className="p-4 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg h-48 flex items-center justify-center overflow-hidden">
               {optimizedSvg ? (
-                <div
-                  className="max-h-full max-w-full flex items-center justify-center"
-                  dangerouslySetInnerHTML={{ __html: optimizedSvg }}
+                <img
+                  src={`data:image/svg+xml;utf8,${encodeURIComponent(optimizedSvg)}`}
+                  alt="Optimized SVG preview"
+                  className="max-h-full max-w-full object-contain"
                 />
               ) : (
                 <p className="text-xs text-gray-400">Invalid SVG</p>

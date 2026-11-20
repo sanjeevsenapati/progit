@@ -177,3 +177,19 @@ func TestDiscoverOIDCDirectAndJWTClaims(t *testing.T) {
 		t.Errorf("Unexpected parsed JWT claims: %+v", claims)
 	}
 }
+
+func TestDiscoverOIDCSSRFProtection(t *testing.T) {
+	blockedURLs := []string{
+		"http://169.254.169.254/latest/meta-data",
+		"https://169.254.1.1/realms/master",
+		"http://metadata.google.internal/computeMetadata/v1",
+		"http://instance-data/latest",
+	}
+
+	for _, u := range blockedURLs {
+		_, err := DiscoverOIDC(u)
+		if err == nil {
+			t.Errorf("expected DiscoverOIDC on %q to fail due to SSRF policy, but succeeded", u)
+		}
+	}
+}

@@ -514,6 +514,28 @@ func TestSetDefaultBranchAndValidation(t *testing.T) {
 	}
 }
 
+func TestIsValidRepoName(t *testing.T) {
+	valid := []string{
+		"repo", "my-repo", "project_1", "app.v2", "CoolProject123",
+	}
+	for _, name := range valid {
+		if !IsValidRepoName(name) {
+			t.Errorf("expected %q to be a valid repo name", name)
+		}
+	}
+
+	invalid := []string{
+		"", " ", "-repo", "--upload-pack", ".git", "repo.git", "repo.wiki",
+		"../traversal", "foo/bar", "foo\\bar", ".hidden", "trailing.",
+		strings.Repeat("a", 101),
+	}
+	for _, name := range invalid {
+		if IsValidRepoName(name) {
+			t.Errorf("expected %q to be an invalid repo name", name)
+		}
+	}
+}
+
 func TestGitMaintenanceAndCommitGraph(t *testing.T) {
 	tempDir := t.TempDir()
 	repoPath := filepath.Join(tempDir, "maint-repo.git")
