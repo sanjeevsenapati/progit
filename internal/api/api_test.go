@@ -1036,15 +1036,32 @@ func TestForksAPI(t *testing.T) {
 		t.Errorf("expected 1 fork with ID %d, got %v", forked.ID, forks)
 	}
 
-	// 3. Alice cannot fork her own repo into her personal account
-	reqSelfFork := httptest.NewRequest("POST", "/api/v1/repos/alice/source-repo/forks", bytes.NewReader(b))
+	// 3. Alice cannot fork her own repo with the same name into her personal account
+	sameNamePayload, _ := json.Marshal(map[string]string{
+		"name": "source-repo",
+	})
+	reqSelfFork := httptest.NewRequest("POST", "/api/v1/repos/alice/source-repo/forks", bytes.NewReader(sameNamePayload))
 	reqSelfFork.Header.Set("Authorization", "Bearer "+token1)
 	reqSelfFork.Header.Set("Content-Type", "application/json")
 	recSelfFork := httptest.NewRecorder()
 	router.ServeHTTP(recSelfFork, reqSelfFork)
 
 	if recSelfFork.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 Bad Request for self fork, got %d", recSelfFork.Code)
+		t.Errorf("expected 400 Bad Request for self fork with same name, got %d", recSelfFork.Code)
+	}
+
+	// 4. Alice CAN fork her own repo into her personal account with a different name
+	diffNamePayload, _ := json.Marshal(map[string]string{
+		"name": "source-repo-copy",
+	})
+	reqSelfForkDiff := httptest.NewRequest("POST", "/api/v1/repos/alice/source-repo/forks", bytes.NewReader(diffNamePayload))
+	reqSelfForkDiff.Header.Set("Authorization", "Bearer "+token1)
+	reqSelfForkDiff.Header.Set("Content-Type", "application/json")
+	recSelfForkDiff := httptest.NewRecorder()
+	router.ServeHTTP(recSelfForkDiff, reqSelfForkDiff)
+
+	if recSelfForkDiff.Code != http.StatusCreated {
+		t.Errorf("expected 201 Created for self fork with different name, got %d: %s", recSelfForkDiff.Code, recSelfForkDiff.Body.String())
 	}
 }
 

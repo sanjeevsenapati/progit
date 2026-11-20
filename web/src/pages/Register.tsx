@@ -65,7 +65,7 @@ export const Register: React.FC = () => {
                   value={username}
                   onChange={e => setUsername(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 rounded-lg bg-gray-50 dark:bg-dark-bg border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                  placeholder="e.g. alex"
+                  placeholder="e.g. sanjeev"
                 />
               </div>
             </div>
@@ -84,7 +84,7 @@ export const Register: React.FC = () => {
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 rounded-lg bg-gray-50 dark:bg-dark-bg border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                  placeholder="alex@example.com"
+                  placeholder="sanjeev@example.com"
                 />
               </div>
             </div>
@@ -98,7 +98,7 @@ export const Register: React.FC = () => {
                 value={fullName}
                 onChange={e => setFullName(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg bg-gray-50 dark:bg-dark-bg border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                placeholder="Alex Mercer"
+                placeholder="Sanjeev"
               />
             </div>
 

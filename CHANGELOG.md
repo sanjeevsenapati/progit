@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.19.0] - 2026-11-20
+
+### Highlights: Fork Modal Lifecycle & Keycloak OIDC SSO Integration
+Resolved an issue where the repository fork modal would stay open in a spinning "Forking..." state with duplicate name warnings after creation, and verified local Keycloak OpenID Connect Single Sign-On end-to-end.
+
+### Fixed
+- **Repository Fork Modal Lifecycle (`web/src/components/RepoNav.tsx`)**:
+  - Fixed perpetual spinning "Forking..." state on fork submission by resetting modal state (`setShowForkModal(false)`, `setForking(false)`) and triggering a hard browser reload (`window.location.href`) to newly forked repositories.
+  - Added robust case-insensitive comparison (`toLowerCase()`) for repository owner matching across user and organization accounts.
+  - Synchronized form validation so that name collision alerts immediately disable submission and clear cleanly upon changing the repository name or owner.
+  - Bound modal backdrop clicks, modal close buttons, and cancel buttons to safely reset state.
+
+### Verified
+- **Keycloak OIDC SSO End-to-End (`internal/auth/oidc.go`, `internal/api/api.go`)**:
+  - Deployed local Keycloak instance on container bridge network `progit-net`.
+  - Configured OIDC realm `progit`, client `progit-oidc`, client secret, and redirect URI `http://localhost:3000/api/v1/auth/oidc/callback`.
+  - Verified live dynamic discovery (`POST /api/v1/admin/oidc/discover`), auth redirect (`GET /api/v1/auth/oidc/login`), authorization code token exchange, and automatic user provisioning (`sanjeev_sso`).
+
+---
+
 ## [1.18.0] - 2026-11-20
 
 ### Highlights: Flexible Repository Forking & Same-Account Fork Support
