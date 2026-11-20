@@ -33,6 +33,11 @@
   - Issues & Labels, Milestones, and threaded Markdown comments.
   - Pull Requests with live syntax diffing, comparison, and native Git merges (Merge Commit, Squash, Rebase).
   - Branch protection, forks, stars, and activity feeds.
+
+<p align="center">
+  <img src="assets/images/repo-code-browser.jpg" alt="ProGit Repository Code Browser &amp; File Tree" width="100%" style="border-radius: 8px;" />
+</p>
+
 - **OpenID Connect (OIDC) & OAuth2 SSO**: Native single sign-on with Google Workspace, GitHub, Microsoft 365, Keycloak, and generic OIDC providers with Just-In-Time (JIT) provisioning and corporate domain whitelisting.
 - **Self-Hosted Administration**: First-run setup installation wizard, Super Admin management panel, runtime telemetry, and database WAL maintenance.
 
@@ -92,6 +97,11 @@ ProGit features a built-in, zero-overhead developer productivity suite at `/tool
 - **Regex Library & Live Tester**: Comprehensive pattern directory (web, forms, security, code) with real-time match highlighting and regex capture group extraction.
   <p align="center">
     <img src="assets/images/toolbox-regex-library.jpg" alt="Regex Library" width="100%" style="border-radius: 8px;" />
+  </p>
+
+- **Code Snippet Vault & JSONPath Tester**: In-browser reusable code snippet manager with tag filters, syntax highlighting, and live JSONPath evaluator.
+  <p align="center">
+    <img src="assets/images/toolbox-snippet-manager.jpg" alt="Code Snippet Manager" width="100%" style="border-radius: 8px;" />
   </p>
 
 ### Complete Directory of 37 Utilities

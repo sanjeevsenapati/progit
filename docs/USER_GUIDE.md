@@ -32,6 +32,8 @@ ProGit supports both standard local database authentication and enterprise Singl
 - **Domain Restriction**: If domain filtering is enabled, only users with email addresses matching your organization's allowed domains can log in. Attempting to log in with an unauthorized email will present an immediate security alert.
 - **Fail-Safe Access**: Administrators can always use standard credentials to log in even if third-party SSO providers experience temporary upstream downtime.
 
+![ProGit Single Sign-On and Local Login Screen](../assets/images/progit-login-oidc.jpg)
+
 ---
 
 ## 2. Managing Repositories
@@ -97,6 +99,8 @@ ProGit features a global, real-time repository search engine:
 - **Explore Page Search (`/explore?q=...`)**: Full search results page with deep URL synchronization, allowing users to bookmark or share search queries.
 - **Access Control & Privacy**: Repository search strictly adheres to security boundaries. Public repositories are discoverable by everyone. Private repositories only appear in search results for their authenticated owners, collaborators, and organization members. Stranger and unauthenticated queries never leak the existence of private repositories.
 
+![ProGit Explore & Repository Catalog](../assets/images/progit-explore.jpg)
+
 ---
 
 ## 3. Code Browsing & Explorer Layout
@@ -109,6 +113,8 @@ ProGit features a GitHub-style two-column file explorer interface:
 - **Syntax Highlighting & Auto-Theme**: Code highlighting automatically matches the global light or dark theme with zero user configuration required.
 - **Clickable Line Anchors & Permalinks**: Click any line number in the code viewer to jump to that line and automatically copy the permalink (`#L42`) to your clipboard.
 - **Git Blame View**: Switch between **Code** and **Blame** tabs to inspect line-by-line history, including commit author, short SHA, commit summary, and relative date.
+
+![ProGit Repository View and Code Browser](../assets/images/repo-code-browser.jpg)
 
 ### 3.1 Online File Creation and Colorful Syntax Highlighting Editor
 ProGit features a responsive, full-featured web code editor with live syntax highlighting:
@@ -141,6 +147,8 @@ ProGit features a responsive, full-featured web code editor with live syntax hig
 1. Navigate to the **Issues** tab.
 2. Click **New Issue** to report bugs or track feature ideas.
 3. Add comments, assign team members, and track status.
+
+![ProGit Issue Tracker with Filter and Assignee Dropdown](../assets/images/repo-issue-tracker.jpg)
 
 ### 4.2 Pull Requests & Merges
 - **Public Visibility Without Login**: Pull requests on public repositories are accessible to the public without requiring a login, allowing open-source communities and external developers to browse code reviews, compare diffs, and inspect review comments.
@@ -463,9 +471,12 @@ ProGit includes a built-in **Developer Toolbox** accessible from the top navigat
 - **Regex Library & Live Tester**: Comprehensive pattern directory (web, forms, security, code) with real-time match highlighting and regex capture group extraction.
   ![Regex Library Tool](../assets/images/toolbox-regex-library.jpg)
 - **Code Snippet Manager**: Browser-persisted snippet vault with syntax highlighting, language filtering, tagging, and JSON backup/restore.
+  ![ProGit Code Snippet Manager Vault](../assets/images/toolbox-snippet-manager.jpg)
 - **JSON Path Tester**: Real-time JSONPath evaluator supporting root access (`$`), wildcards (`.*`), recursive descent (`..`), slice indexing, and predicate filters (`[?(@.price < 20)]`).
+  ![ProGit JSONPath Evaluator and Tester](../assets/images/toolbox-jsonpath.jpg)
 - **XPath Tester**: XML XPath 1.0 evaluator supporting DOM node matching, attribute selection, and serialized node output.
 - **SQL Query Explainer**: Static SQL analyzer detailing query execution order (`FROM` &rarr; `WHERE` &rarr; `SELECT`), clause mechanics, and index recommendations.
+  ![ProGit SQL Query Explainer and Optimizer](../assets/images/toolbox-sql-explainer.jpg)
 - **Stack Trace Explainer**: Parser for Java, Python, Node.js, and Go; highlights root cause exceptions, filters runtime noise, and recommends actionable code remediations.
 - **Error Code Search**: Directory of HTTP status codes, Linux/POSIX errno & signals, Java exceptions, and Docker/Git error codes.
 - **Log Analyzer**: Log parser featuring automatic severity level classification (`ERROR`, `WARN`, `INFO`, `DEBUG`), regex filtering, timeline charts, and clean export.
