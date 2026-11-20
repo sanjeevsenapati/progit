@@ -97,7 +97,7 @@
           "priceCurrency": "USD"
         },
         "description": "A high-performance, single-binary self-hosted Git service and alternative to GitHub, Gogs, Gitea, and GitLab. Built with pure Go and embedded React 19 UI.",
-        "softwareVersion": "1.18.0",
+        "softwareVersion": "1.19.0",
         "license": "https://opensource.org/licenses/MIT",
         "url": "https://progit.co.in/"
       },
@@ -1159,7 +1159,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
         </div>
         <span class="brand-title">ProGit</span>
-        <span class="version-pill">v1.18.0</span>
+        <span class="version-pill">v1.19.0</span>
       </a>
     </div>
 
@@ -1425,9 +1425,19 @@
                 </div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">
-                    <span>v1.18.0</span>
+                    <span>v1.19.0</span>
                     <span class="dropdown-badge badge-accent">LATEST</span>
                   </div>
+                  <div class="dropdown-desc">Fork Modal Lifecycle Fix &amp; Keycloak OIDC SSO</div>
+                </div>
+              </a>
+
+              <a href="#ops-changelog" class="dropdown-item" onclick="navigate('ops-changelog')">
+                <div class="dropdown-icon-box icon-tint-blue">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9"/><path d="M12 12v3"/></svg>
+                </div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">v1.18.0</div>
                   <div class="dropdown-desc">Same-Account Fork Support &amp; Collision Protection</div>
                 </div>
               </a>
@@ -5116,7 +5126,17 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
         <p class="page-subtitle">Complete version release history for ProGit adhering to Semantic Versioning.</p>
 
                                 <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
-          <h2 style="margin-top: 0; color: var(--accent);">v1.18.0 &mdash; Flexible Repository Forking &amp; Same-Account Fork Support <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <h2 style="margin-top: 0; color: var(--accent);">v1.19.0 &mdash; Fork Modal Lifecycle Fix &amp; Keycloak OIDC SSO Integration <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <p><strong>Release Date:</strong> November 20, 2026</p>
+          <ul>
+            <li><strong>Fork Modal Lifecycle &amp; State Cleanup</strong>: Resolved perpetual spinning &quot;Forking...&quot; state upon repository fork creation by cleanly unmounting and resetting modal state and issuing a hard reload to the new repository fork.</li>
+            <li><strong>Case-Insensitive Collision Checking</strong>: Enforced case-insensitive username and repository comparisons to eliminate false collision alerts.</li>
+            <li><strong>Keycloak OIDC SSO Integration</strong>: Verified end-to-end Single Sign-On with local Keycloak: live discovery, auth redirect, token exchange, and automatic user provisioning.</li>
+          </ul>
+        </div>
+
+                                <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0;">v1.18.0 &mdash; Flexible Repository Forking &amp; Same-Account Fork Support</h2>
           <p><strong>Release Date:</strong> November 20, 2026</p>
           <ul>
             <li><strong>Same-Account Repository Forking</strong>: Removed the hard block preventing users from forking public repositories within the same account or organization. Fork any repository under the same namespace by choosing a custom repository name.</li>
