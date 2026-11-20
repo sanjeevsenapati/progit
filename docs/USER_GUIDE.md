@@ -446,19 +446,70 @@ To safeguard project privacy and prevent unauthorized user targeting, issue assi
 
 ## 15. Developer Toolbox (`/toolbox`)
 
-ProGit includes a built-in **Developer Toolbox** accessible from the top navigation bar (**Toolbox** -> `/toolbox`) with searchable categories, Favorites, and Recently Used utilities (`⌘K` shortcut).
+ProGit includes a built-in **Developer Toolbox** accessible from the top navigation bar (**Toolbox** &rarr; `/toolbox`) featuring 37 client-side and server-assisted developer utilities with instant fuzzy search (`⌘K` / `Ctrl+K`), favorite pinning, and recently used tracking.
+
+![ProGit Developer Toolbox Dashboard](../assets/images/toolbox-dashboard.jpg)
 
 ### 15.1 Architecture & Zero Core Overhead
-- **Two-Level Lazy Loading**: The Toolbox route and each individual tool chunk load dynamically on demand, so repository, issue, pull request, and admin pages pay zero bundle overhead.
-- **Browser-First Execution**: 10 of 11 Phase-1 utilities run 100% locally in your browser (`crypto.getRandomValues`, Web Crypto `crypto.subtle`, `DOMParser`, and lazy parsers) with zero server CPU or database writes. Favorites and Recently Used tools persist in `localStorage`.
+- **Two-Level Lazy Loading**: The Toolbox route and each individual tool chunk load dynamically on demand via Vite 6 code splitting (48 dynamic chunks), so repository, issue, pull request, and admin pages pay zero bundle overhead (< 212 kB initial load).
+- **Browser-First Execution**: 36 of 37 utilities run 100% locally in your browser (`crypto.getRandomValues`, Web Crypto `crypto.subtle`, `DOMParser`, HTML5 Canvas, and client-side AST parsers) with zero server CPU load or database writes. Favorites and Recently Used tools persist in `localStorage`.
+- **Server-Assisted Guard**: The sole server-assisted utility (DNS Lookup) requires an authenticated session, is strictly rate-limited at 30 req/min, and runs within a dedicated 8-slot worker pool with a 3-second timeout.
 
-### 15.2 Phase-1 Utilities
-- **Security**: Password Generator (`crypto.getRandomValues` + entropy bits), JWT Decoder & HMAC Verifier (`HS256`/`384`/`512`), Hash & Checksum Generator (`MD5`, `SHA-1`, `SHA-256`, `SHA-384`, `SHA-512`, `HMAC-SHA256`, local file checksums).
-- **Formatters**: JSON Formatter & Validator (2/4/tab, minify, sort keys), XML Formatter & Validator (`DOMParser`), YAML Formatter & YAML ↔ JSON Converter.
-- **Network**: DNS Lookup (`A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`, `PTR`, `ALL` — requires authenticated session, rate-limited at 30 req/min with 3s timeout).
-- **Cron & Time**: Cron Expression Parser (5-field Linux, `@macros`, and 6-field Quartz/Spring) with human-readable schedule summary and next 10 run timestamps in Local or UTC.
-- **Converters**: Base64 Encode/Decode (UTF-8 safe, URL-safe, File → Base64 Data URL).
-- **Text & Code**: Text Diff Viewer (Side-by-Side & Unified, ignore whitespace), UUID Generator (v4 random & RFC 9562 time-ordered v7, bulk export).
+### 15.2 Complete Directory of 37 Utilities
+
+#### 1. Developer Productivity Tools (20 Utilities)
+- **Mermaid Live Editor**: Create flowcharts (TD/LR), sequence diagrams, state machines, and pie charts with live preview, zoom, split/diagram/code layouts, and dedicated **Full Page View** overlay mode.
+  ![Mermaid Live Editor with Full Page View](../assets/images/toolbox-mermaid-editor.jpg)
+- **Regex Library & Live Tester**: Comprehensive pattern directory (web, forms, security, code) with real-time match highlighting and regex capture group extraction.
+  ![Regex Library Tool](../assets/images/toolbox-regex-library.jpg)
+- **Code Snippet Manager**: Browser-persisted snippet vault with syntax highlighting, language filtering, tagging, and JSON backup/restore.
+- **JSON Path Tester**: Real-time JSONPath evaluator supporting root access (`$`), wildcards (`.*`), recursive descent (`..`), slice indexing, and predicate filters (`[?(@.price < 20)]`).
+- **XPath Tester**: XML XPath 1.0 evaluator supporting DOM node matching, attribute selection, and serialized node output.
+- **SQL Query Explainer**: Static SQL analyzer detailing query execution order (`FROM` &rarr; `WHERE` &rarr; `SELECT`), clause mechanics, and index recommendations.
+- **Stack Trace Explainer**: Parser for Java, Python, Node.js, and Go; highlights root cause exceptions, filters runtime noise, and recommends actionable code remediations.
+- **Error Code Search**: Directory of HTTP status codes, Linux/POSIX errno & signals, Java exceptions, and Docker/Git error codes.
+- **Log Analyzer**: Log parser featuring automatic severity level classification (`ERROR`, `WARN`, `INFO`, `DEBUG`), regex filtering, timeline charts, and clean export.
+- **Log Pattern Extractor**: Automatic log template mining, variable clustering, and repetition frequencies.
+- **CSV Viewer**: High-performance CSV tabular viewer with column sorting, live search, pagination, and JSON export.
+- **Markdown Editor**: Split-screen Markdown editor featuring live GitHub Flavored Markdown (GFM) preview, alert callouts (`> [!NOTE]`), table formatting, and `.md` export.
+- **Markdown Table Generator**: Visual WYSIWYG table grid builder with cell alignment controls, row/column insertion, and bidirectional CSV import/export.
+- **Color Picker**: Color manipulation supporting HEX, RGB, HSL, and HSV color models, alpha transparency, contrast ratios, and palette presets.
+- **CSS Gradient Generator**: Interactive gradient designer supporting Linear & Radial modes, angle sliders, multi-stops, and 1-click CSS copy.
+- **SVG Optimizer**: SVG cleaner removing redundant metadata, XML namespaces, comments, and empty attributes with a W3C-sandboxed safe preview.
+- **QR Code Generator**: Generates customizable QR codes for URLs, WiFi credentials, vCards, and text with SVG/PNG download.
+- **Barcode Generator**: Generates standard 1D linear barcodes including CODE128, EAN-13, UPC-A, CODE39, and ITF-14 with SVG/PNG export.
+- **Image Compressor**: In-browser image compressor using HTML5 Canvas & WebP/JPEG encoding with quality sliders and file size savings.
+- **Favicon Generator**: Multi-resolution website icon generator producing 16x16, 32x32, 48x48 `.ico` files, 180x180 Apple Touch Icons, and web manifest archives.
+
+#### 2. Database Suite (6 Utilities)
+- **SQL Formatter**: Standardize SQL keywords and formatting.
+- **SQL Beautifier**: Advanced clause alignment with dedicated fullscreen expansion.
+- **SQL Minifier**: Strip comments and whitespace for production ORMs and configuration files.
+- **SQL Validator**: Syntax checking and query safety linter.
+- **Connection String Builder**: Interactive generator for PostgreSQL, MySQL, SQL Server, Oracle, SQLite, MongoDB, and Redis.
+- **Java JDBC URL Generator**: Tailored JDBC URLs for Spring Boot, HikariCP, Maven, and Gradle.
+
+#### 3. Security & Cryptography (3 Utilities)
+- **Password Generator**: Cryptographically secure random password generator utilizing `crypto.getRandomValues` with entropy metrics and bulk generation.
+- **JWT Decoder & Verifier**: Decodes JWT headers and payload claims, verifies expiration timestamps, and validates HMAC-SHA signatures.
+- **Hash & Checksum Generator**: Real-time cryptographic hashing (MD5, SHA-1, SHA-256, SHA-384, SHA-512), HMAC generation, and local file checksum verification.
+
+#### 4. Formatters & Converters (4 Utilities)
+- **JSON Formatter & Validator**: Pretty-prints, minifies, sorts keys alphabetically, and pinpoints JSON syntax errors.
+- **XML Formatter & Validator**: Indents and formats XML documents using browser DOMParser with validation diagnostics.
+- **YAML Formatter & Converter**: Bidirectional YAML ↔ JSON conversion, schema linting, and multi-document stream support.
+- **Base64 Encode / Decode**: Encodes and decodes standard UTF-8 text, URL-safe Base64 strings, and binary files to Data URLs.
+
+#### 5. Network & Infrastructure (1 Utility)
+- **DNS Lookup**: Queries live `A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`, and `PTR` records through ProGit's bounded server-assisted resolver.
+
+#### 6. Cron & Scheduling (1 Utility)
+- **Cron Expression Parser**: Translates 5-field Linux crontab and 6-field Quartz/Spring cron schedules into human language with the next 10 calculated execution timestamps.
+
+#### 7. Text & Identifiers (2 Utilities)
+- **Text Diff Viewer**: Visual side-by-side split diff and unified diff viewer with character-level difference highlighting.
+- **UUID Generator**: Generates RFC 4122 v4 (random) and RFC 9562 v7 (time-ordered, database index-friendly) UUIDs in bulk.
+
 
 
 
