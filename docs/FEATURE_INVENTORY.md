@@ -41,6 +41,7 @@
 | **Pull Requests**| PR Code Reviews | Basic | Implemented | Sticky Changed Files sidebar, inline line comments, approvals, Cmd+Enter shortcut |
 | **Pull Requests**| Merge Execution | Basic Merge | Implemented | Native Merge Commit, Squash, Rebase; auto-closes issues (`Fixes #X`), post-merge branch delete |
 | **Developer Messaging**| Direct Developer Messaging | No (ProGit exclusive)| Implemented | Built-in developer direct messaging, inbox/outbox, unread counter, thread replies |
+| **Toolbox** | Developer Productivity Toolbox (37 Tools) | No (ProGit exclusive) | Implemented | Suite of 37 client-side and server-assisted developer utilities across 8 categories: Mermaid Live Editor (with Full Page View), Regex Library, Code Snippets, JSONPath/XPath, SQL/Stack Trace explainers, Log analyzer, CSV viewer, QR/Barcode, Image compressor |
 | **Organizations**| Org & Team Management | Yes | Implemented | Multi-user roles, teams & permissions, full profile editing, direct routing `/:org` |
 | **Settings** | Branch Protection Rules | No | Implemented | Require pull request before merge, prevent force push on `main` or custom branches |
 | **Settings** | User & Repo Settings | Yes | Implemented | Tabbed modern settings pages matching dark/light base theme |

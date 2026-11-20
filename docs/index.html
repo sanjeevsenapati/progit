@@ -1684,6 +1684,10 @@
         <h1 class="page-title">What is ProGit?</h1>
         <p class="page-subtitle">ProGit is an ultra-fast, single-binary, self-hosted Git collaboration platform engineered in pure Go with zero CGO dependencies and an embedded modern React frontend.</p>
 
+        <div style="margin: 1.5rem 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 12px 35px rgba(0,0,0,0.45);">
+          <img src="assets/images/progit-og-banner.jpg" alt="ProGit Platform Architecture and Dashboard Overview" style="width: 100%; display: block;" />
+        </div>
+
         <h2>Core Mission &amp; Philosophy</h2>
         <p>ProGit provides development teams and enterprises with an ultra-lightweight, resilient, and beautiful alternative to bloated Git platforms. It runs on any machine with less than <strong>50 MB of RAM</strong>, boots in under <strong>50 milliseconds</strong>, and operates without external database servers like PostgreSQL or MySQL.</p>
 
@@ -3487,31 +3491,115 @@ def verify_progit_signature(payload_bytes, secret_key, header_signature):
           <span>/</span>
           <span class="current">Developer Toolbox</span>
         </div>
-        <h1 class="page-title">Developer Toolbox</h1>
-        <p class="page-subtitle">Built-in, zero-overhead developer utilities at <code>/toolbox</code> with instant search, Favorites, and Recently Used history.</p>
+        <h1 class="page-title">Developer Toolbox (37 Built-in Utilities)</h1>
+        <p class="page-subtitle">Built-in, zero-overhead developer productivity suite at <code>/toolbox</code> with instant search (<code>Cmd+K</code>), Favorites, and offline browser execution.</p>
+
+        <div style="margin: 1.5rem 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 12px 35px rgba(0,0,0,0.45);">
+          <img src="assets/images/toolbox-dashboard.jpg" alt="ProGit Developer Toolbox Dashboard (37 Utilities)" style="width: 100%; display: block;" />
+        </div>
 
         <h2>Zero Core Overhead Architecture</h2>
         <ul>
-          <li><strong>Two-Level Code Splitting</strong>: Both <code>/toolbox</code> and every individual tool chunk load lazily via dynamic imports. Users browsing code, issues, PRs, or Admin pages pay <strong>0 KB</strong> extra JS.</li>
-          <li><strong>Browser-First Compute (10/11 Tools)</strong>: Runs locally via <code>crypto.getRandomValues</code>, Web Crypto <code>crypto.subtle</code>, <code>DOMParser</code>, and lazy parsers. Favorites and Recently Used tools persist in <code>localStorage</code> with zero database writes.</li>
-          <li><strong>Bounded DNS Resolver</strong>: Live DNS lookup (<code>A</code>, <code>AAAA</code>, <code>CNAME</code>, <code>MX</code>, <code>TXT</code>, <code>NS</code>, <code>PTR</code>, <code>ALL</code>) requires authentication, caps concurrency at 8 slots, times out at 3 seconds, and rate-limits at 30 req/min.</li>
+          <li><strong>Two-Level Code Splitting</strong>: Both the <code>/toolbox</code> shell and every individual tool chunk load lazily via Vite 6 dynamic imports (48 dynamic code chunks). Users browsing repositories, issues, PRs, or admin panels pay <strong>0 KB extra JavaScript</strong>.</li>
+          <li><strong>Browser-First Compute (36/37 Tools)</strong>: 36 of the 37 utilities execute 100% locally in the user's browser using native Web APIs (<code>crypto.getRandomValues</code>, Web Crypto <code>crypto.subtle</code>, <code>DOMParser</code>, HTML5 Canvas, and client-side AST parsers). Zero server CPU load, zero latency, and zero database writes.</li>
+          <li><strong>Persistent State &amp; Offline Favorites</strong>: Tool favorites (starred) and recently accessed tools persist in <code>localStorage</code>. Quick filter chips and instant keyboard search (<code>Cmd+K</code> / <code>Ctrl+K</code>) provide sub-second tool discovery.</li>
+          <li><strong>Bounded DNS Resolver</strong>: The sole server-assisted tool (DNS Lookup) enforces strict authenticated rate-limiting (30 req/min), an 8-slot worker pool, and a 3-second timeout to prevent resource exhaustion.</li>
         </ul>
 
-        <h2>Built-In Developer Utilities (17 Tools)</h2>
+        <h2>Complete Directory of 37 Developer Utilities</h2>
+
+        <h3>1. Developer Productivity Tools (20 Utilities)</h3>
+        <p>A comprehensive collection of everyday software engineering tools covering visualization, debugging, pattern extraction, and asset generation:</p>
+        
+        <div style="margin: 1.5rem 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 12px 35px rgba(0,0,0,0.45);">
+          <img src="assets/images/toolbox-mermaid-editor.jpg" alt="ProGit Mermaid Live Editor with Full Page View" style="width: 100%; display: block;" />
+        </div>
+
         <ul>
-          <li><strong>Security</strong>: Password Generator, JWT Decoder &amp; HMAC Verifier, Hash &amp; Checksum Generator (MD5, SHA-1/256/384/512, HMAC, File checksum).</li>
-          <li><strong>Formatters</strong>: JSON Formatter &amp; Validator, XML Formatter &amp; Validator, YAML Formatter &amp; YAML &harr; JSON Converter.</li>
-          <li><strong>Database</strong>: SQL Formatter, SQL Beautifier (Aligned Clauses &amp; Fullscreen Expand), SQL Minifier, SQL Validator (Syntax &amp; Safety Linter), Connection String Builder (PostgreSQL, MySQL, JDBC, SQL Server, Oracle, SQLite, MongoDB, Redis), and Java JDBC URL Generator (Spring Boot / HikariCP / Maven / Gradle).</li>
-          <li><strong>Network</strong>: Server-assisted DNS Lookup.</li>
-          <li><strong>Cron &amp; Time</strong>: Cron Expression Parser (5-field Linux, macros, 6-field Quartz/Spring) + Next 10 Runs in Local/UTC.</li>
-          <li><strong>Converters</strong>: Base64 Encode/Decode (UTF-8, URL-safe, File to Data URL).</li>
-          <li><strong>Text &amp; Code</strong>: Text Diff Viewer (Side-by-Side &amp; Unified), UUID Generator (v4 &amp; RFC 9562 v7, bulk export).</li>
+          <li><strong>Mermaid Live Editor</strong>: Interactive diagram and flowchart editor supporting Flowcharts (TD/LR), Sequence Diagrams, State Machines, Class Diagrams, and Pie Charts. Features live syntax validation, pan &amp; zoom canvas, SVG &amp; PNG export, and a dedicated <strong>Full Page View</strong> overlay mode with flexible layout switching (Split, Diagram Only, Code Only).</li>
+          <li><strong>Regex Library</strong>: Searchable directory of production regular expressions across 5 domains (Web &amp; Email, Form Validation, Numbers &amp; Currency, Programming, and Security). Includes an interactive tester with live match highlighting and regex capture group extraction.</li>
+          <li><strong>Code Snippet Manager</strong>: Local-first code snippet vault supporting multi-language syntax highlighting, tagging, instant search, starter templates, and JSON backup/restore.</li>
+          <li><strong>JSON Path Tester</strong>: Real-time JSONPath evaluator supporting root access (<code>$</code>), wildcard properties (<code>.*</code>), recursive descent (<code>..</code>), array slice indexing, and predicate filter expressions (<code>[?(@.price &lt; 20)]</code>).</li>
+          <li><strong>XPath Tester</strong>: XML XPath 1.0 evaluator supporting DOM node matching, attribute selection, and serialized node output.</li>
+          <li><strong>SQL Query Explainer</strong>: Static SQL analysis engine detailing logical query execution order (<code>FROM</code> &rarr; <code>WHERE</code> &rarr; <code>GROUP BY</code> &rarr; <code>SELECT</code>), clause mechanics, estimated computational complexity, and index optimization recommendations.</li>
+          <li><strong>Stack Trace Explainer</strong>: Multi-language stack trace parser for Java, Python, Node.js, and Go; isolates root cause exceptions, filters runtime noise, and recommends actionable code remediations.</li>
+          <li><strong>Error Code Search</strong>: Comprehensive lookup directory for HTTP status codes, Linux/POSIX errno and signals, common Java exceptions, and Docker/Git error codes.</li>
+          <li><strong>Log Analyzer</strong>: Client-side log parser featuring automatic severity level classification (<code>ERROR</code>, <code>WARN</code>, <code>INFO</code>, <code>DEBUG</code>), regex filtering, timeline charts, and clean log export.</li>
+          <li><strong>Log Pattern Extractor</strong>: Automated log template miner identifying repeated message templates, variable clustering, and event frequency distributions.</li>
+          <li><strong>CSV Viewer</strong>: Tabular data viewer for large CSV datasets with column sorting, live substring filtering, row pagination, and JSON export.</li>
+          <li><strong>Markdown Editor</strong>: Split-screen Markdown editor featuring real-time GitHub Flavored Markdown (GFM) preview, alert callouts (<code>&gt; [!NOTE]</code>), table formatting, and <code>.md</code> export.</li>
+          <li><strong>Markdown Table Generator</strong>: Visual WYSIWYG table grid builder with cell alignment controls, row/column insertion, and bidirectional CSV import/export.</li>
+          <li><strong>Color Picker</strong>: Color manipulation suite supporting HEX, RGB, HSL, and HSV color models, alpha transparency, contrast ratio analysis, and curated design palettes.</li>
+          <li><strong>CSS Gradient Generator</strong>: Interactive gradient studio with Linear and Radial modes, rotation angle sliders, multi-stop color controls, and 1-click CSS code generation.</li>
+          <li><strong>SVG Optimizer</strong>: Vector optimization tool removing XML namespaces, redundant attributes, editor metadata, and comments with a W3C-sandboxed safe preview.</li>
+          <li><strong>QR Code Generator</strong>: Generates high-density QR codes for URLs, Wi-Fi network credentials, vCards, and plain text with error correction controls and SVG/PNG download.</li>
+          <li><strong>Barcode Generator</strong>: Generates standard 1D linear barcodes including CODE128, EAN-13, UPC-A, CODE39, and ITF-14 with customizable dimensions and vector export.</li>
+          <li><strong>Image Compressor</strong>: In-browser image compressor utilizing HTML5 Canvas and WebP/JPEG encoders with dynamic quality sliders and instant side-by-side file size savings.</li>
+          <li><strong>Favicon Generator</strong>: Multi-resolution website icon generator producing 16&times;16, 32&times;32, 48&times;48 <code>.ico</code> files, 180&times;180 Apple Touch Icons, and <code>manifest.json</code> archives.</li>
         </ul>
 
-        <h2>Feature Toggles</h2>
+        <div style="margin: 1.5rem 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 12px 35px rgba(0,0,0,0.45);">
+          <img src="assets/images/toolbox-regex-library.jpg" alt="ProGit Regex Library Tool with Live Matcher" style="width: 100%; display: block;" />
+        </div>
+
+        <h3>2. Database Suite (6 Utilities)</h3>
+        <ul>
+          <li><strong>SQL Formatter</strong>: Standardizes complex queries with custom indentation, uppercase keywords, and clean multi-line wrapping.</li>
+          <li><strong>SQL Beautifier</strong>: Advanced SQL layout engine with aligned relational clauses and dedicated fullscreen editing mode.</li>
+          <li><strong>SQL Minifier</strong>: Compresses SQL statements by stripping comments and unnecessary whitespace for production ORMs and configuration files.</li>
+          <li><strong>SQL Validator</strong>: In-browser syntax verification and safety linter detecting missing clauses, malformed predicates, and dangerous patterns.</li>
+          <li><strong>Connection String Builder</strong>: Interactive parameter builder for PostgreSQL, MySQL, Microsoft SQL Server, Oracle, SQLite, MongoDB, and Redis.</li>
+          <li><strong>Java JDBC URL Generator</strong>: Production JDBC connection string builder for Spring Boot, HikariCP, Maven, and Gradle profiles.</li>
+        </ul>
+
+        <h3>3. Security &amp; Cryptography (3 Utilities)</h3>
+        <ul>
+          <li><strong>Password Generator</strong>: Cryptographically secure random password generator utilizing <code>crypto.getRandomValues</code> with entropy metrics and bulk generation.</li>
+          <li><strong>JWT Decoder &amp; Verifier</strong>: Decodes JWT headers and payload claims, verifies expiration timestamps, and validates HMAC-SHA signatures.</li>
+          <li><strong>Hash &amp; Checksum Generator</strong>: Real-time cryptographic hashing (MD5, SHA-1, SHA-256, SHA-384, SHA-512), HMAC generation, and local file integrity checksum verification.</li>
+        </ul>
+
+        <h3>4. Formatters &amp; Converters (4 Utilities)</h3>
+        <ul>
+          <li><strong>JSON Formatter &amp; Validator</strong>: Pretty-prints, minifies, sorts keys alphabetically, and pinpoints JSON syntax errors.</li>
+          <li><strong>XML Formatter &amp; Validator</strong>: Indents and formats XML documents using browser DOMParser with validation diagnostics.</li>
+          <li><strong>YAML Formatter &amp; Converter</strong>: Bidirectional YAML &harr; JSON conversion, schema linting, and multi-document stream support.</li>
+          <li><strong>Base64 Encode / Decode</strong>: Encodes and decodes standard UTF-8 text, URL-safe Base64 strings, and binary files to Data URLs.</li>
+        </ul>
+
+        <h3>5. Network &amp; Infrastructure (1 Utility)</h3>
+        <ul>
+          <li><strong>DNS Lookup</strong>: Queries live <code>A</code>, <code>AAAA</code>, <code>CNAME</code>, <code>MX</code>, <code>TXT</code>, <code>NS</code>, and <code>PTR</code> records through ProGit's bounded server-assisted resolver.</li>
+        </ul>
+
+        <h3>6. Cron &amp; Scheduling (1 Utility)</h3>
+        <ul>
+          <li><strong>Cron Expression Parser</strong>: Translates 5-field Linux crontab and 6-field Quartz/Spring cron schedules into human language with the next 10 calculated execution timestamps.</li>
+        </ul>
+
+        <h3>7. Text &amp; Identifiers (2 Utilities)</h3>
+        <ul>
+          <li><strong>Text Diff Viewer</strong>: Visual side-by-side split diff and unified diff viewer with character-level difference highlighting.</li>
+          <li><strong>UUID Generator</strong>: Generates RFC 4122 v4 (random) and RFC 9562 v7 (time-ordered, database index-friendly) UUIDs in bulk.</li>
+        </ul>
+
+        <h2>Configuration &amp; Feature Toggles</h2>
+        <p>Toolbox features can be managed globally in <code>conf/app.ini</code> or via container environment variables:</p>
         <pre><code>[features]
 ENABLE_TOOLBOX = true
 ENABLE_TOOLBOX_DNS = true</code></pre>
+
+        <h2>REST API Reference</h2>
+        <p>The Developer Toolbox exposes authenticated backend services for network queries:</p>
+        <pre><code>GET /api/v1/toolbox/dns?domain=example.com&amp;type=TXT
+
+Response:
+{
+  "domain": "example.com",
+  "type": "TXT",
+  "records": ["v=spf1 -all"],
+  "elapsed_ms": 142
+}</code></pre>
 
         <div class="page-nav-buttons">
           <a href="#feature-messages" class="nav-btn" onclick="navigate('feature-messages')">
@@ -5532,7 +5620,7 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
       { id: 'feature-orgs', title: 'Organizations, Teams & Access', section: 'Features', desc: 'Enterprise organization structures, team permissions, and collaborators.' },
       { id: 'feature-webhooks', title: 'Webhooks & Automated Delivery', section: 'Features', desc: 'Push, issue, and PR event triggers, HMAC-SHA256 signature verification, delivery logs.' },
       { id: 'feature-messages', title: 'Developer Direct Messaging', section: 'Features', desc: 'Internal developer messaging system with real-time unread badges and replies.' },
-      { id: 'feature-toolbox', title: 'Developer Toolbox', section: 'Features', desc: 'Lazy-loaded developer utilities: Password, UUID, Base64, Hash, JSON, XML, YAML, JWT, Cron, DNS, Diff.' },
+      { id: 'feature-toolbox', title: 'Developer Toolbox (37 Utilities)', section: 'Features', desc: 'Suite of 37 developer productivity tools: Mermaid Live Editor with Full Page view, Regex library, Code Snippets, JSONPath, XPath, SQL/Stack trace explainers, Log analyzer, CSV viewer, and QR/Barcode generators.' },
       { id: 'feature-danger-zone', title: 'Danger Zone & Security Scoping', section: 'Features', desc: 'Visibility toggling, read-only archiving, ownership transfers, and collaborator assignee guards.' },
       { id: 'feature-search', title: 'Repository Search & Discovery', section: 'Features', desc: 'Real-time navbar autocomplete, keyboard shortcuts (/), Explore URL sync, and access control.' },
       { id: 'admin-setup', title: 'Super Admin Setup & CLI', section: 'Administration', desc: 'CLI user creation with progit admin create-user.' },

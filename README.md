@@ -14,6 +14,10 @@
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT" />
 </p>
 
+<p align="center">
+  <img src="assets/images/progit-og-banner.jpg" alt="ProGit Platform Architecture &amp; Dashboard" width="100%" style="border-radius: 8px;" />
+</p>
+
 ---
 
 ## Highlights
@@ -21,7 +25,7 @@
 - **Enterprise Long-Term Support (LTS)**: Production-hardened v2.0.0-LTS release with guaranteed 36-month support lifecycle, vulnerability mitigations, and pure-Go runtime stability.
 - **Single Static Binary**: Built with pure Go (`modernc.org/sqlite`, zero CGO) and embedded modern React single-page application using `embed.FS`.
 - **Full Git Engine**: Native Git Smart HTTP (`git-upload-pack`, `git-receive-pack`) and integrated pure-Go SSH server on port 2222.
-- **Developer Toolbox Suite**: Integrated 36-tool productivity suite including Mermaid Live Editor (with full-page mode), Regex Library, Code Snippets, JSONPath/XPath testers, SQL/Stack Trace explainers, and media generators.
+- **Developer Toolbox Suite**: Integrated 37-tool productivity suite including Mermaid Live Editor (with full-page view), Regex Library, Code Snippets, JSONPath/XPath testers, SQL/Stack Trace explainers, and media generators.
 - **Modern GitHub-Like Experience**: React 19 + TypeScript + Vite + Tailwind CSS with dark mode, responsive layout, and reactive updates.
 - **Git-Backed Wiki Engine**: Every repository features an independent, real Git-backed wiki (`<owner>/<repo>.wiki.git`) accessible via Web UI (Markdown preview, revisions, history) and Git CLI (HTTP/SSH).
 - **ProGit Pages (GitHub Pages)**: Host static websites, portfolios, or documentation directly from `gh-pages` or `main` branches with automatic Markdown rendering and access control.
@@ -67,6 +71,40 @@
                       |  - /data/config/                      |
                       +---------------------------------------+
 ```
+
+---
+
+## 🛠️ Developer Productivity Toolbox (37 Built-in Tools)
+
+ProGit features a built-in, zero-overhead developer productivity suite at `/toolbox` with instant fuzzy search (`Cmd+K` / `Ctrl+K`), local-first offline execution, and browser favorites:
+
+<p align="center">
+  <img src="assets/images/toolbox-dashboard.jpg" alt="ProGit Developer Toolbox Dashboard" width="100%" style="border-radius: 8px;" />
+</p>
+
+### Highlighted Capabilities
+
+- **Mermaid Live Editor (with Full Page View)**: Interactive flowchart, sequence diagram, state machine, and pie chart editor with live preview, SVG/PNG download, and full-screen overlay mode.
+  <p align="center">
+    <img src="assets/images/toolbox-mermaid-editor.jpg" alt="Mermaid Live Editor Full Page View" width="100%" style="border-radius: 8px;" />
+  </p>
+
+- **Regex Library & Live Tester**: Comprehensive pattern directory (web, forms, security, code) with real-time match highlighting and regex capture group extraction.
+  <p align="center">
+    <img src="assets/images/toolbox-regex-library.jpg" alt="Regex Library" width="100%" style="border-radius: 8px;" />
+  </p>
+
+### Complete Directory of 37 Utilities
+
+| Category | Count | Tools Included |
+| :--- | :---: | :--- |
+| **Developer Productivity** | 20 | Mermaid Live Editor (with Full Page View), Regex Library, Code Snippets, JSONPath Tester, XPath Tester, SQL Query Explainer, Stack Trace Explainer, Error Code Search, Log Analyzer, Log Pattern Extractor, CSV Viewer, Markdown Editor, Markdown Table Generator, Color Picker, CSS Gradient Generator, SVG Optimizer, QR Code Generator, Barcode Generator, Image Compressor, Favicon Generator |
+| **Database Suite** | 6 | SQL Formatter, SQL Beautifier, SQL Minifier, SQL Validator, Connection String Builder, Java JDBC URL Generator |
+| **Security & Crypto** | 3 | Password Generator (`crypto.getRandomValues`), JWT Decoder & Verifier, Hash & Checksum Generator (MD5/SHA/HMAC) |
+| **Formatters & Converters**| 4 | JSON Formatter/Validator, XML Formatter/Validator, YAML Formatter & YAML ↔ JSON, Base64 Encode/Decode |
+| **Network** | 1 | Server-assisted DNS Lookup (A, AAAA, CNAME, MX, TXT, NS, PTR) |
+| **Cron & Scheduling** | 1 | Cron Expression Parser (Linux 5-field, Quartz 6-field, Spring) + Next 10 Runs |
+| **Text & Identifiers** | 2 | Text Diff Viewer (Side-by-side & Unified), UUID Generator (v4 & RFC 9562 v7 time-ordered) |
 
 ---
 
