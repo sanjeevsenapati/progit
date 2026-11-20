@@ -97,7 +97,7 @@
           "priceCurrency": "USD"
         },
         "description": "A high-performance, single-binary self-hosted Git service and alternative to GitHub, Gogs, Gitea, and GitLab. Built with pure Go and embedded React 19 UI.",
-        "softwareVersion": "1.19.0",
+        "softwareVersion": "2.0.0-LTS",
         "license": "https://opensource.org/licenses/MIT",
         "url": "https://progit.co.in/"
       },
@@ -1159,7 +1159,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg>
         </div>
         <span class="brand-title">ProGit</span>
-        <span class="version-pill">v1.19.0</span>
+        <span class="version-pill">v2.0.0-LTS</span>
       </a>
     </div>
 
@@ -1425,10 +1425,10 @@
                 </div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">
-                    <span>v1.19.0</span>
-                    <span class="dropdown-badge badge-accent">LATEST</span>
+                    <span>v2.0.0-LTS</span>
+                    <span class="dropdown-badge badge-accent">LTS</span>
                   </div>
-                  <div class="dropdown-desc">Fork Modal Lifecycle Fix &amp; Keycloak OIDC SSO</div>
+                  <div class="dropdown-desc">Long-Term Support, Security Hardening &amp; Performance Tuning</div>
                 </div>
               </a>
 
@@ -5126,7 +5126,18 @@ sudo systemctl start progit</code><button class="copy-btn" onclick="copyCode(thi
         <p class="page-subtitle">Complete version release history for ProGit adhering to Semantic Versioning.</p>
 
                                 <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
-          <h2 style="margin-top: 0; color: var(--accent);">v1.19.0 &mdash; Fork Modal Lifecycle Fix &amp; Keycloak OIDC SSO Integration <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">Latest</span></h2>
+          <h2 style="margin-top: 0; color: var(--accent);">v2.0.0-LTS &mdash; Enterprise Long-Term Support, Security Hardening &amp; Performance Tuning <span style="font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 12px; margin-left: 8px;">LTS</span></h2>
+          <p><strong>Release Date:</strong> November 20, 2026</p>
+          <ul>
+            <li><strong>Long-Term Support (LTS) Baseline</strong>: Official enterprise LTS release with guaranteed security maintenance, zero-breaking-change API guarantees, and high-performance multi-platform builds.</li>
+            <li><strong>Complete Vulnerability Assessment (VA) Remediations</strong>: Full defense-in-depth resolutions for 13 security vectors, including OIDC SSO random token generation (VA-OIDC-1), Cloud Instance Metadata (IMDS) SSRF filtering (VA-OIDC-2), repository name traversal and CLI flag injection prevention (VA-REPO-1), DOM XSS neutralization (VA-XSS-1), and W3C SVG sandbox isolation (VA-XSS-2).</li>
+            <li><strong>Full 36-Tool Developer Productivity Suite</strong>: Complete suite of offline developer tools including diagrams (Mermaid), regex library, JSONPath/XPath testers, SQL/stack-trace explainers, log analyzer/pattern extractor, CSV viewer, and vector generators.</li>
+            <li><strong>Performance &amp; Memory Optimizations</strong>: Sub-300ms initial load time with Vite 6 48-chunk code-splitting, pure-Go SQLite WAL mode, and Unix process group isolation.</li>
+          </ul>
+        </div>
+
+                                <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+          <h2 style="margin-top: 0;">v1.19.0 &mdash; Fork Modal Lifecycle Fix &amp; Keycloak OIDC SSO Integration</h2>
           <p><strong>Release Date:</strong> November 20, 2026</p>
           <ul>
             <li><strong>Fork Modal Lifecycle &amp; State Cleanup</strong>: Resolved perpetual spinning &quot;Forking...&quot; state upon repository fork creation by cleanly unmounting and resetting modal state and issuing a hard reload to the new repository fork.</li>

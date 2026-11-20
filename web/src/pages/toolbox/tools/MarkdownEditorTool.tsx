@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { CopyButton } from '../components/ToolUI';
 
-const SAMPLE_MD = `# ProGit 1.19.0 Release Notes
+const SAMPLE_MD = `# ProGit 2.0.0-LTS Release Notes
 
 Welcome to the **ProGit** developer productivity suite!
 
